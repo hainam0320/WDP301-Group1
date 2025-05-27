@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock, FaCamera, FaEdit } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 
@@ -14,12 +14,13 @@ const ShipperDashboard = () => {
     vehicle: 'Honda Wave',
     licensePlate: '29A1-12345',
     rating: 4.8,
-    totalDeliveries: 156
+    totalDeliveries: 156,
+    avatar: null
   });
 
   const [availableOrders, setAvailableOrders] = useState([
     { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', distance: '25km', price: 50000, weight: '2kg', status: 'available' },
-    { id: 2, type: 'pickup', from: 'Cầu Giấy', to: 'Thăng Long', distance: '15km', price: 35000, weight: '', status: 'available' },
+    { id: 2, type: 'pickup', from: 'Cầu Giấy', to: 'Thăng Long', distance: '15km', price: 35000, weight: '3kg', status: 'available' },
     { id: 3, type: 'delivery', from: 'Đống Đa', to: 'Hòa Lạc', distance: '30km', price: 60000, weight: '5kg', status: 'available' }
   ]);
 
@@ -52,6 +53,21 @@ const ShipperDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
     navigate('/login');
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setShipperProfile({...shipperProfile, avatar: e.target.result});
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeAvatar = () => {
+    setShipperProfile({...shipperProfile, avatar: null});
   };
 
   const headerStyle = {
@@ -98,8 +114,17 @@ const ShipperDashboard = () => {
               <span>{shipperProfile.rating}</span>
             </div>
             <div className="dropdown">
-              <button className="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
-                <FaUser className="me-2" />
+              <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+                {shipperProfile.avatar ? (
+                  <img 
+                    src={shipperProfile.avatar} 
+                    alt="Avatar" 
+                    className="rounded-circle me-2" 
+                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                  />
+                ) : (
+                  <FaUser className="me-2" />
+                )}
                 {shipperProfile.name}
               </button>
               <ul className="dropdown-menu">
@@ -368,6 +393,63 @@ const ShipperDashboard = () => {
                 </div>
                 <div className="card-body">
                   <form>
+                    {/* Avatar Section */}
+                    <div className="text-center mb-4">
+                      <div className="position-relative d-inline-block">
+                        {shipperProfile.avatar ? (
+                          <img 
+                            src={shipperProfile.avatar} 
+                            alt="Avatar" 
+                            className="rounded-circle border border-3 border-success"
+                            style={{width: '120px', height: '120px', objectFit: 'cover'}}
+                          />
+                        ) : (
+                          <div 
+                            className="rounded-circle border border-3 border-success d-flex align-items-center justify-content-center bg-light"
+                            style={{width: '120px', height: '120px'}}
+                          >
+                            <FaUser size={40} className="text-muted" />
+                          </div>
+                        )}
+                        
+                        {/* Camera icon overlay */}
+                        <label 
+                          htmlFor="shipper-avatar-upload" 
+                          className="position-absolute bottom-0 end-0 btn btn-success btn-sm rounded-circle p-2"
+                          style={{cursor: 'pointer'}}
+                        >
+                          <FaCamera />
+                        </label>
+                        <input 
+                          id="shipper-avatar-upload"
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          style={{display: 'none'}}
+                        />
+                      </div>
+                      
+                      <div className="mt-3">
+                        <h5 className="mb-1">{shipperProfile.name}</h5>
+                        <p className="text-muted">{shipperProfile.phone}</p>
+                        <div className="d-flex justify-content-center align-items-center mb-2">
+                          <FaStar className="text-warning me-1" />
+                          <span className="fw-bold">{shipperProfile.rating}</span>
+                          <span className="text-muted ms-2">({shipperProfile.totalDeliveries} đơn)</span>
+                        </div>
+                        
+                        {shipperProfile.avatar && (
+                          <button 
+                            type="button" 
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={removeAvatar}
+                          >
+                            Xóa ảnh đại diện
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="row mb-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Họ và tên</label>

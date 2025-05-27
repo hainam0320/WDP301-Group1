@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 
@@ -20,7 +20,8 @@ const Home = () => {
   const [userProfile, setUserProfile] = useState({
     name: 'Nguyễn Văn A',
     phone: '0123456789',
-    address: 'Hà Nội'
+    address: 'Hà Nội',
+    avatar: null
   });
 
   const [orders, setOrders] = useState([
@@ -39,6 +40,21 @@ const Home = () => {
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
     navigate('/login');
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUserProfile({...userProfile, avatar: e.target.result});
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeAvatar = () => {
+    setUserProfile({...userProfile, avatar: null});
   };
 
   const headerStyle = {
@@ -81,8 +97,17 @@ const Home = () => {
               <span className="badge bg-danger">3</span>
             </div>
             <div className="dropdown">
-              <button className="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
-                <FaUser className="me-2" />
+              <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+                {userProfile.avatar ? (
+                  <img 
+                    src={userProfile.avatar} 
+                    alt="Avatar" 
+                    className="rounded-circle me-2" 
+                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                  />
+                ) : (
+                  <FaUser className="me-2" />
+                )}
                 {userProfile.name}
               </button>
               <ul className="dropdown-menu">
@@ -378,6 +403,58 @@ const Home = () => {
                 </div>
                 <div className="card-body">
                   <form>
+                    {/* Avatar Section */}
+                    <div className="text-center mb-4">
+                      <div className="position-relative d-inline-block">
+                        {userProfile.avatar ? (
+                          <img 
+                            src={userProfile.avatar} 
+                            alt="Avatar" 
+                            className="rounded-circle border border-3 border-primary"
+                            style={{width: '120px', height: '120px', objectFit: 'cover'}}
+                          />
+                        ) : (
+                          <div 
+                            className="rounded-circle border border-3 border-primary d-flex align-items-center justify-content-center bg-light"
+                            style={{width: '120px', height: '120px'}}
+                          >
+                            <FaUser size={40} className="text-muted" />
+                          </div>
+                        )}
+                        
+                        {/* Camera icon overlay */}
+                        <label 
+                          htmlFor="avatar-upload" 
+                          className="position-absolute bottom-0 end-0 btn btn-primary btn-sm rounded-circle p-2"
+                          style={{cursor: 'pointer'}}
+                        >
+                          <FaCamera />
+                        </label>
+                        <input 
+                          id="avatar-upload"
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          style={{display: 'none'}}
+                        />
+                      </div>
+                      
+                      <div className="mt-3">
+                        <h5 className="mb-1">{userProfile.name}</h5>
+                        <p className="text-muted">{userProfile.phone}</p>
+                        
+                        {userProfile.avatar && (
+                          <button 
+                            type="button" 
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={removeAvatar}
+                          >
+                            Xóa ảnh đại diện
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="row mb-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Họ và tên</label>
