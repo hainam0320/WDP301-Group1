@@ -1,25 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('orders');
+  const BASE_URL = 'http://localhost:9999';
   
   const [shipperProfile, setShipperProfile] = useState({
-    name: 'Nguyễn Văn Shipper',
-    phone: '0987654321',
-    vehicle: 'Honda Wave',
-    licensePlate: '29A1-12345',
-    rating: 4.8,
-    totalDeliveries: 156
+    name: '',
+    phone: '',
+    licensePlateImage: '',
+    cmndFront: '',
+    cmndBack: '',
+    rating: 0,
+    totalDeliveries: 0,
+    avatar: ''
   });
+
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    // Chuyển đổi đường dẫn Windows thành URL path
+    const relativePath = path.split('back-end\\uploads\\')[1]?.replace(/\\/g, '/');
+    return relativePath ? `${BASE_URL}/uploads/${relativePath}` : '';
+  };
+
+  useEffect(() => {
+    // Lấy thông tin user từ localStorage khi component mount
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setShipperProfile(prev => ({
+        ...prev,
+        name: user.fullName,
+        phone: user.phone,
+        licensePlateImage: user.licensePlateImage || '',
+        cmndFront: user.cmndFront || '',
+        cmndBack: user.cmndBack || '',
+        rating: user.rating || 0,
+        totalDeliveries: user.totalDeliveries || 0,
+        avatar: user.avatar || ''
+      }));
+    }
+  }, []);
 
   const [availableOrders, setAvailableOrders] = useState([
     { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', distance: '25km', price: 50000, weight: '2kg', status: 'available' },
-    { id: 2, type: 'pickup', from: 'Cầu Giấy', to: 'Thăng Long', distance: '15km', price: 35000, weight: '', status: 'available' },
+    { id: 2, type: 'pickup', from: 'Cầu Giấy', to: 'Thăng Long', distance: '15km', price: 35000, weight: '3kg', status: 'available' },
     { id: 3, type: 'delivery', from: 'Đống Đa', to: 'Hòa Lạc', distance: '30km', price: 60000, weight: '5kg', status: 'available' }
   ]);
 
@@ -50,8 +78,30 @@ const ShipperDashboard = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setShipperProfile({...shipperProfile, avatar: e.target.result});
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeAvatar = () => {
+    setShipperProfile({...shipperProfile, avatar: ''});
+  };
+
+  const handleProfileUpdate = (e) => {
+    e.preventDefault();
+    // TODO: Gọi API để cập nhật thông tin profile
+    console.log('Cập nhật thông tin:', shipperProfile);
   };
 
   const headerStyle = {
@@ -98,8 +148,17 @@ const ShipperDashboard = () => {
               <span>{shipperProfile.rating}</span>
             </div>
             <div className="dropdown">
-              <button className="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
-                <FaUser className="me-2" />
+              <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+                {shipperProfile.avatar ? (
+                  <img 
+                    src={getImageUrl(shipperProfile.avatar)} 
+                    alt="Avatar" 
+                    className="rounded-circle me-2" 
+                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                  />
+                ) : (
+                  <FaUser className="me-2" />
+                )}
                 {shipperProfile.name}
               </button>
               <ul className="dropdown-menu">
@@ -367,7 +426,64 @@ const ShipperDashboard = () => {
                   <h4 className="mb-0"><FaUser className="me-2" />Thông tin shipper</h4>
                 </div>
                 <div className="card-body">
-                  <form>
+                  <form onSubmit={handleProfileUpdate}>
+                    {/* Avatar Section */}
+                    <div className="text-center mb-4">
+                      <div className="position-relative d-inline-block">
+                        {shipperProfile.avatar ? (
+                          <img 
+                            src={getImageUrl(shipperProfile.avatar)} 
+                            alt="Avatar" 
+                            className="rounded-circle border border-3 border-success"
+                            style={{width: '120px', height: '120px', objectFit: 'cover'}}
+                          />
+                        ) : (
+                          <div 
+                            className="rounded-circle border border-3 border-success d-flex align-items-center justify-content-center bg-light"
+                            style={{width: '120px', height: '120px'}}
+                          >
+                            <FaUser size={40} className="text-muted" />
+                          </div>
+                        )}
+                        
+                        {/* Camera icon overlay */}
+                        <label 
+                          htmlFor="shipper-avatar-upload" 
+                          className="position-absolute bottom-0 end-0 btn btn-success btn-sm rounded-circle p-2"
+                          style={{cursor: 'pointer'}}
+                        >
+                          <FaCamera />
+                        </label>
+                        <input 
+                          id="shipper-avatar-upload"
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          style={{display: 'none'}}
+                        />
+                      </div>
+                      
+                      <div className="mt-3">
+                        <h5 className="mb-1">{shipperProfile.name}</h5>
+                        <p className="text-muted">{shipperProfile.phone}</p>
+                        <div className="d-flex justify-content-center align-items-center mb-2">
+                          <FaStar className="text-warning me-1" />
+                          <span className="fw-bold">{shipperProfile.rating}</span>
+                          <span className="text-muted ms-2">({shipperProfile.totalDeliveries} đơn)</span>
+                        </div>
+                        
+                        {shipperProfile.avatar && (
+                          <button 
+                            type="button" 
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={removeAvatar}
+                          >
+                            Xóa ảnh đại diện
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="row mb-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Họ và tên</label>
@@ -388,27 +504,65 @@ const ShipperDashboard = () => {
                         />
                       </div>
                     </div>
+
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label className="form-label fw-semibold">Loại xe</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          value={shipperProfile.vehicle}
-                          onChange={(e) => setShipperProfile({...shipperProfile, vehicle: e.target.value})}
-                        />
+                        <label className="form-label fw-semibold">Ảnh CMND mặt trước</label>
+                        <div className="border rounded p-2">
+                          {shipperProfile.cmndFront ? (
+                            <img 
+                              src={getImageUrl(shipperProfile.cmndFront)}
+                              alt="CMND mặt trước"
+                              className="img-fluid rounded"
+                              style={{maxHeight: '150px', objectFit: 'contain'}}
+                            />
+                          ) : (
+                            <div className="text-center text-muted py-3">
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Chưa có ảnh CMND mặt trước</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="col-md-6">
-                        <label className="form-label fw-semibold">Biển số xe</label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          value={shipperProfile.licensePlate}
-                          onChange={(e) => setShipperProfile({...shipperProfile, licensePlate: e.target.value})}
-                        />
+                        <label className="form-label fw-semibold">Ảnh CMND mặt sau</label>
+                        <div className="border rounded p-2">
+                          {shipperProfile.cmndBack ? (
+                            <img 
+                              src={getImageUrl(shipperProfile.cmndBack)}
+                              alt="CMND mặt sau"
+                              className="img-fluid rounded"
+                              style={{maxHeight: '150px', objectFit: 'contain'}}
+                            />
+                          ) : (
+                            <div className="text-center text-muted py-3">
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Chưa có ảnh CMND mặt sau</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+
                     <div className="row mb-3">
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Ảnh biển số xe</label>
+                        <div className="border rounded p-2">
+                          {shipperProfile.licensePlateImage ? (
+                            <img 
+                              src={getImageUrl(shipperProfile.licensePlateImage)}
+                              alt="Biển số xe"
+                              className="img-fluid rounded"
+                              style={{maxHeight: '150px', objectFit: 'contain'}}
+                            />
+                          ) : (
+                            <div className="text-center text-muted py-3">
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Chưa có ảnh biển số xe</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Đánh giá</label>
                         <div className="input-group">
@@ -416,6 +570,9 @@ const ShipperDashboard = () => {
                           <span className="input-group-text"><FaStar className="text-warning" /></span>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="row mb-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Tổng số đơn đã giao</label>
                         <input type="text" className="form-control" value={shipperProfile.totalDeliveries} readOnly />
