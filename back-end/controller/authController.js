@@ -95,7 +95,7 @@ exports.login = async (req, res) => {
     }
 
     if (password !== account.password) {
-  return res.status(400).json({ message: 'Sai mật khẩu 1' });
+  return res.status(400).json({ message: 'Sai mật khẩu ' });
 }
 
     const token = jwt.sign({ id: account._id, role }, process.env.JWT_SECRET_KEY, {

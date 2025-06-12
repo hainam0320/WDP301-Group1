@@ -26,7 +26,7 @@ function Login() {
         navigate('/driver/dashboard');
       }
       else if (role === 'admin') {
-        navigate('/admin/dashboard');
+        link('/admin/dashboard');
       }
        else {
         navigate('/admin');
