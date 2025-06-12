@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -8,6 +8,8 @@ const Home = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('order');
   const [serviceType, setServiceType] = useState('delivery');
+  const BASE_URL = 'http://localhost:9999';
+  
   const [orderData, setOrderData] = useState({
     pickupLocation: '',
     deliveryLocation: '',
@@ -18,11 +20,33 @@ const Home = () => {
   });
   
   const [userProfile, setUserProfile] = useState({
-    name: 'Nguyễn Văn A',
-    phone: '0123456789',
-    address: 'Hà Nội',
-    avatar: null
+    name: '',
+    phone: '',
+    address: '',
+    email: '',
+    avatar: ''
   });
+
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    // Chuyển đổi đường dẫn Windows thành URL path
+    const relativePath = path.split('back-end\\uploads\\')[1]?.replace(/\\/g, '/');
+    return relativePath ? `${BASE_URL}/uploads/${relativePath}` : '';
+  };
+
+  useEffect(() => {
+    // Lấy thông tin user từ localStorage khi component mount
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setUserProfile({
+        name: user.fullName,
+        phone: user.phone,
+        address: user.address || '',
+        email: user.email || '',
+        avatar: user.avatar || ''
+      });
+    }
+  }, []);
 
   const [orders, setOrders] = useState([
     { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', status: 'completed', price: 50000, date: '2025-01-25' },
@@ -38,7 +62,8 @@ const Home = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/login');
   };
 
@@ -54,7 +79,13 @@ const Home = () => {
   };
 
   const removeAvatar = () => {
-    setUserProfile({...userProfile, avatar: null});
+    setUserProfile({...userProfile, avatar: ''});
+  };
+
+  const handleProfileUpdate = (e) => {
+    e.preventDefault();
+    // TODO: Gọi API để cập nhật thông tin profile
+    console.log('Cập nhật thông tin:', userProfile);
   };
 
   const headerStyle = {
@@ -100,7 +131,7 @@ const Home = () => {
               <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
                 {userProfile.avatar ? (
                   <img 
-                    src={userProfile.avatar} 
+                    src={getImageUrl(userProfile.avatar)} 
                     alt="Avatar" 
                     className="rounded-circle me-2" 
                     style={{width: '30px', height: '30px', objectFit: 'cover'}}
@@ -402,13 +433,13 @@ const Home = () => {
                   <h4 className="mb-0"><FaUser className="me-2" />Thông tin cá nhân</h4>
                 </div>
                 <div className="card-body">
-                  <form>
+                  <form onSubmit={handleProfileUpdate}>
                     {/* Avatar Section */}
                     <div className="text-center mb-4">
                       <div className="position-relative d-inline-block">
                         {userProfile.avatar ? (
                           <img 
-                            src={userProfile.avatar} 
+                            src={getImageUrl(userProfile.avatar)} 
                             alt="Avatar" 
                             className="rounded-circle border border-3 border-primary"
                             style={{width: '120px', height: '120px', objectFit: 'cover'}}
@@ -466,6 +497,17 @@ const Home = () => {
                         />
                       </div>
                       <div className="col-md-6">
+                        <label className="form-label fw-semibold">Email</label>
+                        <input 
+                          type="email" 
+                          className="form-control" 
+                          value={userProfile.email}
+                          onChange={(e) => setUserProfile({...userProfile, email: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                    <div className="row mb-3">
+                      <div className="col-md-6">
                         <label className="form-label fw-semibold">Số điện thoại</label>
                         <input 
                           type="tel" 
@@ -474,15 +516,15 @@ const Home = () => {
                           onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})}
                         />
                       </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label fw-semibold">Địa chỉ</label>
-                      <textarea 
-                        className="form-control" 
-                        rows="3"
-                        value={userProfile.address}
-                        onChange={(e) => setUserProfile({...userProfile, address: e.target.value})}
-                      ></textarea>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Địa chỉ</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          value={userProfile.address}
+                          onChange={(e) => setUserProfile({...userProfile, address: e.target.value})}
+                        />
+                      </div>
                     </div>
                     <button type="submit" className="btn btn-primary" style={buttonStyle}>
                       Cập nhật thông tin

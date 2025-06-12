@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import logo from '../assets/img/favicon.png';
-import { FaUser, FaPhoneAlt, FaLock, FaEye, FaEyeSlash, FaMapMarkerAlt, FaEnvelope, FaCheck } from 'react-icons/fa';
+import { FaUser, FaPhoneAlt, FaLock, FaEye, FaEyeSlash, FaMapMarkerAlt, FaEnvelope, FaCheck, FaIdCard, FaCar, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { authAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Register = () => {
+  const navigate = useNavigate();
+  const [accountType, setAccountType] = useState('user'); // 'user' or 'driver'
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -11,12 +15,23 @@ const Register = () => {
     address: '',
     password: '',
     confirmPassword: '',
-    agreeTerms: false
+    agreeTerms: false,
+    // Driver specific fields
+    Bsx: '',
+    cmnd: '',
+  });
+
+  const [files, setFiles] = useState({
+    avatar: null,
+    licensePlateImage: null,
+    cmndFront: null,
+    cmndBack: null
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -24,6 +39,24 @@ const Register = () => {
 
   const toggleConfirmPasswordVisibility = () => {
     setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleFileChange = (e) => {
+    const { name, files: uploadedFiles } = e.target;
+    if (uploadedFiles.length > 0) {
+      setFiles(prev => ({
+        ...prev,
+        [name]: uploadedFiles[0]
+      }));
+
+      // Clear error when file is selected
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    }
   };
 
   const validateForm = () => {
@@ -71,6 +104,24 @@ const Register = () => {
       newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
     }
 
+    // Validate avatar for all users
+    if (!files.avatar) {
+      newErrors.avatar = 'Vui lòng chọn ảnh đại diện';
+    }
+
+    // Driver specific validations
+    if (accountType === 'driver') {
+      if (!files.licensePlateImage) {
+        newErrors.licensePlateImage = 'Vui lòng chọn ảnh biển số xe';
+      }
+      if (!files.cmndFront) {
+        newErrors.cmndFront = 'Vui lòng chọn ảnh CMND/CCCD mặt trước';
+      }
+      if (!files.cmndBack) {
+        newErrors.cmndBack = 'Vui lòng chọn ảnh CMND/CCCD mặt sau';
+      }
+    }
+
     // Validate terms agreement
     if (!formData.agreeTerms) {
       newErrors.agreeTerms = 'Vui lòng đồng ý với điều khoản sử dụng';
@@ -80,12 +131,44 @@ const Register = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      console.log('Form submitted:', formData);
-      // Handle registration logic here
-      alert('Đăng ký thành công!');
+      setIsLoading(true);
+      try {
+        const formDataToSend = new FormData();
+        
+        // Add text fields
+        Object.keys(formData).forEach(key => {
+          if (key !== 'confirmPassword' && key !== 'agreeTerms') {
+            formDataToSend.append(key, formData[key]);
+          }
+        });
+
+        // Add files
+        formDataToSend.append('avatar', files.avatar);
+        if (accountType === 'driver') {
+          formDataToSend.append('licensePlateImage', files.licensePlateImage);
+          formDataToSend.append('cmndFront', files.cmndFront);
+          formDataToSend.append('cmndBack', files.cmndBack);
+        }
+
+        let response;
+        if (accountType === 'user') {
+          response = await authAPI.registerUser(formDataToSend);
+        } else {
+          response = await authAPI.registerDriver(formDataToSend);
+        }
+
+        if (response.data) {
+          alert('Đăng ký thành công!');
+          navigate('/login');
+        }
+      } catch (error) {
+        alert(error.response?.data?.message || 'Đã có lỗi xảy ra khi đăng ký');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -193,6 +276,11 @@ const Register = () => {
     boxShadow: '0 8px 20px rgba(0, 123, 255, 0.3)'
   };
 
+  const fileInputStyle = {
+    ...inputGroupStyle,
+    cursor: 'pointer'
+  };
+
   return (
     <div style={registerPageStyle} className="d-flex align-items-center justify-content-center py-5">
       {/* Background decorative elements */}
@@ -225,6 +313,39 @@ const Register = () => {
                 <div style={{width: '60px', height: '4px', background: 'linear-gradient(135deg, #007bff, #6f42c1)', borderRadius: '2px'}} className="mx-auto"></div>
               </div>
 
+              {/* Account Type Selection */}
+              <div className="mb-4">
+                <label className="form-label fw-semibold text-dark">Loại tài khoản *</label>
+                <div className="d-flex gap-3">
+                  <div className="form-check">
+                    <input
+                      type="radio"
+                      className="form-check-input"
+                      name="accountType"
+                      id="userType"
+                      checked={accountType === 'user'}
+                      onChange={() => setAccountType('user')}
+                    />
+                    <label className="form-check-label" htmlFor="userType">
+                      Người dùng
+                    </label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      type="radio"
+                      className="form-check-input"
+                      name="accountType"
+                      id="driverType"
+                      checked={accountType === 'driver'}
+                      onChange={() => setAccountType('driver')}
+                    />
+                    <label className="form-check-label" htmlFor="driverType">
+                      Tài xế
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <form onSubmit={handleSubmit}>
                 {/* Full Name Input */}
                 <div className="mb-3">
@@ -249,68 +370,58 @@ const Register = () => {
                   {errors.fullName && <div className="text-danger small mt-1">{errors.fullName}</div>}
                 </div>
 
-                {/* Email and Phone Row */}
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label fw-semibold text-dark">Email *</label>
-                    <div 
-                      style={inputGroupStyle} 
-                      className="input-group p-3"
-                    >
-                      <span className="input-group-text bg-transparent border-0 text-muted">
-                        <FaEnvelope />
-                      </span>
-                      <input
-                        type="email"
-                        name="email"
-                        className={`form-control bg-transparent border-0 text-dark ${errors.email ? 'is-invalid' : ''}`}
-                        placeholder="example@email.com"
-                        value={formData.email}
-                        onChange={handleChange}
-                        style={{outline: 'none', boxShadow: 'none'}}
-                      />
-                    </div>
-                    {errors.email && <div className="text-danger small mt-1">{errors.email}</div>}
+                {/* Email Input */}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold text-dark">Email *</label>
+                  <div style={inputGroupStyle} className="input-group p-3">
+                    <span className="input-group-text bg-transparent border-0 text-muted">
+                      <FaEnvelope />
+                    </span>
+                    <input
+                      type="email"
+                      name="email"
+                      className={`form-control bg-transparent border-0 ${errors.email ? 'is-invalid' : ''}`}
+                      placeholder="Nhập địa chỉ email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      style={{outline: 'none', boxShadow: 'none'}}
+                    />
                   </div>
+                  {errors.email && <div className="text-danger small mt-1">{errors.email}</div>}
+                </div>
 
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label fw-semibold text-dark">Số điện thoại *</label>
-                    <div 
-                      style={inputGroupStyle} 
-                      className="input-group p-3"
-                    >
-                      <span className="input-group-text bg-transparent border-0 text-muted">
-                        <FaPhoneAlt />
-                      </span>
-                      <input
-                        type="tel"
-                        name="phone"
-                        className={`form-control bg-transparent border-0 text-dark ${errors.phone ? 'is-invalid' : ''}`}
-                        placeholder="0123456789"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        style={{outline: 'none', boxShadow: 'none'}}
-                      />
-                    </div>
-                    {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
+                {/* Phone Input */}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold text-dark">Số điện thoại *</label>
+                  <div style={inputGroupStyle} className="input-group p-3">
+                    <span className="input-group-text bg-transparent border-0 text-muted">
+                      <FaPhoneAlt />
+                    </span>
+                    <input
+                      type="tel"
+                      name="phone"
+                      className={`form-control bg-transparent border-0 ${errors.phone ? 'is-invalid' : ''}`}
+                      placeholder="Nhập số điện thoại"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      style={{outline: 'none', boxShadow: 'none'}}
+                    />
                   </div>
+                  {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
                 </div>
 
                 {/* Address Input */}
                 <div className="mb-3">
                   <label className="form-label fw-semibold text-dark">Địa chỉ *</label>
-                  <div 
-                    style={inputGroupStyle} 
-                    className="input-group p-3"
-                  >
+                  <div style={inputGroupStyle} className="input-group p-3">
                     <span className="input-group-text bg-transparent border-0 text-muted">
                       <FaMapMarkerAlt />
                     </span>
                     <input
                       type="text"
                       name="address"
-                      className={`form-control bg-transparent border-0 text-dark ${errors.address ? 'is-invalid' : ''}`}
-                      placeholder="Nhập địa chỉ đầy đủ"
+                      className={`form-control bg-transparent border-0 ${errors.address ? 'is-invalid' : ''}`}
+                      placeholder="Nhập địa chỉ"
                       value={formData.address}
                       onChange={handleChange}
                       style={{outline: 'none', boxShadow: 'none'}}
@@ -319,158 +430,178 @@ const Register = () => {
                   {errors.address && <div className="text-danger small mt-1">{errors.address}</div>}
                 </div>
 
-                {/* Password and Confirm Password Row */}
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label fw-semibold text-dark">Mật khẩu *</label>
-                    <div 
-                      style={inputGroupStyle} 
-                      className="input-group p-3"
-                    >
-                      <span className="input-group-text bg-transparent border-0 text-muted">
-                        <FaLock />
-                      </span>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        className={`form-control bg-transparent border-0 text-dark ${errors.password ? 'is-invalid' : ''}`}
-                        placeholder="Ít nhất 6 ký tự"
-                        value={formData.password}
-                        onChange={handleChange}
-                        style={{outline: 'none', boxShadow: 'none'}}
-                      />
-                      <button
-                        type="button"
-                        className="btn bg-transparent border-0 text-muted"
-                        onClick={togglePasswordVisibility}
-                      >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
-                    </div>
-                    {errors.password && <div className="text-danger small mt-1">{errors.password}</div>}
+                {/* Avatar Upload */}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold text-dark">Ảnh đại diện *</label>
+                  <div style={fileInputStyle} className="input-group p-3">
+                    <span className="input-group-text bg-transparent border-0 text-muted">
+                      <FaUser />
+                    </span>
+                    <input
+                      type="file"
+                      name="avatar"
+                      accept="image/*"
+                      className={`form-control bg-transparent border-0 ${errors.avatar ? 'is-invalid' : ''}`}
+                      onChange={handleFileChange}
+                      style={{outline: 'none', boxShadow: 'none'}}
+                    />
                   </div>
+                  {errors.avatar && <div className="text-danger small mt-1">{errors.avatar}</div>}
+                </div>
 
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label fw-semibold text-dark">Xác nhận mật khẩu *</label>
-                    <div 
-                      style={inputGroupStyle} 
-                      className="input-group p-3"
-                    >
-                      <span className="input-group-text bg-transparent border-0 text-muted">
-                        <FaLock />
-                      </span>
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        className={`form-control bg-transparent border-0 text-dark ${errors.confirmPassword ? 'is-invalid' : ''}`}
-                        placeholder="Nhập lại mật khẩu"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        style={{outline: 'none', boxShadow: 'none'}}
-                      />
-                      <button
-                        type="button"
-                        className="btn bg-transparent border-0 text-muted"
-                        onClick={toggleConfirmPasswordVisibility}
-                      >
-                        {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
+                {/* Driver specific fields */}
+                {accountType === 'driver' && (
+                  <>
+                    {/* License Plate Image Upload */}
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold text-dark">Ảnh biển số xe *</label>
+                      <div style={fileInputStyle} className="input-group p-3">
+                        <span className="input-group-text bg-transparent border-0 text-muted">
+                          <FaCar />
+                        </span>
+                        <input
+                          type="file"
+                          name="licensePlateImage"
+                          accept="image/*"
+                          className={`form-control bg-transparent border-0 ${errors.licensePlateImage ? 'is-invalid' : ''}`}
+                          onChange={handleFileChange}
+                          style={{outline: 'none', boxShadow: 'none'}}
+                        />
+                      </div>
+                      {errors.licensePlateImage && <div className="text-danger small mt-1">{errors.licensePlateImage}</div>}
                     </div>
-                    {errors.confirmPassword && <div className="text-danger small mt-1">{errors.confirmPassword}</div>}
+
+                    {/* CMND Front Image Upload */}
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold text-dark">Ảnh CMND/CCCD mặt trước *</label>
+                      <div style={fileInputStyle} className="input-group p-3">
+                        <span className="input-group-text bg-transparent border-0 text-muted">
+                          <FaIdCard />
+                        </span>
+                        <input
+                          type="file"
+                          name="cmndFront"
+                          accept="image/*"
+                          className={`form-control bg-transparent border-0 ${errors.cmndFront ? 'is-invalid' : ''}`}
+                          onChange={handleFileChange}
+                          style={{outline: 'none', boxShadow: 'none'}}
+                        />
+                      </div>
+                      {errors.cmndFront && <div className="text-danger small mt-1">{errors.cmndFront}</div>}
+                    </div>
+
+                    {/* CMND Back Image Upload */}
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold text-dark">Ảnh CMND/CCCD mặt sau *</label>
+                      <div style={fileInputStyle} className="input-group p-3">
+                        <span className="input-group-text bg-transparent border-0 text-muted">
+                          <FaIdCard />
+                        </span>
+                        <input
+                          type="file"
+                          name="cmndBack"
+                          accept="image/*"
+                          className={`form-control bg-transparent border-0 ${errors.cmndBack ? 'is-invalid' : ''}`}
+                          onChange={handleFileChange}
+                          style={{outline: 'none', boxShadow: 'none'}}
+                        />
+                      </div>
+                      {errors.cmndBack && <div className="text-danger small mt-1">{errors.cmndBack}</div>}
+                    </div>
+                  </>
+                )}
+
+                {/* Password Input */}
+                <div className="mb-3">
+                  <label className="form-label fw-semibold text-dark">Mật khẩu *</label>
+                  <div style={inputGroupStyle} className="input-group p-3">
+                    <span className="input-group-text bg-transparent border-0 text-muted">
+                      <FaLock />
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      className={`form-control bg-transparent border-0 ${errors.password ? 'is-invalid' : ''}`}
+                      placeholder="Nhập mật khẩu"
+                      value={formData.password}
+                      onChange={handleChange}
+                      style={{outline: 'none', boxShadow: 'none'}}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-link text-muted"
+                      onClick={togglePasswordVisibility}
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
                   </div>
+                  {errors.password && <div className="text-danger small mt-1">{errors.password}</div>}
+                </div>
+
+                {/* Confirm Password Input */}
+                <div className="mb-4">
+                  <label className="form-label fw-semibold text-dark">Xác nhận mật khẩu *</label>
+                  <div style={inputGroupStyle} className="input-group p-3">
+                    <span className="input-group-text bg-transparent border-0 text-muted">
+                      <FaLock />
+                    </span>
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      className={`form-control bg-transparent border-0 ${errors.confirmPassword ? 'is-invalid' : ''}`}
+                      placeholder="Xác nhận mật khẩu"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      style={{outline: 'none', boxShadow: 'none'}}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-link text-muted"
+                      onClick={toggleConfirmPasswordVisibility}
+                    >
+                      {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && <div className="text-danger small mt-1">{errors.confirmPassword}</div>}
                 </div>
 
                 {/* Terms Agreement */}
                 <div className="mb-4">
                   <div className="form-check">
-                    <input 
-                      className={`form-check-input ${errors.agreeTerms ? 'is-invalid' : ''}`} 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       name="agreeTerms"
-                      id="agreeTerms"
+                      className={`form-check-input ${errors.agreeTerms ? 'is-invalid' : ''}`}
                       checked={formData.agreeTerms}
                       onChange={handleChange}
+                      id="agreeTerms"
                     />
-                    <label className="form-check-label text-muted" htmlFor="agreeTerms">
-                      Tôi đồng ý với{' '}
-                      <a href="#" className="text-decoration-none fw-bold">
-                        Điều khoản sử dụng
-                      </a>
-                      {' '}và{' '}
-                      <a href="#" className="text-decoration-none fw-bold">
-                        Chính sách bảo mật
-                      </a>
+                    <label className="form-check-label" htmlFor="agreeTerms">
+                      Tôi đồng ý với <a href="#" className="text-primary">điều khoản sử dụng</a>
                     </label>
+                    {errors.agreeTerms && <div className="text-danger small mt-1">{errors.agreeTerms}</div>}
                   </div>
-                  {errors.agreeTerms && <div className="text-danger small mt-1">{errors.agreeTerms}</div>}
                 </div>
 
-                {/* Register Button */}
+                {/* Submit Button */}
                 <button
                   type="submit"
                   style={buttonStyle}
-                  className="btn btn-primary w-100 mb-4"
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-2px)';
-                    e.target.style.boxShadow = '0 12px 25px rgba(0, 123, 255, 0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 8px 20px rgba(0, 123, 255, 0.3)';
-                  }}
+                  className="btn btn-primary w-100 text-white"
+                  disabled={isLoading}
                 >
-                  <span className="d-flex align-items-center justify-content-center">
-                    <FaCheck className="me-2" />
-                    Tạo tài khoản
-                  </span>
+                  {isLoading ? (
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  ) : null}
+                  {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
                 </button>
 
-                {/* Divider */}
-                <div className="position-relative my-4">
-                  <hr className="text-muted" />
-                  <span className="position-absolute top-50 start-50 translate-middle bg-white px-3 text-muted">
-                    hoặc
-                  </span>
-                </div>
-
-                {/* Social Register Buttons */}
-                <div className="row g-3 mb-4">
-                  <div className="col-6">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center"
-                      style={{borderRadius: '15px', padding: '12px'}}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#1877f2" className="me-2">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                      <span className="fw-medium">Facebook</span>
-                    </button>
-                  </div>
-                  <div className="col-6">
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center"
-                      style={{borderRadius: '15px', padding: '12px'}}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#dc3545" className="me-2">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      <span className="fw-medium">Google</span>
-                    </button>
-                  </div>
-                </div>
-
                 {/* Login Link */}
-                <p className="text-center text-muted mb-0">
-                  Đã có tài khoản?{' '}
-                  <a href="/login" className="text-decoration-none fw-bold">
-                    Đăng nhập ngay
-                  </a>
-                </p>
+                <div className="text-center mt-4">
+                  <p className="mb-0">
+                    Đã có tài khoản? <a href="/login" className="text-primary">Đăng nhập</a>
+                  </p>
+                </div>
               </form>
             </div>
           </div>
