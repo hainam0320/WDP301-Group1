@@ -160,4 +160,10 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
     }
 });
 
+const handleMapClick = (location) => {
+  if (!isSelectingPoint) return;
+  handleLocationSelect(location, isSelectingPoint);
+  setIsSelectingPoint(null);
+};
+
 module.exports = router; 
