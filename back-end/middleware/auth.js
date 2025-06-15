@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../model/userModel');
+const Driver = require('../model/driverModel');
 
 exports.protect = async (req, res, next) => {
     try {
@@ -27,12 +28,31 @@ exports.protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
             console.log('Token decoded:', decoded);
             
-            const user = await User.findById(decoded.id);
+            // Kiểm tra trong bảng Driver trước nếu là route của shipper
+            let user;
+            if (req.baseUrl.includes('/api/shipper')) {
+                user = await Driver.findById(decoded.id);
+                if (!user) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Not authorized as shipper'
+                    });
+                }
+            } else {
+                // Nếu không phải route của shipper, kiểm tra trong bảng User
+                user = await User.findById(decoded.id);
+                if (!user) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'User not found'
+                    });
+                }
+            }
+
             console.log('User found:', {
                 id: user._id,
                 email: user.email,
-                role: user.role,
-                isAdmin: user.isAdmin
+                model: user.constructor.modelName
             });
             
             req.user = user;
@@ -58,27 +78,28 @@ exports.authorize = (...roles) => {
     return (req, res, next) => {
         console.log('=== AUTHORIZE MIDDLEWARE ===');
         console.log('Required roles:', roles);
-        console.log('User:', {
-            id: req.user._id,
-            role: req.user.role,
-            isAdmin: req.user.isAdmin
+        console.log('User model:', req.user.constructor.modelName);
+        
+        // Nếu là Driver model, cho phép truy cập các route của shipper
+        if (req.user.constructor.modelName === 'Driver') {
+            if (roles.includes('driver') || roles.includes('shipper')) {
+                console.log('Access granted: Valid driver');
+                return next();
+            }
+        }
+        
+        // Nếu là User model, kiểm tra role
+        if (req.user.constructor.modelName === 'User') {
+            if (req.user.isAdmin || roles.includes(req.user.role)) {
+                console.log('Access granted: Valid user role');
+                return next();
+            }
+        }
+
+        console.log('Access denied: Invalid role');
+        return res.status(403).json({
+            success: false,
+            error: 'Not authorized to access this route'
         });
-        
-        // Cho phép truy cập nếu user là admin
-        if (req.user.isAdmin) {
-            console.log('User is admin, access granted');
-            return next();
-        }
-        
-        // Nếu không phải admin, kiểm tra role
-        if (!roles.includes(req.user.role)) {
-            console.log('Access denied: Invalid role');
-            return res.status(403).json({
-                success: false,
-                error: `User role ${req.user.role} is not authorized to access this route`
-            });
-        }
-        console.log('Access granted: Valid role');
-        next();
     };
 }; 

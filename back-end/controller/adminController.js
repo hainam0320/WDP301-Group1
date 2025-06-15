@@ -153,7 +153,6 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const newStatus = status === 'active';
 
     // Try to update in User collection
     let user = await User.findById(req.params.id);
@@ -162,8 +161,17 @@ exports.updateUserStatus = async (req, res) => {
         req.params.id,
         { status: status },
         { new: true }
-      );
-      return res.json(user);
+      ).select('-password');
+      return res.json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        status: user.status,
+        type: 'user',
+        createdAt: user.createdAt,
+        avatar: user.avatar
+      });
     }
 
     // If not found in User collection, try Driver collection
@@ -171,26 +179,27 @@ exports.updateUserStatus = async (req, res) => {
     if (driver) {
       driver = await Driver.findByIdAndUpdate(
         req.params.id,
-        { status: newStatus },
+        { status: status },
         { new: true }
-      );
-      // Format driver response to match user structure
-      const formattedDriver = {
+      ).select('-password');
+      
+      return res.json({
         _id: driver._id,
-        name: driver.fullName,
+        fullName: driver.fullName,
         email: driver.email,
         phone: driver.phone,
-        role: 'driver',
-        status: driver.status ? 'active' : 'inactive',
-        createdAt: driver._id.getTimestamp()
-      };
-      return res.json(formattedDriver);
+        status: driver.status,
+        type: 'driver',
+        createdAt: driver.createdAt || driver._id.getTimestamp(),
+        avatar: driver.avatar,
+        licensePlateImage: driver.licensePlateImage
+      });
     }
 
     return res.status(404).json({ message: 'User/Driver not found' });
   } catch (error) {
     console.error('Error updating user status:', error);
-    res.status(500).json({ message: 'Error updating user status' });
+    res.status(500).json({ message: 'Error updating user status', error: error.message });
   }
 };
 

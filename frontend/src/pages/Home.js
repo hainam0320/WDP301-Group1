@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
+import { userAPI } from '../services/api';
 
 const Home = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('order');
   const [serviceType, setServiceType] = useState('delivery');
   const BASE_URL = 'http://localhost:9999';
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', content: '' });
   
   const [orderData, setOrderData] = useState({
     pickupLocation: '',
@@ -28,10 +31,20 @@ const Home = () => {
   });
 
   const getImageUrl = (path) => {
-    if (!path) return '';
-    // Chuyển đổi đường dẫn Windows thành URL path
-    const relativePath = path.split('back-end\\uploads\\')[1]?.replace(/\\/g, '/');
-    return relativePath ? `${BASE_URL}/uploads/${relativePath}` : '';
+    if (!path) return null;
+    
+    // Nếu path đã là đường dẫn tương đối (bắt đầu bằng 'uploads/')
+    if (path.startsWith('uploads/')) {
+      return `${BASE_URL}/${path}`;
+    }
+    
+    // Nếu path là đường dẫn đầy đủ (có chứa '\uploads\')
+    const relativePath = path.split('\\uploads\\')[1];
+    if (relativePath) {
+      return `${BASE_URL}/uploads/${relativePath}`;
+    }
+    
+    return null;
   };
 
   useEffect(() => {
@@ -67,25 +80,93 @@ const Home = () => {
     navigate('/login');
   };
 
-  const handleAvatarChange = (event) => {
+  const handleFileUpload = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await userAPI.uploadFile(formData);
+      if (!response.data.success) {
+        throw new Error(response.data.message);
+      }
+      return response.data.filePath;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setMessage({ 
+        type: 'error', 
+        content: error.response?.data?.message || 'Lỗi khi tải file lên server' 
+      });
+      return null;
+    }
+  };
+
+  const handleAvatarChange = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUserProfile({...userProfile, avatar: e.target.result});
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      setIsLoading(true);
+      const filePath = await handleFileUpload(file);
+      if (filePath) {
+        setUserProfile(prev => ({
+          ...prev,
+          avatar: filePath
+        }));
+        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+      }
+    } catch (error) {
+      console.error('Error handling avatar upload:', error);
+      setMessage({ 
+        type: 'error', 
+        content: 'Lỗi khi xử lý ảnh' 
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const removeAvatar = () => {
-    setUserProfile({...userProfile, avatar: ''});
+    setUserProfile(prev => ({ ...prev, avatar: '' }));
   };
 
-  const handleProfileUpdate = (e) => {
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    // TODO: Gọi API để cập nhật thông tin profile
-    console.log('Cập nhật thông tin:', userProfile);
+    setIsLoading(true);
+    setMessage({ type: '', content: '' });
+
+    try {
+      const response = await userAPI.updateProfile({
+        fullName: userProfile.name,
+        phone: userProfile.phone,
+        address: userProfile.address,
+        avatar: userProfile.avatar
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message);
+      }
+
+      const data = response.data.data;
+      setMessage({ type: 'success', content: 'Cập nhật thông tin thành công' });
+      
+      // Update localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      localStorage.setItem('user', JSON.stringify({
+        ...user,
+        ...data
+      }));
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      const errorMessage = error.response?.data?.message || 'Lỗi khi cập nhật thông tin';
+      if (error.response?.data?.errors) {
+        setMessage({ type: 'error', content: error.response.data.errors.join(', ') });
+      } else {
+        setMessage({ type: 'error', content: errorMessage });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const headerStyle = {
@@ -433,11 +514,17 @@ const Home = () => {
                   <h4 className="mb-0"><FaUser className="me-2" />Thông tin cá nhân</h4>
                 </div>
                 <div className="card-body">
+                  {message.content && (
+                    <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
+                      {message.content}
+                    </div>
+                  )}
+
                   <form onSubmit={handleProfileUpdate}>
                     {/* Avatar Section */}
                     <div className="text-center mb-4">
                       <div className="position-relative d-inline-block">
-                        {userProfile.avatar ? (
+                        {userProfile.avatar && getImageUrl(userProfile.avatar) ? (
                           <img 
                             src={getImageUrl(userProfile.avatar)} 
                             alt="Avatar" 
@@ -494,6 +581,7 @@ const Home = () => {
                           className="form-control" 
                           value={userProfile.name}
                           onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
+                          required
                         />
                       </div>
                       <div className="col-md-6">
@@ -503,6 +591,8 @@ const Home = () => {
                           className="form-control" 
                           value={userProfile.email}
                           onChange={(e) => setUserProfile({...userProfile, email: e.target.value})}
+                          required
+                          readOnly
                         />
                       </div>
                     </div>
@@ -514,6 +604,7 @@ const Home = () => {
                           className="form-control" 
                           value={userProfile.phone}
                           onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})}
+                          required
                         />
                       </div>
                       <div className="col-md-6">
@@ -523,11 +614,24 @@ const Home = () => {
                           className="form-control" 
                           value={userProfile.address}
                           onChange={(e) => setUserProfile({...userProfile, address: e.target.value})}
+                          required
                         />
                       </div>
                     </div>
-                    <button type="submit" className="btn btn-primary" style={buttonStyle}>
-                      Cập nhật thông tin
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary" 
+                      style={buttonStyle}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Đang cập nhật...
+                        </>
+                      ) : (
+                        'Cập nhật thông tin'
+                      )}
                     </button>
                   </form>
                 </div>

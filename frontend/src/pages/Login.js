@@ -36,7 +36,11 @@ function Login() {
       }
     } catch (err) {
       console.error('Login error:', err.response?.data || err);
-      setError(err.response?.data?.message || 'Đăng nhập thất bại!');
+      if (err.response?.status === 403) {
+        setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
+      } else {
+        setError(err.response?.data?.message || 'Đăng nhập thất bại!');
+      }
     }
   };
 

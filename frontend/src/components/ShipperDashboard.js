@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
+import { shipperAPI } from '../services/api';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
@@ -20,11 +21,24 @@ const ShipperDashboard = () => {
     avatar: ''
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', content: '' });
+
   const getImageUrl = (path) => {
-    if (!path) return '';
-    // Chuyển đổi đường dẫn Windows thành URL path
-    const relativePath = path.split('back-end\\uploads\\')[1]?.replace(/\\/g, '/');
-    return relativePath ? `${BASE_URL}/uploads/${relativePath}` : '';
+    if (!path) return null;
+    
+    // Nếu path đã là đường dẫn tương đối (bắt đầu bằng 'uploads/')
+    if (path.startsWith('uploads/')) {
+      return `${BASE_URL}/${path}`;
+    }
+    
+    // Nếu path là đường dẫn đầy đủ (có chứa '\uploads\')
+    const relativePath = path.split('\\uploads\\')[1];
+    if (relativePath) {
+      return `${BASE_URL}/uploads/${relativePath}`;
+    }
+    
+    return null;
   };
 
   useEffect(() => {
@@ -83,25 +97,101 @@ const ShipperDashboard = () => {
     navigate('/login');
   };
 
-  const handleAvatarChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setShipperProfile({...shipperProfile, avatar: e.target.result});
-      };
-      reader.readAsDataURL(file);
+  const handleFileUpload = async (file, type) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await shipperAPI.uploadFile(formData);
+      if (!response.data.success) {
+        throw new Error(response.data.message);
+      }
+      return response.data.filePath;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi tải file lên server' });
+      return null;
     }
   };
 
-  const removeAvatar = () => {
-    setShipperProfile({...shipperProfile, avatar: ''});
+  const handleImageUpload = async (event, type) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      setIsLoading(true);
+      const filePath = await handleFileUpload(file, type);
+      if (filePath) {
+        setShipperProfile(prev => ({
+          ...prev,
+          [type]: filePath
+        }));
+        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+      }
+    } catch (error) {
+      console.error('Error handling image upload:', error);
+      setMessage({ type: 'error', content: 'Lỗi khi xử lý ảnh' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleProfileUpdate = (e) => {
+  const handleAvatarChange = (event) => {
+    handleImageUpload(event, 'avatar');
+  };
+
+  const handleCMNDFrontUpload = (event) => {
+    handleImageUpload(event, 'cmndFront');
+  };
+
+  const handleCMNDBackUpload = (event) => {
+    handleImageUpload(event, 'cmndBack');
+  };
+
+  const handleLicensePlateUpload = (event) => {
+    handleImageUpload(event, 'licensePlateImage');
+  };
+
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    // TODO: Gọi API để cập nhật thông tin profile
-    console.log('Cập nhật thông tin:', shipperProfile);
+    setIsLoading(true);
+    setMessage({ type: '', content: '' });
+
+    try {
+      const response = await shipperAPI.updateProfile({
+        fullName: shipperProfile.name,
+        phone: shipperProfile.phone,
+        avatar: shipperProfile.avatar,
+        cmndFront: shipperProfile.cmndFront,
+        cmndBack: shipperProfile.cmndBack,
+        licensePlateImage: shipperProfile.licensePlateImage
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message);
+      }
+
+      const data = response.data.data;
+      setMessage({ type: 'success', content: 'Cập nhật thông tin thành công' });
+      
+      // Update localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      localStorage.setItem('user', JSON.stringify({
+        ...user,
+        ...data
+      }));
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      const errorMessage = error.response?.data?.message || 'Lỗi khi cập nhật thông tin';
+      if (error.response?.data?.errors) {
+        setMessage({ type: 'error', content: error.response.data.errors.join(', ') });
+      } else {
+        setMessage({ type: 'error', content: errorMessage });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const headerStyle = {
@@ -149,7 +239,7 @@ const ShipperDashboard = () => {
             </div>
             <div className="dropdown">
               <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
-                {shipperProfile.avatar ? (
+                {shipperProfile.avatar && getImageUrl(shipperProfile.avatar) ? (
                   <img 
                     src={getImageUrl(shipperProfile.avatar)} 
                     alt="Avatar" 
@@ -426,11 +516,17 @@ const ShipperDashboard = () => {
                   <h4 className="mb-0"><FaUser className="me-2" />Thông tin shipper</h4>
                 </div>
                 <div className="card-body">
+                  {message.content && (
+                    <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
+                      {message.content}
+                      <button type="button" className="btn-close" onClick={() => setMessage({ type: '', content: '' })}></button>
+                    </div>
+                  )}
                   <form onSubmit={handleProfileUpdate}>
                     {/* Avatar Section */}
                     <div className="text-center mb-4">
                       <div className="position-relative d-inline-block">
-                        {shipperProfile.avatar ? (
+                        {shipperProfile.avatar && getImageUrl(shipperProfile.avatar) ? (
                           <img 
                             src={getImageUrl(shipperProfile.avatar)} 
                             alt="Avatar" 
@@ -476,7 +572,7 @@ const ShipperDashboard = () => {
                           <button 
                             type="button" 
                             className="btn btn-outline-danger btn-sm"
-                            onClick={removeAvatar}
+                            onClick={() => setShipperProfile({...shipperProfile, avatar: ''})}
                           >
                             Xóa ảnh đại diện
                           </button>
@@ -492,6 +588,7 @@ const ShipperDashboard = () => {
                           className="form-control" 
                           value={shipperProfile.name}
                           onChange={(e) => setShipperProfile({...shipperProfile, name: e.target.value})}
+                          required
                         />
                       </div>
                       <div className="col-md-6">
@@ -501,6 +598,7 @@ const ShipperDashboard = () => {
                           className="form-control" 
                           value={shipperProfile.phone}
                           onChange={(e) => setShipperProfile({...shipperProfile, phone: e.target.value})}
+                          required
                         />
                       </div>
                     </div>
@@ -509,37 +607,77 @@ const ShipperDashboard = () => {
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Ảnh CMND mặt trước</label>
                         <div className="border rounded p-2">
-                          {shipperProfile.cmndFront ? (
-                            <img 
-                              src={getImageUrl(shipperProfile.cmndFront)}
-                              alt="CMND mặt trước"
-                              className="img-fluid rounded"
-                              style={{maxHeight: '150px', objectFit: 'contain'}}
-                            />
-                          ) : (
-                            <div className="text-center text-muted py-3">
-                              <FaImage size={40} />
-                              <p className="mt-2 mb-0">Chưa có ảnh CMND mặt trước</p>
+                          {shipperProfile.cmndFront && getImageUrl(shipperProfile.cmndFront) ? (
+                            <div className="position-relative">
+                              <img 
+                                src={getImageUrl(shipperProfile.cmndFront)}
+                                alt="CMND mặt trước"
+                                className="img-fluid rounded"
+                                style={{maxHeight: '150px', objectFit: 'contain'}}
+                              />
+                              <label 
+                                htmlFor="cmnd-front-upload" 
+                                className="position-absolute bottom-0 end-0 btn btn-primary btn-sm m-2"
+                              >
+                                <FaEdit className="me-1" />
+                                Thay đổi
+                              </label>
                             </div>
+                          ) : (
+                            <label 
+                              htmlFor="cmnd-front-upload" 
+                              className="text-center text-muted py-3 d-block" 
+                              style={{cursor: 'pointer'}}
+                            >
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Click để tải ảnh CMND mặt trước</p>
+                            </label>
                           )}
+                          <input 
+                            id="cmnd-front-upload"
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleCMNDFrontUpload}
+                            style={{display: 'none'}}
+                          />
                         </div>
                       </div>
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Ảnh CMND mặt sau</label>
                         <div className="border rounded p-2">
-                          {shipperProfile.cmndBack ? (
-                            <img 
-                              src={getImageUrl(shipperProfile.cmndBack)}
-                              alt="CMND mặt sau"
-                              className="img-fluid rounded"
-                              style={{maxHeight: '150px', objectFit: 'contain'}}
-                            />
-                          ) : (
-                            <div className="text-center text-muted py-3">
-                              <FaImage size={40} />
-                              <p className="mt-2 mb-0">Chưa có ảnh CMND mặt sau</p>
+                          {shipperProfile.cmndBack && getImageUrl(shipperProfile.cmndBack) ? (
+                            <div className="position-relative">
+                              <img 
+                                src={getImageUrl(shipperProfile.cmndBack)}
+                                alt="CMND mặt sau"
+                                className="img-fluid rounded"
+                                style={{maxHeight: '150px', objectFit: 'contain'}}
+                              />
+                              <label 
+                                htmlFor="cmnd-back-upload" 
+                                className="position-absolute bottom-0 end-0 btn btn-primary btn-sm m-2"
+                              >
+                                <FaEdit className="me-1" />
+                                Thay đổi
+                              </label>
                             </div>
+                          ) : (
+                            <label 
+                              htmlFor="cmnd-back-upload" 
+                              className="text-center text-muted py-3 d-block" 
+                              style={{cursor: 'pointer'}}
+                            >
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Click để tải ảnh CMND mặt sau</p>
+                            </label>
                           )}
+                          <input 
+                            id="cmnd-back-upload"
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleCMNDBackUpload}
+                            style={{display: 'none'}}
+                          />
                         </div>
                       </div>
                     </div>
@@ -548,19 +686,39 @@ const ShipperDashboard = () => {
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Ảnh biển số xe</label>
                         <div className="border rounded p-2">
-                          {shipperProfile.licensePlateImage ? (
-                            <img 
-                              src={getImageUrl(shipperProfile.licensePlateImage)}
-                              alt="Biển số xe"
-                              className="img-fluid rounded"
-                              style={{maxHeight: '150px', objectFit: 'contain'}}
-                            />
-                          ) : (
-                            <div className="text-center text-muted py-3">
-                              <FaImage size={40} />
-                              <p className="mt-2 mb-0">Chưa có ảnh biển số xe</p>
+                          {shipperProfile.licensePlateImage && getImageUrl(shipperProfile.licensePlateImage) ? (
+                            <div className="position-relative">
+                              <img 
+                                src={getImageUrl(shipperProfile.licensePlateImage)}
+                                alt="Biển số xe"
+                                className="img-fluid rounded"
+                                style={{maxHeight: '150px', objectFit: 'contain'}}
+                              />
+                              <label 
+                                htmlFor="license-plate-upload" 
+                                className="position-absolute bottom-0 end-0 btn btn-primary btn-sm m-2"
+                              >
+                                <FaEdit className="me-1" />
+                                Thay đổi
+                              </label>
                             </div>
+                          ) : (
+                            <label 
+                              htmlFor="license-plate-upload" 
+                              className="text-center text-muted py-3 d-block" 
+                              style={{cursor: 'pointer'}}
+                            >
+                              <FaImage size={40} />
+                              <p className="mt-2 mb-0">Click để tải ảnh biển số xe</p>
+                            </label>
                           )}
+                          <input 
+                            id="license-plate-upload"
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleLicensePlateUpload}
+                            style={{display: 'none'}}
+                          />
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -578,8 +736,20 @@ const ShipperDashboard = () => {
                         <input type="text" className="form-control" value={shipperProfile.totalDeliveries} readOnly />
                       </div>
                     </div>
-                    <button type="submit" className="btn btn-primary" style={buttonStyle}>
-                      Cập nhật thông tin
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary" 
+                      style={buttonStyle}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Đang cập nhật...
+                        </>
+                      ) : (
+                        'Cập nhật thông tin'
+                      )}
                     </button>
                   </form>
                 </div>
