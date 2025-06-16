@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
@@ -94,8 +94,10 @@ const Home = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'tracking' || activeTab === 'history') {
+    if (activeTab === 'tracking') {
       fetchOrders();
+      const interval = setInterval(fetchOrders, 30000); // Refresh mỗi 30 giây
+      return () => clearInterval(interval);
     }
   }, [activeTab]);
 
@@ -528,16 +530,30 @@ const Home = () => {
                               <p className="mb-1"><strong>Từ:</strong> {order.pickupaddress}</p>
                               <p className="mb-1"><strong>Đến:</strong> {order.dropupaddress}</p>
                               <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
+                              {order.status !== 'pending' && order.driverId && (
+                                <div className="mb-2 p-2 bg-light rounded">
+                                  <p className="mb-1">
+                                    <FaUser className="text-primary me-2" />
+                                    <strong>Shipper:</strong> {order.driverId.fullName}
+                                  </p>
+                                  <p className="mb-0">
+                                    <FaPhone className="text-success me-2" />
+                                    <strong>Liên hệ:</strong> {order.driverId.phone || 'Chưa có thông tin'}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             <div className="text-end">
                               <span className={`badge ${
                                 order.status === 'pending' ? 'bg-warning' : 
                                 order.status === 'accepted' ? 'bg-info' :
-                                order.status === 'delivering' ? 'bg-primary' : 'bg-success'
+                                order.status === 'in-progress' ? 'bg-primary' : 
+                                order.status === 'completed' ? 'bg-success' : 'bg-secondary'
                               } mb-2`}>
                                 {order.status === 'pending' ? 'Chờ xử lý' : 
                                  order.status === 'accepted' ? 'Đã nhận đơn' :
-                                 order.status === 'delivering' ? 'Đang giao' : 'Hoàn thành'}
+                                 order.status === 'in-progress' ? 'Đang giao' : 
+                                 order.status === 'completed' ? 'Đã giao hàng' : 'Không xác định'}
                               </span>
                               <div className="fw-bold text-primary">{order.price.toLocaleString()} VNĐ</div>
                             </div>
