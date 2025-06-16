@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaCalculator, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
 import { userAPI } from '../services/api';
+import DeliveryMap from '../components/DeliveryMap';
+import RideMap from '../components/RideMap';
+import { useMapEvents } from 'react-leaflet';
+import axios from 'axios';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -15,11 +20,14 @@ const Home = () => {
   
   const [orderData, setOrderData] = useState({
     pickupLocation: '',
+    pickupCoordinates: null,
     deliveryLocation: '',
+    deliveryCoordinates: null,
     itemType: '',
     weight: '',
     dimensions: '',
-    estimatedPrice: 0
+    estimatedPrice: 0,
+    distance: 0
   });
   
   const [userProfile, setUserProfile] = useState({
@@ -29,6 +37,11 @@ const Home = () => {
     email: '',
     avatar: ''
   });
+
+  const [isSelectingPoint, setIsSelectingPoint] = useState(null); // 'pickup', 'delivery', or null
+
+  const [orders, setOrders] = useState([]);
+  const [error, setError] = useState('');
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -61,17 +74,77 @@ const Home = () => {
     }
   }, []);
 
-  const [orders, setOrders] = useState([
-    { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', status: 'completed', price: 50000, date: '2025-01-25' },
-    { id: 2, type: 'pickup', from: 'Hòa Lạc', to: 'Hà Nội', status: 'in-progress', price: 30000, date: '2025-01-27' },
-    { id: 3, type: 'delivery', from: 'Cầu Giấy', to: 'Thăng Long', status: 'pending', price: 45000, date: '2025-01-27' }
-  ]);
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setOrders(response.data);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError('Không thể tải danh sách đơn hàng');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const calculatePrice = () => {
+  useEffect(() => {
+    if (activeTab === 'tracking') {
+      fetchOrders();
+      const interval = setInterval(fetchOrders, 30000); // Refresh mỗi 30 giây
+      return () => clearInterval(interval);
+    }
+  }, [activeTab]);
+
+  const handleLocationUpdate = (type, location, coordinates) => {
+    if (type === 'route') {
+      setOrderData(prev => ({
+        ...prev,
+        distance: coordinates.distance,
+        estimatedPrice: calculatePrice(coordinates.distance)
+      }));
+      return;
+    }
+
+    setOrderData(prev => ({
+      ...prev,
+      [`${type}Location`]: location,
+      [`${type}Coordinates`]: coordinates
+    }));
+  };
+
+  const calculatePrice = (distance) => {
+    if (!distance) return 0;
+    
     let basePrice = serviceType === 'delivery' ? 25000 : 20000;
+    let distancePrice = distance * 10000; // 10,000 VND per km
     let weightFactor = orderData.weight ? parseInt(orderData.weight) * 2000 : 0;
-    let estimated = basePrice + weightFactor;
-    setOrderData({...orderData, estimatedPrice: estimated});
+    let estimated = basePrice + distancePrice + weightFactor;
+    
+    return Math.round(estimated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!orderData.pickupCoordinates || !orderData.deliveryCoordinates) {
+      setMessage({ type: 'error', content: 'Vui lòng chọn địa điểm trên bản đồ' });
+      return;
+    }
+
+    if (serviceType === 'delivery' && (!orderData.itemType || !orderData.weight || !orderData.dimensions)) {
+      setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
+      return;
+    }
+ navigate('/confirmOrder', { state: { orderData, serviceType } });
+    // TODO: Implement order submission
+    console.log('Submitting order:', orderData);
+    setMessage({ type: 'success', content: 'Đặt đơn thành công!' });
   };
 
   const handleLogout = () => {
@@ -193,6 +266,17 @@ const Home = () => {
     minHeight: '500px'
   };
 
+  const MapClickHandler = ({ onMapClick }) => {
+    useMapEvents({
+      click: async (e) => {
+        const { lat, lng } = e.latlng;
+        // Reverse geocoding để lấy địa chỉ từ tọa độ
+        // ...
+      }
+    });
+    return null;
+  };
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       {/* Header */}
@@ -280,6 +364,12 @@ const Home = () => {
                   <h4 className="mb-0"><FaShippingFast className="me-2" />Đặt đơn mới</h4>
                 </div>
                 <div className="card-body">
+                  {message.content && (
+                    <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
+                      {message.content}
+                    </div>
+                  )}
+
                   {/* Service Type Selection */}
                   <div className="row mb-4">
                     <div className="col-md-6">
@@ -310,114 +400,105 @@ const Home = () => {
                     </div>
                   </div>
 
-                  <form>
-                    {/* Location inputs */}
-                    <div className="row mb-3">
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">
-                          <FaMapMarkerAlt className="me-2 text-success" />
-                          {serviceType === 'delivery' ? 'Nơi lấy hàng' : 'Điểm đón'}
-                        </label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder={serviceType === 'delivery' ? 'Nhập địa chỉ lấy hàng' : 'Nhập điểm đón'}
-                          value={orderData.pickupLocation}
-                          onChange={(e) => setOrderData({...orderData, pickupLocation: e.target.value})}
-                        />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">
-                          <FaMapMarkerAlt className="me-2 text-danger" />
-                          {serviceType === 'delivery' ? 'Nơi giao hàng' : 'Điểm đến'}
-                        </label>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder={serviceType === 'delivery' ? 'Nhập địa chỉ giao hàng' : 'Nhập điểm đến'}
-                          value={orderData.deliveryLocation}
-                          onChange={(e) => setOrderData({...orderData, deliveryLocation: e.target.value})}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Additional fields for delivery */}
-                    {serviceType === 'delivery' && (
-                      <div className="row mb-3">
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold">Loại hàng</label>
-                          <select 
-                            className="form-select"
-                            value={orderData.itemType}
-                            onChange={(e) => setOrderData({...orderData, itemType: e.target.value})}
-                          >
-                            <option value="">Chọn loại hàng</option>
-                            <option value="document">Tài liệu</option>
-                            <option value="food">Thực phẩm</option>
-                            <option value="clothes">Quần áo</option>
-                            <option value="electronics">Điện tử</option>
-                            <option value="other">Khác</option>
-                          </select>
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold">
-                            <FaWeight className="me-2" />
-                            Cân nặng (kg)
-                          </label>
-                          <input 
-                            type="number" 
-                            className="form-control" 
-                            placeholder="0"
-                            value={orderData.weight}
-                            onChange={(e) => setOrderData({...orderData, weight: e.target.value})}
-                          />
-                        </div>
-                        <div className="col-md-4">
-                          <label className="form-label fw-semibold">
-                            <FaRuler className="me-2" />
-                            Kích thước
-                          </label>
-                          <select 
-                            className="form-select"
-                            value={orderData.dimensions}
-                            onChange={(e) => setOrderData({...orderData, dimensions: e.target.value})}
-                          >
-                            <option value="">Chọn kích thước</option>
-                            <option value="small">Nhỏ (&lt; 30cm)</option>
-                            <option value="medium">Vừa (30-60cm)</option>
-                            <option value="large">Lớn (&gt; 60cm)</option>
-                          </select>
-                        </div>
-                      </div>
+                  {/* Map Component */}
+                  <div className="mb-4">
+                    {serviceType === 'delivery' ? (
+                      <DeliveryMap 
+                        onLocationUpdate={handleLocationUpdate}
+                        pickupLocation={orderData.pickupLocation}
+                        deliveryLocation={orderData.deliveryLocation}
+                        isSelectingPoint={isSelectingPoint}
+                        onSelectingPointChange={setIsSelectingPoint}
+                      />
+                    ) : (
+                      <RideMap 
+                        onLocationUpdate={handleLocationUpdate}
+                        pickupLocation={orderData.pickupLocation}
+                        dropoffLocation={orderData.deliveryLocation}
+                        isSelectingPoint={isSelectingPoint}
+                        onSelectingPointChange={setIsSelectingPoint}
+                      />
                     )}
+                  </div>
 
-                    {/* Price calculation */}
-                    <div className="row mb-4">
-                      <div className="col-md-6">
-                        <button 
-                          type="button" 
-                          className="btn btn-outline-primary"
-                          onClick={calculatePrice}
-                          style={buttonStyle}
+                  {/* Additional fields for delivery */}
+                  {serviceType === 'delivery' && (
+                    <div className="row mb-3">
+                      <div className="col-md-4">
+                        <label className="form-label fw-semibold">Loại hàng</label>
+                        <select 
+                          className="form-select"
+                          value={orderData.itemType}
+                          onChange={(e) => setOrderData({...orderData, itemType: e.target.value})}
                         >
-                          <FaCalculator className="me-2" />
-                          Tính giá tạm tính
-                        </button>
+                          <option value="">Chọn loại hàng</option>
+                          <option value="document">Tài liệu</option>
+                          <option value="food">Thực phẩm</option>
+                          <option value="clothes">Quần áo</option>
+                          <option value="electronics">Điện tử</option>
+                          <option value="other">Khác</option>
+                        </select>
                       </div>
-                      <div className="col-md-6">
-                        {orderData.estimatedPrice > 0 && (
-                          <div className="alert alert-info">
-                            <strong>Giá tạm tính: {orderData.estimatedPrice.toLocaleString()} VNĐ</strong>
-                          </div>
-                        )}
+                      <div className="col-md-4">
+                        <label className="form-label fw-semibold">
+                          <FaWeight className="me-2" />
+                          Cân nặng (kg)
+                        </label>
+                        <input 
+                          type="number" 
+                          className="form-control" 
+                          placeholder="0"
+                          value={orderData.weight}
+                          onChange={(e) => {
+                            setOrderData({...orderData, weight: e.target.value});
+                            if (orderData.pickupCoordinates && orderData.deliveryCoordinates) {
+                              handleLocationUpdate('route', null, { distance: orderData.distance });
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label fw-semibold">
+                          <FaRuler className="me-2" />
+                          Kích thước
+                        </label>
+                        <select 
+                          className="form-select"
+                          value={orderData.dimensions}
+                          onChange={(e) => setOrderData({...orderData, dimensions: e.target.value})}
+                        >
+                          <option value="">Chọn kích thước</option>
+                          <option value="small">Nhỏ (&lt; 30cm)</option>
+                          <option value="medium">Vừa (30-60cm)</option>
+                          <option value="large">Lớn (&gt; 60cm)</option>
+                        </select>
                       </div>
                     </div>
+                  )}
 
-                    {/* Submit button */}
-                    <button type="submit" className="btn btn-primary btn-lg w-100" style={buttonStyle}>
-                      Đặt đơn ngay
-                    </button>
-                  </form>
+                  {/* Price display */}
+                  {orderData.estimatedPrice > 0 && (
+                    <div className="alert alert-info mb-4">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <strong>Khoảng cách:</strong> {orderData.distance ? `${orderData.distance.toFixed(1)} km` : '0 km'}
+                        </div>
+                        <div>
+                          <strong>Giá tạm tính:</strong> {orderData.estimatedPrice.toLocaleString()} VNĐ
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submit button */}
+                  <button
+          type="button"
+          className="btn btn-primary btn-lg w-100"
+          disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates}
+          onClick={handleSubmit}
+        >
+                    Đặt đơn ngay
+                  </button>
                 </div>
               </div>
             )}
@@ -429,26 +510,58 @@ const Home = () => {
                   <h4 className="mb-0"><FaMapMarkerAlt className="me-2" />Theo dõi đơn hàng</h4>
                 </div>
                 <div className="card-body">
-                  {orders.filter(order => order.status !== 'completed').map(order => (
-                    <div key={order.id} className="card mb-3">
-                      <div className="card-body">
-                        <div className="row align-items-center">
-                          <div className="col-md-8">
-                            <h6 className="fw-bold">Đơn hàng #{order.id}</h6>
-                            <p className="mb-1"><strong>Từ:</strong> {order.from}</p>
-                            <p className="mb-1"><strong>Đến:</strong> {order.to}</p>
-                            <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
-                          </div>
-                          <div className="col-md-4 text-end">
-                            <span className={`badge fs-6 ${order.status === 'pending' ? 'bg-warning' : 'bg-info'}`}>
-                              {order.status === 'pending' ? 'Chờ xử lý' : 'Đang giao'}
-                            </span>
-                            <p className="mt-2 fw-bold text-primary">{order.price.toLocaleString()} VNĐ</p>
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                      </div>
+                    </div>
+                  ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                  ) : orders.length === 0 ? (
+                    <div className="alert alert-info">Không có đơn hàng nào</div>
+                  ) : (
+                    orders.filter(order => order.status !== 'completed').map(order => (
+                      <div key={order._id} className="card mb-3">
+                        <div className="card-body">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                              <h6 className="fw-bold mb-2">Đơn hàng #{order._id.slice(-6)}</h6>
+                              <p className="mb-1"><strong>Từ:</strong> {order.pickupaddress}</p>
+                              <p className="mb-1"><strong>Đến:</strong> {order.dropupaddress}</p>
+                              <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
+                              {order.status !== 'pending' && order.driverId && (
+                                <div className="mb-2 p-2 bg-light rounded">
+                                  <p className="mb-1">
+                                    <FaUser className="text-primary me-2" />
+                                    <strong>Shipper:</strong> {order.driverId.fullName}
+                                  </p>
+                                  <p className="mb-0">
+                                    <FaPhone className="text-success me-2" />
+                                    <strong>Liên hệ:</strong> {order.driverId.phone || 'Chưa có thông tin'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-end">
+                              <span className={`badge ${
+                                order.status === 'pending' ? 'bg-warning' : 
+                                order.status === 'accepted' ? 'bg-info' :
+                                order.status === 'in-progress' ? 'bg-primary' : 
+                                order.status === 'completed' ? 'bg-success' : 'bg-secondary'
+                              } mb-2`}>
+                                {order.status === 'pending' ? 'Chờ xử lý' : 
+                                 order.status === 'accepted' ? 'Đã nhận đơn' :
+                                 order.status === 'in-progress' ? 'Đang giao' : 
+                                 order.status === 'completed' ? 'Đã giao hàng' : 'Không xác định'}
+                              </span>
+                              <div className="fw-bold text-primary">{order.price.toLocaleString()} VNĐ</div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -460,49 +573,54 @@ const Home = () => {
                   <h4 className="mb-0"><FaHistory className="me-2" />Lịch sử đơn hàng</h4>
                 </div>
                 <div className="card-body">
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Mã đơn</th>
-                          <th>Loại</th>
-                          <th>Tuyến đường</th>
-                          <th>Ngày</th>
-                          <th>Trạng thái</th>
-                          <th>Giá</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map(order => (
-                          <tr key={order.id}>
-                            <td>#{order.id}</td>
-                            <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                            <td>{order.from} → {order.to}</td>
-                            <td>{order.date}</td>
-                            <td>
-                              <span className={`badge ${
-                                order.status === 'completed' ? 'bg-success' : 
-                                order.status === 'in-progress' ? 'bg-info' : 'bg-warning'
-                              }`}>
-                                {order.status === 'completed' ? 'Hoàn thành' : 
-                                 order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
-                              </span>
-                            </td>
-                            <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                            <td>
-                              {order.status === 'completed' && (
-                                <button className="btn btn-sm btn-outline-warning">
-                                  <FaStar className="me-1" />
-                                  Đánh giá
-                                </button>
-                              )}
-                            </td>
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                      </div>
+                    </div>
+                  ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                  ) : orders.length === 0 ? (
+                    <div className="alert alert-info">Không có lịch sử đơn hàng</div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Mã đơn</th>
+                            <th>Từ</th>
+                            <th>Đến</th>
+                            <th>Loại</th>
+                            <th>Trạng thái</th>
+                            <th>Giá</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {orders.map(order => (
+                            <tr key={order._id}>
+                              <td>#{order._id.slice(-6)}</td>
+                              <td>{order.pickupaddress}</td>
+                              <td>{order.dropupaddress}</td>
+                              <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
+                              <td>
+                                <span className={`badge ${
+                                  order.status === 'completed' ? 'bg-success' : 
+                                  order.status === 'accepted' ? 'bg-info' :
+                                  order.status === 'delivering' ? 'bg-primary' : 'bg-warning'
+                                }`}>
+                                  {order.status === 'completed' ? 'Hoàn thành' : 
+                                   order.status === 'accepted' ? 'Đã nhận đơn' :
+                                   order.status === 'delivering' ? 'Đang giao' : 'Chờ xử lý'}
+                                </span>
+                              </td>
+                              <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

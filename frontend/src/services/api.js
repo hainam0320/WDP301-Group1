@@ -55,6 +55,12 @@ export const userAPI = {
     api.post('/users/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+
+  // ---- Create Order ----
+  createOrder: (orderData) => api.post('/orders', orderData),
+
+  // ---- Get User Orders ----
+  getUserOrders: () => api.get('/orders/user'),
 };
 
 export const adminAPI = {

@@ -4,6 +4,7 @@ const { protect } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const Driver = require('../model/driverModel');
+const Order = require('../model/orderModel');
 
 // Cấu hình multer cho việc upload file
 const storage = multer.diskStorage({
@@ -159,5 +160,202 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
         });
     }
 });
+
+// Get available orders
+router.get('/available', protect, async (req, res) => {
+  try {
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized as driver' 
+      });
+    }
+
+    const availableOrders = await Order.find({ 
+      status: 'pending',
+      driverId: { $exists: false }
+    }).populate('userId', 'name phone');
+
+    res.json(availableOrders);
+  } catch (error) {
+    console.error('Error fetching available orders:', error);
+    res.status(500).json({ message: 'Error fetching available orders' });
+  }
+});
+
+// Accept order
+router.post('/:orderId/accept', protect, async (req, res) => {
+  try {
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized as driver' 
+      });
+    }
+
+    const order = await Order.findById(req.params.orderId);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.driverId) {
+      return res.status(400).json({ message: 'Order already accepted by another driver' });
+    }
+
+    order.driverId = req.user._id;
+    order.status = 'accepted';
+    await order.save();
+
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    res.status(500).json({ message: 'Error accepting order' });
+  }
+});
+
+// Get shipper's orders
+router.get('/orders', protect, async (req, res) => {
+  try {
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized as driver' 
+      });
+    }
+
+    const orders = await Order.find({ 
+      driverId: req.user._id 
+    }).populate('userId', 'name phone');
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching shipper orders:', error);
+    res.status(500).json({ message: 'Error fetching shipper orders' });
+  }
+});
+
+// Update order status
+router.put('/orders/:orderId/status', protect, async (req, res) => {
+  try {
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized as driver' 
+      });
+    }
+
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required'
+      });
+    }
+
+    const order = await Order.findById(req.params.orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Kiểm tra xem đơn hàng có phải của shipper này không
+    if (order.driverId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this order'
+      });
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error updating order status' 
+    });
+  }
+});
+
+// Get shipper's earnings statistics
+router.get('/earnings', protect, async (req, res) => {
+  try {
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized as driver' 
+      });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const oneWeekAgo = new Date(today);
+    oneWeekAgo.setDate(today.getDate() - 7);
+
+    const oneMonthAgo = new Date(today);
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+
+    // Lấy các đơn hàng đã hoàn thành
+    const completedOrders = await Order.find({
+      driverId: req.user._id,
+      status: 'completed'
+    });
+
+    // Tính toán thống kê
+    const earnings = {
+      today: 0,
+      thisWeek: 0,
+      thisMonth: 0,
+      total: 0,
+      totalDeliveries: completedOrders.length
+    };
+
+    completedOrders.forEach(order => {
+      const orderDate = new Date(order.updatedAt);
+      earnings.total += order.price;
+
+      if (orderDate >= today) {
+        earnings.today += order.price;
+      }
+      if (orderDate >= oneWeekAgo) {
+        earnings.thisWeek += order.price;
+      }
+      if (orderDate >= oneMonthAgo) {
+        earnings.thisMonth += order.price;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: earnings
+    });
+  } catch (error) {
+    console.error('Error getting earnings:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error getting earnings statistics' 
+    });
+  }
+});
+
+const handleMapClick = (location) => {
+  if (!isSelectingPoint) return;
+  handleLocationSelect(location, isSelectingPoint);
+  setIsSelectingPoint(null);
+};
 
 module.exports = router; 

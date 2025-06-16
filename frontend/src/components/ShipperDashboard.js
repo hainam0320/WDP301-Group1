@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaTimes, FaRoute, FaClock, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaRoute, FaClock, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 import { shipperAPI } from '../services/api';
+import axios from 'axios';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
@@ -23,6 +24,89 @@ const ShipperDashboard = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
+  const [availableOrders, setAvailableOrders] = useState([]);
+  const [error, setError] = useState('');
+
+  const [myOrders, setMyOrders] = useState([]);
+
+  const [earnings, setEarnings] = useState({
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    total: 0,
+    totalDeliveries: 0
+  });
+
+  // Fetch available orders
+  const fetchAvailableOrders = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/shipper/available`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setAvailableOrders(response.data);
+    } catch (err) {
+      console.error('Error fetching available orders:', err);
+      setError('Không thể tải danh sách đơn hàng khả dụng');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch my orders
+  const fetchMyOrders = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/shipper/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setMyOrders(response.data);
+    } catch (err) {
+      console.error('Error fetching my orders:', err);
+      setError('Không thể tải danh sách đơn hàng của bạn');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Hàm lấy thống kê thu nhập
+  const fetchEarnings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/shipper/earnings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.data.success) {
+        setEarnings(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching earnings:', error);
+      setMessage({ 
+        type: 'error', 
+        content: 'Không thể tải dữ liệu thống kê thu nhập' 
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchAvailableOrders();
+    } else if (activeTab === 'myorders') {
+      fetchMyOrders();
+    } else if (activeTab === 'earnings') {
+      fetchEarnings();
+    }
+  }, [activeTab]);
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -57,38 +141,87 @@ const ShipperDashboard = () => {
         avatar: user.avatar || ''
       }));
     }
+    // Gọi API earnings khi component mount
+    fetchEarnings();
   }, []);
 
-  const [availableOrders, setAvailableOrders] = useState([
-    { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', distance: '25km', price: 50000, weight: '2kg', status: 'available' },
-    { id: 2, type: 'pickup', from: 'Cầu Giấy', to: 'Thăng Long', distance: '15km', price: 35000, weight: '3kg', status: 'available' },
-    { id: 3, type: 'delivery', from: 'Đống Đa', to: 'Hòa Lạc', distance: '30km', price: 60000, weight: '5kg', status: 'available' }
-  ]);
+  const acceptOrder = async (orderId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${BASE_URL}/api/shipper/${orderId}/accept`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-  const [myOrders, setMyOrders] = useState([
-    { id: 4, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', distance: '25km', price: 45000, status: 'in-progress', customerPhone: '0123456789' },
-    { id: 5, type: 'pickup', from: 'Hòa Lạc', to: 'Hà Nội', distance: '25km', price: 40000, status: 'completed', customerPhone: '0987123456' }
-  ]);
-
-  const [earnings, setEarnings] = useState({
-    today: 125000,
-    thisWeek: 850000,
-    thisMonth: 3200000,
-    total: 15600000
-  });
-
-  const acceptOrder = (orderId) => {
-    const order = availableOrders.find(o => o.id === orderId);
-    if (order) {
-      setMyOrders([...myOrders, {...order, status: 'accepted', customerPhone: '0123456789'}]);
-      setAvailableOrders(availableOrders.filter(o => o.id !== orderId));
+      if (response.data.success) {
+        // Add to my orders
+        const acceptedOrder = availableOrders.find(o => o._id === orderId);
+        if (acceptedOrder) {
+          setMyOrders([...myOrders, {...acceptedOrder, status: 'accepted'}]);
+          // Remove from available orders
+          setAvailableOrders(availableOrders.filter(o => o._id !== orderId));
+        }
+        setMessage({ type: 'success', content: 'Nhận đơn thành công!' });
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      setMessage({ 
+        type: 'error', 
+        content: error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn' 
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const updateOrderStatus = (orderId, newStatus) => {
-    setMyOrders(myOrders.map(order => 
-      order.id === orderId ? {...order, status: newStatus} : order
-    ));
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${BASE_URL}/api/shipper/orders/${orderId}/status`,
+        { status: newStatus },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // Cập nhật state local
+        setMyOrders(myOrders.map(order => 
+          order._id === orderId ? {...order, status: newStatus} : order
+        ));
+        setMessage({ type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' });
+        
+        // Nếu đơn hàng hoàn thành, cập nhật earnings
+        if (newStatus === 'completed') {
+          const completedOrder = myOrders.find(order => order._id === orderId);
+          if (completedOrder) {
+            setEarnings(prev => ({
+              ...prev,
+              today: prev.today + completedOrder.price,
+              thisWeek: prev.thisWeek + completedOrder.price,
+              thisMonth: prev.thisMonth + completedOrder.price,
+              total: prev.total + completedOrder.price
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      setMessage({ 
+        type: 'error', 
+        content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -296,7 +429,7 @@ const ShipperDashboard = () => {
               <div className="card-body text-center">
                 <FaStar size={30} className="mb-2" />
                 <h5>Tổng giao</h5>
-                <h4>{shipperProfile.totalDeliveries} đơn</h4>
+                <h4>{earnings.totalDeliveries} đơn</h4>
               </div>
             </div>
           </div>
@@ -349,52 +482,65 @@ const ShipperDashboard = () => {
                   <h4 className="mb-0"><FaShippingFast className="me-2" />Đơn hàng khả dụng</h4>
                 </div>
                 <div className="card-body">
-                  {availableOrders.map(order => (
-                    <div key={order.id} className="card mb-3">
-                      <div className="card-body">
-                        <div className="row align-items-center">
-                          <div className="col-md-8">
-                            <h6 className="fw-bold">
-                              {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'} #{order.id}
-                            </h6>
-                            <p className="mb-1">
-                              <FaMapMarkerAlt className="text-success me-2" />
-                              <strong>Từ:</strong> {order.from}
-                            </p>
-                            <p className="mb-1">
-                              <FaMapMarkerAlt className="text-danger me-2" />
-                              <strong>Đến:</strong> {order.to}
-                            </p>
-                            <p className="mb-1">
-                              <FaRoute className="text-info me-2" />
-                              <strong>Khoảng cách:</strong> {order.distance}
-                            </p>
-                            {order.weight && (
-                              <p className="mb-1">
-                                <strong>Khối lượng:</strong> {order.weight}
-                              </p>
-                            )}
-                          </div>
-                          <div className="col-md-4 text-end">
-                            <h5 className="text-success fw-bold">{order.price.toLocaleString()} VNĐ</h5>
-                            <button 
-                              className="btn btn-success"
-                              onClick={() => acceptOrder(order.id)}
-                              style={buttonStyle}
-                            >
-                              <FaCheck className="me-2" />
-                              Nhận đơn
-                            </button>
-                          </div>
-                        </div>
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-success" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
                       </div>
                     </div>
-                  ))}
-                  {availableOrders.length === 0 && (
+                  ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                  ) : availableOrders.length === 0 ? (
                     <div className="text-center text-muted py-4">
                       <FaClock size={50} className="mb-3" />
                       <p>Hiện tại không có đơn hàng khả dụng</p>
                     </div>
+                  ) : (
+                    availableOrders.map(order => (
+                      <div key={order._id} className="card mb-3">
+                        <div className="card-body">
+                          <div className="row align-items-center">
+                            <div className="col-md-8">
+                              <h6 className="fw-bold">
+                                {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'} #{order._id.slice(-6)}
+                              </h6>
+                              <p className="mb-1">
+                                <FaMapMarkerAlt className="text-success me-2" />
+                                <strong>Từ:</strong> {order.pickupaddress}
+                              </p>
+                              <p className="mb-1">
+                                <FaMapMarkerAlt className="text-danger me-2" />
+                                <strong>Đến:</strong> {order.dropupaddress}
+                              </p>
+                              <p className="mb-1">
+                                <FaRoute className="text-info me-2" />
+                                <strong>Khoảng cách:</strong> {order.distance_km ? `${order.distance_km.toFixed(1)} km` : 'N/A'}
+                              </p>
+                              {order.type === 'delivery' && order.weight && (
+                                <p className="mb-1">
+                                  <strong>Khối lượng:</strong> {order.weight} kg
+                                </p>
+                              )}
+                              <p className="mb-1">
+                              <FaUser className="text-primary me-2" />
+                              <strong>KH:</strong> {order.userId?.phone || order.phone}
+                            </p>
+                            </div>
+                            <div className="col-md-4 text-end">
+                              <h5 className="text-success fw-bold">{order.price.toLocaleString()} VNĐ</h5>
+                              <button 
+                                className="btn btn-success"
+                                onClick={() => acceptOrder(order._id)}
+                                style={buttonStyle}
+                              >
+                                <FaCheck className="me-2" />
+                                Nhận đơn
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -408,16 +554,30 @@ const ShipperDashboard = () => {
                 </div>
                 <div className="card-body">
                   {myOrders.map(order => (
-                    <div key={order.id} className="card mb-3">
+                    <div key={order._id} className="card mb-3">
                       <div className="card-body">
                         <div className="row align-items-center">
                           <div className="col-md-6">
                             <h6 className="fw-bold">
-                              {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'} #{order.id}
+                              {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'} #{order._id.slice(-6)}
                             </h6>
-                            <p className="mb-1"><strong>Từ:</strong> {order.from}</p>
-                            <p className="mb-1"><strong>Đến:</strong> {order.to}</p>
-                            <p className="mb-1"><strong>KH:</strong> {order.customerPhone}</p>
+                            <p className="mb-1">
+                              <FaMapMarkerAlt className="text-success me-2" />
+                              <strong>Từ:</strong> {order.pickupaddress}
+                            </p>
+                            <p className="mb-1">
+                              <FaMapMarkerAlt className="text-danger me-2" />
+                              <strong>Đến:</strong> {order.dropupaddress}
+                            </p>
+                            <p className="mb-1">
+                              <FaUser className="text-primary me-2" />
+                              <strong>KH:</strong> {order.userId?.phone || order.phone}
+                            </p>
+                            {order.type === 'delivery' && order.weight && (
+                              <p className="mb-1">
+                                <strong>Khối lượng:</strong> {order.weight} kg
+                              </p>
+                            )}
                           </div>
                           <div className="col-md-3">
                             <span className={`badge fs-6 ${
@@ -433,7 +593,7 @@ const ShipperDashboard = () => {
                             {order.status === 'accepted' && (
                               <button 
                                 className="btn btn-warning btn-sm mb-2 w-100"
-                                onClick={() => updateOrderStatus(order.id, 'in-progress')}
+                                onClick={() => updateOrderStatus(order._id, 'in-progress')}
                               >
                                 Bắt đầu giao
                               </button>
@@ -441,7 +601,7 @@ const ShipperDashboard = () => {
                             {order.status === 'in-progress' && (
                               <button 
                                 className="btn btn-success btn-sm mb-2 w-100"
-                                onClick={() => updateOrderStatus(order.id, 'completed')}
+                                onClick={() => updateOrderStatus(order._id, 'completed')}
                               >
                                 Hoàn thành
                               </button>
@@ -456,6 +616,12 @@ const ShipperDashboard = () => {
                       </div>
                     </div>
                   ))}
+                  {myOrders.length === 0 && (
+                    <div className="text-center text-muted py-4">
+                      <FaClock size={50} className="mb-3" />
+                      <p>Bạn chưa có đơn hàng nào</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -473,7 +639,9 @@ const ShipperDashboard = () => {
                         <div className="card-body">
                           <h5 className="card-title">Thu nhập hôm nay</h5>
                           <h3 className="text-success">{earnings.today.toLocaleString()} VNĐ</h3>
-                          <small className="text-muted">3 đơn hàng hoàn thành</small>
+                          <small className="text-muted">
+                            {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                          </small>
                         </div>
                       </div>
                     </div>
@@ -482,7 +650,9 @@ const ShipperDashboard = () => {
                         <div className="card-body">
                           <h5 className="card-title">Thu nhập tuần này</h5>
                           <h3 className="text-info">{earnings.thisWeek.toLocaleString()} VNĐ</h3>
-                          <small className="text-muted">18 đơn hàng hoàn thành</small>
+                          <small className="text-muted">
+                            {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                          </small>
                         </div>
                       </div>
                     </div>
@@ -491,7 +661,9 @@ const ShipperDashboard = () => {
                         <div className="card-body">
                           <h5 className="card-title">Thu nhập tháng này</h5>
                           <h3 className="text-warning">{earnings.thisMonth.toLocaleString()} VNĐ</h3>
-                          <small className="text-muted">72 đơn hàng hoàn thành</small>
+                          <small className="text-muted">
+                            {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                          </small>
                         </div>
                       </div>
                     </div>
@@ -500,7 +672,9 @@ const ShipperDashboard = () => {
                         <div className="card-body">
                           <h5 className="card-title">Tổng thu nhập</h5>
                           <h3 className="text-primary">{earnings.total.toLocaleString()} VNĐ</h3>
-                          <small className="text-muted">{shipperProfile.totalDeliveries} đơn hàng</small>
+                          <small className="text-muted">
+                            {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng` : 'Chưa có đơn hàng nào'}
+                          </small>
                         </div>
                       </div>
                     </div>
