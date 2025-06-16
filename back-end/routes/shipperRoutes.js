@@ -352,10 +352,4 @@ router.get('/earnings', protect, async (req, res) => {
   }
 });
 
-const handleMapClick = (location) => {
-  if (!isSelectingPoint) return;
-  handleLocationSelect(location, isSelectingPoint);
-  setIsSelectingPoint(null);
-};
-
 module.exports = router; 
