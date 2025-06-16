@@ -8,6 +8,7 @@ import { userAPI } from '../services/api';
 import DeliveryMap from '../components/DeliveryMap';
 import RideMap from '../components/RideMap';
 import { useMapEvents } from 'react-leaflet';
+import axios from 'axios';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -38,6 +39,9 @@ const Home = () => {
   });
 
   const [isSelectingPoint, setIsSelectingPoint] = useState(null); // 'pickup', 'delivery', or null
+
+  const [orders, setOrders] = useState([]);
+  const [error, setError] = useState('');
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -70,11 +74,30 @@ const Home = () => {
     }
   }, []);
 
-  const [orders, setOrders] = useState([
-    { id: 1, type: 'delivery', from: 'Hà Nội', to: 'Hòa Lạc', status: 'completed', price: 50000, date: '2025-01-25' },
-    { id: 2, type: 'pickup', from: 'Hòa Lạc', to: 'Hà Nội', status: 'in-progress', price: 30000, date: '2025-01-27' },
-    { id: 3, type: 'delivery', from: 'Cầu Giấy', to: 'Thăng Long', status: 'pending', price: 45000, date: '2025-01-27' }
-  ]);
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setOrders(response.data);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError('Không thể tải danh sách đơn hàng');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'tracking' || activeTab === 'history') {
+      fetchOrders();
+    }
+  }, [activeTab]);
 
   const handleLocationUpdate = (type, location, coordinates) => {
     if (type === 'route') {
@@ -485,26 +508,44 @@ const Home = () => {
                   <h4 className="mb-0"><FaMapMarkerAlt className="me-2" />Theo dõi đơn hàng</h4>
                 </div>
                 <div className="card-body">
-                  {orders.filter(order => order.status !== 'completed').map(order => (
-                    <div key={order.id} className="card mb-3">
-                      <div className="card-body">
-                        <div className="row align-items-center">
-                          <div className="col-md-8">
-                            <h6 className="fw-bold">Đơn hàng #{order.id}</h6>
-                            <p className="mb-1"><strong>Từ:</strong> {order.from}</p>
-                            <p className="mb-1"><strong>Đến:</strong> {order.to}</p>
-                            <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
-                          </div>
-                          <div className="col-md-4 text-end">
-                            <span className={`badge fs-6 ${order.status === 'pending' ? 'bg-warning' : 'bg-info'}`}>
-                              {order.status === 'pending' ? 'Chờ xử lý' : 'Đang giao'}
-                            </span>
-                            <p className="mt-2 fw-bold text-primary">{order.price.toLocaleString()} VNĐ</p>
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                      </div>
+                    </div>
+                  ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                  ) : orders.length === 0 ? (
+                    <div className="alert alert-info">Không có đơn hàng nào</div>
+                  ) : (
+                    orders.filter(order => order.status !== 'completed').map(order => (
+                      <div key={order._id} className="card mb-3">
+                        <div className="card-body">
+                          <div className="d-flex justify-content-between align-items-center">
+                            <div>
+                              <h6 className="fw-bold mb-2">Đơn hàng #{order._id.slice(-6)}</h6>
+                              <p className="mb-1"><strong>Từ:</strong> {order.pickupaddress}</p>
+                              <p className="mb-1"><strong>Đến:</strong> {order.dropupaddress}</p>
+                              <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
+                            </div>
+                            <div className="text-end">
+                              <span className={`badge ${
+                                order.status === 'pending' ? 'bg-warning' : 
+                                order.status === 'accepted' ? 'bg-info' :
+                                order.status === 'delivering' ? 'bg-primary' : 'bg-success'
+                              } mb-2`}>
+                                {order.status === 'pending' ? 'Chờ xử lý' : 
+                                 order.status === 'accepted' ? 'Đã nhận đơn' :
+                                 order.status === 'delivering' ? 'Đang giao' : 'Hoàn thành'}
+                              </span>
+                              <div className="fw-bold text-primary">{order.price.toLocaleString()} VNĐ</div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -516,49 +557,54 @@ const Home = () => {
                   <h4 className="mb-0"><FaHistory className="me-2" />Lịch sử đơn hàng</h4>
                 </div>
                 <div className="card-body">
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Mã đơn</th>
-                          <th>Loại</th>
-                          <th>Tuyến đường</th>
-                          <th>Ngày</th>
-                          <th>Trạng thái</th>
-                          <th>Giá</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map(order => (
-                          <tr key={order.id}>
-                            <td>#{order.id}</td>
-                            <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                            <td>{order.from} → {order.to}</td>
-                            <td>{order.date}</td>
-                            <td>
-                              <span className={`badge ${
-                                order.status === 'completed' ? 'bg-success' : 
-                                order.status === 'in-progress' ? 'bg-info' : 'bg-warning'
-                              }`}>
-                                {order.status === 'completed' ? 'Hoàn thành' : 
-                                 order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
-                              </span>
-                            </td>
-                            <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                            <td>
-                              {order.status === 'completed' && (
-                                <button className="btn btn-sm btn-outline-warning">
-                                  <FaStar className="me-1" />
-                                  Đánh giá
-                                </button>
-                              )}
-                            </td>
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                      </div>
+                    </div>
+                  ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                  ) : orders.length === 0 ? (
+                    <div className="alert alert-info">Không có lịch sử đơn hàng</div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Mã đơn</th>
+                            <th>Từ</th>
+                            <th>Đến</th>
+                            <th>Loại</th>
+                            <th>Trạng thái</th>
+                            <th>Giá</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {orders.map(order => (
+                            <tr key={order._id}>
+                              <td>#{order._id.slice(-6)}</td>
+                              <td>{order.pickupaddress}</td>
+                              <td>{order.dropupaddress}</td>
+                              <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
+                              <td>
+                                <span className={`badge ${
+                                  order.status === 'completed' ? 'bg-success' : 
+                                  order.status === 'accepted' ? 'bg-info' :
+                                  order.status === 'delivering' ? 'bg-primary' : 'bg-warning'
+                                }`}>
+                                  {order.status === 'completed' ? 'Hoàn thành' : 
+                                   order.status === 'accepted' ? 'Đã nhận đơn' :
+                                   order.status === 'delivering' ? 'Đang giao' : 'Chờ xử lý'}
+                                </span>
+                              </td>
+                              <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

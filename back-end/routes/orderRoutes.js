@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/auth');
 const {
   createOrder,
   getAllOrders,
@@ -7,6 +8,9 @@ const {
   updateOrder,
   deleteOrder
 } = require('../controller/orderController');
+
+// Protect all routes
+router.use(protect);
 
 // Route definitions
 router.post('/', createOrder);
