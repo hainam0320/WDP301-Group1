@@ -3,7 +3,7 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
-const User = require('../model/userModel');
+const Driver = require('../model/driverModel');
 
 // Cấu hình multer cho việc upload file
 const storage = multer.diskStorage({
@@ -33,42 +33,44 @@ const getRelativePath = (filePath) => {
     return filePath;
 };
 
-// Route cập nhật profile user
+// Route cập nhật profile shipper
 router.put('/profile', protect, async (req, res) => {
     try {
-        console.log('=== UPDATE USER PROFILE ===');
+        console.log('=== UPDATE PROFILE ===');
         console.log('User:', req.user);
         console.log('Body:', req.body);
 
-        // Kiểm tra xem user có phải là user thường không
-        if (req.user.constructor.modelName !== 'User') {
-            console.log('Not authorized as user');
+        // Kiểm tra xem user có phải là driver không
+        if (req.user.constructor.modelName !== 'Driver') {
+            console.log('Not authorized as driver');
             return res.status(403).json({ 
                 success: false,
-                message: 'Not authorized as user' 
+                message: 'Not authorized as driver' 
             });
         }
 
-        const { fullName, phone, address, avatar } = req.body;
-        const userId = req.user._id;
+        const { fullName, phone, avatar, cmndFront, cmndBack, licensePlateImage } = req.body;
+        const driverId = req.user._id;
 
         // Validate input
-        if (!fullName || !phone || !address) {
+        if (!fullName || !phone) {
             console.log('Missing required fields');
             return res.status(400).json({
                 success: false,
-                message: 'Full name, phone and address are required'
+                message: 'Full name and phone are required'
             });
         }
 
-        // Cập nhật thông tin user trong database
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
+        // Cập nhật thông tin driver trong database
+        const updatedDriver = await Driver.findByIdAndUpdate(
+            driverId,
             {
                 fullName,
                 phone,
-                address,
                 avatar: getRelativePath(avatar),
+                cmndFront: getRelativePath(cmndFront),
+                cmndBack: getRelativePath(cmndBack),
+                licensePlateImage: getRelativePath(licensePlateImage),
                 updatedAt: Date.now()
             },
             { 
@@ -77,22 +79,22 @@ router.put('/profile', protect, async (req, res) => {
             }
         );
 
-        if (!updatedUser) {
-            console.log('User not found');
+        if (!updatedDriver) {
+            console.log('Driver not found');
             return res.status(404).json({ 
                 success: false,
-                message: 'User not found' 
+                message: 'Driver not found' 
             });
         }
 
         console.log('Profile updated successfully');
-        console.log('Updated user:', updatedUser);
+        console.log('Updated driver:', updatedDriver);
 
         // Loại bỏ password trước khi gửi response
-        const { password, ...userData } = updatedUser.toObject();
+        const { password, ...driverData } = updatedDriver.toObject();
         res.json({
             success: true,
-            data: userData
+            data: driverData
         });
     } catch (error) {
         console.error('Error updating profile:', error);
@@ -123,12 +125,12 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
         console.log('User:', req.user);
         console.log('File:', req.file);
 
-        // Kiểm tra xem user có phải là user thường không
-        if (req.user.constructor.modelName !== 'User') {
-            console.log('Not authorized as user');
+        // Kiểm tra xem user có phải là driver không
+        if (req.user.constructor.modelName !== 'Driver') {
+            console.log('Not authorized as driver');
             return res.status(403).json({ 
                 success: false,
-                message: 'Not authorized as user' 
+                message: 'Not authorized as driver' 
             });
         }
 
@@ -157,5 +159,11 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
         });
     }
 });
+
+const handleMapClick = (location) => {
+  if (!isSelectingPoint) return;
+  handleLocationSelect(location, isSelectingPoint);
+  setIsSelectingPoint(null);
+};
 
 module.exports = router; 

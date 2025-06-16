@@ -1,55 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaEdit, FaTrash, FaEye, FaPlus } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaEdit, FaTrash, FaEye, FaPlus, FaLock, FaLockOpen } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
+import { adminAPI } from '../services/api';
+import { toast } from 'react-toastify';
+import Modal from 'react-bootstrap/Modal';
+import Button from 'react-bootstrap/Button';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [systemStats, setSystemStats] = useState({
-    totalUsers: 1250,
-    totalShippers: 85,
-    totalOrders: 3420,
-    totalRevenue: 125000000,
-    todayOrders: 45,
-    activeShippers: 32
+    totalUsers: 0,
+    totalShippers: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    todayOrders: 0,
+    activeShippers: 0,
+    completionRate: 0,
+    averageRating: 0,
+    averageDeliveryTime: 0,
+    monthlyGrowth: 0
   });
 
-  const [users, setUsers] = useState([
-    { id: 1, name: 'Nguyễn Văn A', email: 'user1@email.com', phone: '0123456789', role: 'user', status: 'active', joinDate: '2025-01-15' },
-    { id: 2, name: 'Trần Thị B', email: 'user2@email.com', phone: '0987654321', role: 'user', status: 'active', joinDate: '2025-01-20' },
-    { id: 3, name: 'Lê Văn C', email: 'shipper1@email.com', phone: '0345678901', role: 'shipper', status: 'active', joinDate: '2025-01-10' }
-  ]);
+  const [users, setUsers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [revenues, setRevenues] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
-  const [orders, setOrders] = useState([
-    { id: 1, customer: 'Nguyễn Văn A', shipper: 'Lê Văn C', from: 'Hà Nội', to: 'Hòa Lạc', price: 50000, status: 'completed', date: '2025-01-27' },
-    { id: 2, customer: 'Trần Thị B', shipper: 'Pending', from: 'Cầu Giấy', to: 'Thăng Long', price: 35000, status: 'pending', date: '2025-01-27' },
-    { id: 3, customer: 'Phạm Văn D', shipper: 'Lê Văn C', from: 'Đống Đa', to: 'Hòa Lạc', price: 60000, status: 'in-progress', date: '2025-01-27' }
-  ]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, [activeTab]);
 
-  const [revenues, setRevenues] = useState([
-    { month: 'Tháng 1', revenue: 12500000, orders: 420, growth: '+15%' },
-    { month: 'Tháng 12', revenue: 11200000, orders: 380, growth: '+8%' },
-    { month: 'Tháng 11', revenue: 10800000, orders: 365, growth: '+12%' }
-  ]);
-
-  const deleteUser = (userId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
-      setUsers(users.filter(user => user.id !== userId));
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      switch(activeTab) {
+        case 'dashboard':
+          const statsData = await adminAPI.getStats();
+          setSystemStats(statsData.data);
+          break;
+          
+        case 'users':
+          const usersData = await adminAPI.getUsers();
+          setUsers(usersData.data);
+          break;
+          
+        case 'orders':
+          const ordersData = await adminAPI.getOrders();
+          setOrders(ordersData.data);
+          break;
+          
+        case 'revenue':
+          const revenueData = await adminAPI.getRevenue();
+          setRevenues(revenueData.data);
+          break;
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Có lỗi xảy ra khi tải dữ liệu');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleUserStatus = (userId) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? {...user, status: user.status === 'active' ? 'inactive' : 'active'}
-        : user
-    ));
+  const deleteUser = async (userId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+      try {
+        await adminAPI.deleteUser(userId);
+        toast.success('Xóa người dùng thành công');
+        fetchDashboardData(); // Refresh users list
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        toast.error('Có lỗi xảy ra khi xóa người dùng');
+      }
+    }
+  };
+
+  const handleViewUser = (user) => {
+    setSelectedUser(user);
+    setShowUserModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowUserModal(false);
+    setSelectedUser(null);
+  };
+
+  const toggleUserStatus = async (userId, currentStatus) => {
+    try {
+      const newStatus = currentStatus ? 'inactive' : 'active';
+      await adminAPI.updateUserStatus(userId, newStatus);
+      toast.success(`Tài khoản đã được ${newStatus === 'active' ? 'mở khóa' : 'khóa'} thành công`);
+      fetchDashboardData(); // Refresh users list
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      toast.error('Có lỗi xảy ra khi cập nhật trạng thái tài khoản');
+    }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('currentUser');
     navigate('/login');
   };
@@ -76,6 +132,107 @@ const AdminDashboard = () => {
     background: 'linear-gradient(135deg, #f8f9fa, #e9ecef)',
     borderRadius: '15px',
     minHeight: '500px'
+  };
+
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return 'https://via.placeholder.com/150';
+    if (imagePath.startsWith('http')) return imagePath;
+    return `http://localhost:9999/${imagePath.replace(/\\/g, '/')}`;
+  };
+
+  const UserDetailsModal = () => {
+    if (!selectedUser) return null;
+
+    return (
+      <Modal show={showUserModal} onHide={handleCloseModal} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Thông tin chi tiết người dùng</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="row">
+            <div className="col-md-4 text-center mb-3">
+              <img 
+                src={getImageUrl(selectedUser.avatar)}
+                alt="Avatar" 
+                className="rounded-circle img-thumbnail"
+                style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/150';
+                }}
+              />
+              {selectedUser.type === 'driver' && selectedUser.licensePlateImage && (
+                <div className="mt-3">
+                  <p className="mb-2">Ảnh biển số xe:</p>
+                  <img 
+                    src={getImageUrl(selectedUser.licensePlateImage)}
+                    alt="Biển số xe" 
+                    className="img-thumbnail"
+                    style={{ maxWidth: '200px' }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/150';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="col-md-8">
+              <table className="table">
+                <tbody>
+                  <tr>
+                    <th style={{ width: '35%' }}>Họ tên:</th>
+                    <td>{selectedUser.fullName}</td>
+                  </tr>
+                  <tr>
+                    <th>Email:</th>
+                    <td>{selectedUser.email}</td>
+                  </tr>
+                  <tr>
+                    <th>Số điện thoại:</th>
+                    <td>{selectedUser.phone}</td>
+                  </tr>
+                  <tr>
+                    <th>Vai trò:</th>
+                    <td>
+                      <span className={`badge ${selectedUser.type === 'admin' ? 'bg-danger' : selectedUser.type === 'driver' ? 'bg-success' : 'bg-primary'}`}>
+                        {selectedUser.type === 'admin' ? 'Admin' : selectedUser.type === 'driver' ? 'Shipper' : 'User'}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Trạng thái:</th>
+                    <td>
+                      <span className={`badge ${selectedUser.status ? 'bg-success' : 'bg-secondary'}`}>
+                        {selectedUser.status ? 'Đang hoạt động' : 'Đã bị khóa'}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Ngày tham gia:</th>
+                    <td>{new Date(selectedUser.createdAt).toLocaleDateString('vi-VN')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModal}>
+            Đóng
+          </Button>
+          <Button
+            variant={selectedUser.status ? 'danger' : 'success'}
+            onClick={() => {
+              toggleUserStatus(selectedUser._id, selectedUser.status);
+              handleCloseModal();
+            }}
+          >
+            {selectedUser.status ? <><FaLock className="me-2" />Khóa tài khoản</> : <><FaLockOpen className="me-2" />Mở khóa tài khoản</>}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
   };
 
   return (
@@ -268,7 +425,6 @@ const AdminDashboard = () => {
                     <table className="table table-hover">
                       <thead>
                         <tr>
-                          <th>ID</th>
                           <th>Tên</th>
                           <th>Email</th>
                           <th>Số điện thoại</th>
@@ -280,43 +436,36 @@ const AdminDashboard = () => {
                       </thead>
                       <tbody>
                         {users.map(user => (
-                          <tr key={user.id}>
-                            <td>#{user.id}</td>
-                            <td>{user.name}</td>
+                          <tr key={user._id}>
+                            <td style={{ whiteSpace: 'nowrap' }}>{user.fullName}</td>
                             <td>{user.email}</td>
                             <td>{user.phone}</td>
                             <td>
-                              <span className={`badge ${user.role === 'admin' ? 'bg-danger' : user.role === 'shipper' ? 'bg-success' : 'bg-primary'}`}>
-                                {user.role === 'admin' ? 'Admin' : user.role === 'shipper' ? 'Shipper' : 'User'}
+                              <span className={`badge ${user.type === 'admin' ? 'bg-danger' : user.type === 'driver' ? 'bg-success' : 'bg-primary'}`}>
+                                {user.type === 'admin' ? 'Admin' : user.type === 'driver' ? 'Shipper' : 'User'}
                               </span>
                             </td>
                             <td>
-                              <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
-                                {user.status === 'active' ? 'Hoạt động' : 'Tạm khóa'}
+                              <span className={`badge ${user.status ? 'bg-success' : 'bg-secondary'}`}>
+                                {user.status ? 'Hoạt động' : 'Đã khóa'}
                               </span>
                             </td>
-                            <td>{user.joinDate}</td>
+                            <td>{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
                             <td>
                               <div className="btn-group btn-group-sm">
-                                <button className="btn btn-outline-primary" title="Xem chi tiết">
+                                <button 
+                                  className="btn btn-outline-primary" 
+                                  title="Xem chi tiết"
+                                  onClick={() => handleViewUser(user)}
+                                >
                                   <FaEye />
                                 </button>
-                                <button className="btn btn-outline-warning" title="Chỉnh sửa">
-                                  <FaEdit />
-                                </button>
                                 <button 
-                                  className={`btn ${user.status === 'active' ? 'btn-outline-secondary' : 'btn-outline-success'}`}
-                                  onClick={() => toggleUserStatus(user.id)}
-                                  title={user.status === 'active' ? 'Khóa tài khoản' : 'Kích hoạt tài khoản'}
+                                  className={`btn ${user.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
+                                  onClick={() => toggleUserStatus(user._id, user.status)}
+                                  title={user.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                                 >
-                                  {user.status === 'active' ? 'Khóa' : 'Mở'}
-                                </button>
-                                <button 
-                                  className="btn btn-outline-danger"
-                                  onClick={() => deleteUser(user.id)}
-                                  title="Xóa"
-                                >
-                                  <FaTrash />
+                                  {user.status ? <FaLock /> : <FaLockOpen />}
                                 </button>
                               </div>
                             </td>
@@ -352,8 +501,8 @@ const AdminDashboard = () => {
                       </thead>
                       <tbody>
                         {orders.map(order => (
-                          <tr key={order.id}>
-                            <td>#{order.id}</td>
+                          <tr key={order._id}>
+                            <td>#{order._id}</td>
                             <td>{order.customer}</td>
                             <td>{order.shipper}</td>
                             <td>{order.from} → {order.to}</td>
@@ -367,7 +516,7 @@ const AdminDashboard = () => {
                                  order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
                               </span>
                             </td>
-                            <td>{order.date}</td>
+                            <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
                             <td>
                               <div className="btn-group btn-group-sm">
                                 <button className="btn btn-outline-primary" title="Xem chi tiết">
@@ -399,8 +548,8 @@ const AdminDashboard = () => {
                       <div className="card bg-success text-white">
                         <div className="card-body text-center">
                           <h5>Doanh thu tháng này</h5>
-                          <h3>{revenues[0].revenue.toLocaleString()} VNĐ</h3>
-                          <small>Tăng trưởng: {revenues[0].growth}</small>
+                          <h3>{revenues[0]?.revenue.toLocaleString()} VNĐ</h3>
+                          <small>Tăng trưởng: {revenues[0]?.growth}</small>
                         </div>
                       </div>
                     </div>
@@ -408,7 +557,7 @@ const AdminDashboard = () => {
                       <div className="card bg-info text-white">
                         <div className="card-body text-center">
                           <h5>Số đơn hàng</h5>
-                          <h3>{revenues[0].orders}</h3>
+                          <h3>{revenues[0]?.orders}</h3>
                           <small>Đơn hàng trong tháng</small>
                         </div>
                       </div>
@@ -417,7 +566,7 @@ const AdminDashboard = () => {
                       <div className="card bg-primary text-white">
                         <div className="card-body text-center">
                           <h5>Trung bình/đơn</h5>
-                          <h3>{Math.round(revenues[0].revenue / revenues[0].orders).toLocaleString()} VNĐ</h3>
+                          <h3>{Math.round(revenues[0]?.revenue / revenues[0]?.orders).toLocaleString()} VNĐ</h3>
                           <small>Giá trị trung bình</small>
                         </div>
                       </div>
@@ -494,6 +643,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      <UserDetailsModal />
     </div>
   );
 };

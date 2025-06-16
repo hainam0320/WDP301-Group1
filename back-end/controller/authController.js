@@ -115,6 +115,11 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Email không tồn tại' });
         }
 
+        // Kiểm tra trạng thái tài khoản
+        if (!account.status && !account.isAdmin) {
+            return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.' });
+        }
+
         // So sánh mật khẩu
         console.log('Comparing passwords...');
         const isMatch = await bcrypt.compare(password, account.password);
