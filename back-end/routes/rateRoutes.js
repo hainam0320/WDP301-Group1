@@ -6,8 +6,8 @@ const rateController = require('../controller/rateController');
 
 router.post('/', rateController.createRate);
 
-router.get('/:id', rateController.getRatesByDriver);
-router.put('/:id', rateController.updateRatesByDriver);
+router.get('/:id', rateController.getRatesByOrder);
+
 
 
 module.exports = router;
