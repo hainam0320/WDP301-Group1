@@ -589,28 +589,18 @@ const Home = () => {
                             <th>Từ</th>
                             <th>Đến</th>
                             <th>Loại</th>
-                            <th>Trạng thái</th>
+                            <th>Thời gian hoàn thành</th>
                             <th>Giá</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {orders.map(order => (
+                          {orders.filter(order => order.status === 'completed').map(order => (
                             <tr key={order._id}>
                               <td>#{order._id.slice(-6)}</td>
                               <td>{order.pickupaddress}</td>
                               <td>{order.dropupaddress}</td>
                               <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                              <td>
-                                <span className={`badge ${
-                                  order.status === 'completed' ? 'bg-success' : 
-                                  order.status === 'accepted' ? 'bg-info' :
-                                  order.status === 'delivering' ? 'bg-primary' : 'bg-warning'
-                                }`}>
-                                  {order.status === 'completed' ? 'Hoàn thành' : 
-                                   order.status === 'accepted' ? 'Đã nhận đơn' :
-                                   order.status === 'delivering' ? 'Đang giao' : 'Chờ xử lý'}
-                                </span>
-                              </td>
+                              <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                               <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
                             </tr>
                           ))}
