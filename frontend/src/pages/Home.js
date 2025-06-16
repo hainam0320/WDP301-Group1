@@ -116,7 +116,7 @@ const Home = () => {
       setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
       return;
     }
-
+ navigate('/confirmOrder', { state: { orderData, serviceType } });
     // TODO: Implement order submission
     console.log('Submitting order:', orderData);
     setMessage({ type: 'success', content: 'Đặt đơn thành công!' });
@@ -466,12 +466,12 @@ const Home = () => {
                   )}
 
                   {/* Submit button */}
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-lg w-100" 
-                    style={buttonStyle}
-                    disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates}
-                  >
+                  <button
+          type="button"
+          className="btn btn-primary btn-lg w-100"
+          disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates}
+          onClick={handleSubmit}
+        >
                     Đặt đơn ngay
                   </button>
                 </div>
