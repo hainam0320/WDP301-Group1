@@ -119,14 +119,14 @@ const Home = () => {
     } else if (type === 'pickup') {
       setOrderData(prev => ({
         ...prev,
-        pickupLocation: location || prev.pickupLocation,
-        pickupCoordinates: coordinates || prev.pickupCoordinates
+        pickupLocation: location !== undefined ? location : prev.pickupLocation,
+        pickupCoordinates: coordinates !== undefined ? coordinates : prev.pickupCoordinates
       }));
-    } else if (type === 'dropoff') {
+    } else if (type === 'delivery' || type === 'dropoff') {
       setOrderData(prev => ({
         ...prev,
-        deliveryLocation: location || prev.deliveryLocation,
-        deliveryCoordinates: coordinates || prev.deliveryCoordinates
+        deliveryLocation: location !== undefined ? location : prev.deliveryLocation,
+        deliveryCoordinates: coordinates !== undefined ? coordinates : prev.deliveryCoordinates
       }));
     }
   };
@@ -489,7 +489,7 @@ const Home = () => {
                       <RideMap 
                         onLocationUpdate={handleLocationUpdate}
                         pickupLocation={orderData.pickupLocation}
-                        dropoffLocahandleLocationUpdatetion={orderData.deliveryLocation}
+                        dropoffLocation={orderData.deliveryLocation}
                         isSelectingPoint={isSelectingPoint}
                         onSelectingPointChange={setIsSelectingPoint}
                       />
