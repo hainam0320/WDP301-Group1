@@ -23,7 +23,10 @@ const ShipperDashboard = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', content: '' });
+  const [messages, setMessages] = useState({
+    orders: { type: '', content: '' },
+    profile: { type: '', content: '' }
+  });
   const [availableOrders, setAvailableOrders] = useState([]);
   const [error, setError] = useState('');
 
@@ -91,10 +94,13 @@ const ShipperDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching earnings:', error);
-      setMessage({ 
-        type: 'error', 
-        content: 'Không thể tải dữ liệu thống kê thu nhập' 
-      });
+      setMessages(prev => ({
+        ...prev,
+        earnings: { 
+          type: 'error', 
+          content: 'Không thể tải dữ liệu thống kê thu nhập' 
+        }
+      }));
     }
   };
 
@@ -149,30 +155,44 @@ const ShipperDashboard = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${BASE_URL}/api/shipper/${orderId}/accept`, {}, {
+      const response = await axios.post(`${BASE_URL}/api/orders/${orderId}/accept`, {}, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
-      if (response.data.success) {
-        // Add to my orders
-        const acceptedOrder = availableOrders.find(o => o._id === orderId);
-        if (acceptedOrder) {
-          setMyOrders([...myOrders, {...acceptedOrder, status: 'accepted'}]);
-          // Remove from available orders
-          setAvailableOrders(availableOrders.filter(o => o._id !== orderId));
-        }
-        setMessage({ type: 'success', content: 'Nhận đơn thành công!' });
-      } else {
-        throw new Error(response.data.message);
+      // Nếu nhận đơn thành công
+      const acceptedOrder = availableOrders.find(o => o._id === orderId);
+      if (acceptedOrder) {
+        setMyOrders([...myOrders, {...acceptedOrder, status: 'accepted'}]);
+        setAvailableOrders(availableOrders.filter(o => o._id !== orderId));
+        setMessages(prev => ({
+          ...prev,
+          orders: { type: 'success', content: 'Nhận đơn thành công!' }
+        }));
       }
     } catch (error) {
       console.error('Error accepting order:', error);
-      setMessage({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn' 
-      });
+      if (error.response?.data?.message === 'Đơn hàng này đã được shipper khác nhận') {
+        // Nếu đơn đã được nhận, xóa khỏi danh sách đơn khả dụng
+        setAvailableOrders(availableOrders.filter(o => o._id !== orderId));
+        setMessages(prev => ({
+          ...prev,
+          orders: { 
+            type: 'error', 
+            content: 'Đơn hàng này đã được shipper khác nhận'
+          }
+        }));
+      } else {
+        setMessages(prev => ({
+          ...prev,
+          orders: { 
+            type: 'error', 
+            content: error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn'
+          }
+        }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +217,10 @@ const ShipperDashboard = () => {
         setMyOrders(myOrders.map(order => 
           order._id === orderId ? {...order, status: newStatus} : order
         ));
-        setMessage({ type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' });
+        setMessages(prev => ({
+          ...prev,
+          orders: { type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' }
+        }));
         
         // Nếu đơn hàng hoàn thành, cập nhật earnings
         if (newStatus === 'completed') {
@@ -215,10 +238,13 @@ const ShipperDashboard = () => {
       }
     } catch (error) {
       console.error('Error updating order status:', error);
-      setMessage({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
-      });
+      setMessages(prev => ({
+        ...prev,
+        orders: { 
+          type: 'error', 
+          content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
+        }
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -242,7 +268,10 @@ const ShipperDashboard = () => {
       return response.data.filePath;
     } catch (error) {
       console.error('Error uploading file:', error);
-      setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi tải file lên server' });
+      setMessages(prev => ({
+        ...prev,
+        profile: { type: 'error', content: error.response?.data?.message || 'Lỗi khi tải file lên server' }
+      }));
       return null;
     }
   };
@@ -259,11 +288,17 @@ const ShipperDashboard = () => {
           ...prev,
           [type]: filePath
         }));
-        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+        setMessages(prev => ({
+          ...prev,
+          profile: { type: 'success', content: 'Tải ảnh lên thành công' }
+        }));
       }
     } catch (error) {
       console.error('Error handling image upload:', error);
-      setMessage({ type: 'error', content: 'Lỗi khi xử lý ảnh' });
+      setMessages(prev => ({
+        ...prev,
+        profile: { type: 'error', content: 'Lỗi khi xử lý ảnh' }
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -288,7 +323,10 @@ const ShipperDashboard = () => {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage({ type: '', content: '' });
+    setMessages(prev => ({
+      ...prev,
+      profile: { type: '', content: '' }
+    }));
 
     try {
       const response = await shipperAPI.updateProfile({
@@ -305,7 +343,10 @@ const ShipperDashboard = () => {
       }
 
       const data = response.data.data;
-      setMessage({ type: 'success', content: 'Cập nhật thông tin thành công' });
+      setMessages(prev => ({
+        ...prev,
+        profile: { type: 'success', content: 'Cập nhật thông tin thành công' }
+      }));
       
       // Update localStorage
       const user = JSON.parse(localStorage.getItem('user'));
@@ -318,9 +359,15 @@ const ShipperDashboard = () => {
       console.error('Error updating profile:', error);
       const errorMessage = error.response?.data?.message || 'Lỗi khi cập nhật thông tin';
       if (error.response?.data?.errors) {
-        setMessage({ type: 'error', content: error.response.data.errors.join(', ') });
+        setMessages(prev => ({
+          ...prev,
+          profile: { type: 'error', content: error.response.data.errors.join(', ') }
+        }));
       } else {
-        setMessage({ type: 'error', content: errorMessage });
+        setMessages(prev => ({
+          ...prev,
+          profile: { type: 'error', content: errorMessage }
+        }));
       }
     } finally {
       setIsLoading(false);
@@ -482,6 +529,12 @@ const ShipperDashboard = () => {
                   <h4 className="mb-0"><FaShippingFast className="me-2" />Đơn hàng khả dụng</h4>
                 </div>
                 <div className="card-body">
+                  {messages.orders.content && (
+                    <div className={`alert alert-${messages.orders.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
+                      {messages.orders.content}
+                      <button type="button" className="btn-close" onClick={() => setMessages(prev => ({...prev, orders: { type: '', content: '' }}))}></button>
+                    </div>
+                  )}
                   {isLoading ? (
                     <div className="text-center py-4">
                       <div className="spinner-border text-success" role="status">
@@ -690,10 +743,10 @@ const ShipperDashboard = () => {
                   <h4 className="mb-0"><FaUser className="me-2" />Thông tin shipper</h4>
                 </div>
                 <div className="card-body">
-                  {message.content && (
-                    <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
-                      {message.content}
-                      <button type="button" className="btn-close" onClick={() => setMessage({ type: '', content: '' })}></button>
+                  {messages.profile.content && (
+                    <div className={`alert alert-${messages.profile.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
+                      {messages.profile.content}
+                      <button type="button" className="btn-close" onClick={() => setMessages(prev => ({...prev, profile: { type: '', content: '' }}))}></button>
                     </div>
                   )}
                   <form onSubmit={handleProfileUpdate}>
