@@ -17,13 +17,11 @@ exports.createRate = async (req, res) => {
 exports.getRatesByOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    console.log('Getting rates for orderId:', orderId);
     
     const rates = await Rate.find({ orderId: orderId })
       .populate('userId', 'fullName email')
       .populate('driverId', 'fullName');
     
-    console.log('Found rates:', rates);
     res.status(200).json(rates);
   } catch (error) {
     console.error('Error getting rates by order:', error);
