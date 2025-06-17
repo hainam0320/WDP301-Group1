@@ -29,3 +29,16 @@ exports.getRatesByOrder = async (req, res) => {
   }
 };
 
+// Lấy số sao trung bình và số lượt đánh giá của driver
+exports.getDriverAverageRate = async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const rates = await Rate.find({ driverId });
+    if (rates.length === 0) return res.json({ avg: 0, count: 0 });
+    const sum = rates.reduce((acc, r) => acc + r.rate, 0);
+    const avg = sum / rates.length;
+    res.json({ avg, count: rates.length });
+  } catch (error) {
+    res.status(500).json({ message: 'Error calculating average rate', error: error.message });
+  }
+};

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaRoute, FaClock, FaCamera, FaEdit, FaImage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaMapMarkerAlt, FaDollarSign, FaHistory, FaStar, FaBell, FaSignOutAlt, FaCheck, FaRoute, FaClock, FaCamera, FaEdit, FaImage, FaEye } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 import { shipperAPI } from '../services/api';
 import axios from 'axios';
+import { Modal, Button } from 'react-bootstrap';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
@@ -39,6 +40,13 @@ const ShipperDashboard = () => {
     total: 0,
     totalDeliveries: 0
   });
+
+  // Modal states
+  const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderRate, setOrderRate] = useState(null);
+
+  const [driverAvgRate, setDriverAvgRate] = useState({ avg: 0, count: 0 });
 
   // Fetch available orders
   const fetchAvailableOrders = async () => {
@@ -101,6 +109,26 @@ const ShipperDashboard = () => {
           content: 'Không thể tải dữ liệu thống kê thu nhập' 
         }
       }));
+    }
+  };
+
+  // Lấy đánh giá cho đơn hàng
+  const fetchOrderRate = async (orderId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/rate/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.data && response.data.length > 0) {
+        setOrderRate(response.data[0]);
+      } else {
+        setOrderRate(null);
+      }
+    } catch (error) {
+      console.error('Error fetching order rate:', error);
+      setOrderRate(null);
     }
   };
 
@@ -374,6 +402,26 @@ const ShipperDashboard = () => {
     }
   };
 
+  // Xử lý mở modal chi tiết đơn hàng
+  const handleShowOrderDetail = async (order) => {
+    setSelectedOrder(order);
+    setShowOrderDetailModal(true);
+    await fetchOrderRate(order._id);
+  };
+
+  const handleCloseOrderDetailModal = () => {
+    setShowOrderDetailModal(false);
+    setSelectedOrder(null);
+    setOrderRate(null);
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('vi-VN');
+  };
+
   const headerStyle = {
     background: 'linear-gradient(135deg, #28a745, #20c997)',
     color: 'white'
@@ -398,6 +446,21 @@ const ShipperDashboard = () => {
     minHeight: '500px'
   };
 
+  // Lấy số sao trung bình của shipper
+  useEffect(() => {
+    const fetchDriverAvgRate = async () => {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user._id) return;
+      try {
+        const res = await axios.get(`${BASE_URL}/api/rate/driver/${user._id}/average`);
+        setDriverAvgRate(res.data);
+      } catch (err) {
+        setDriverAvgRate({ avg: 0, count: 0 });
+      }
+    };
+    fetchDriverAvgRate();
+  }, []);
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       {/* Header */}
@@ -414,8 +477,7 @@ const ShipperDashboard = () => {
               <span className="badge bg-danger">2</span>
             </div>
             <div className="me-3 text-white">
-              <FaStar className="me-1" />
-              <span>{shipperProfile.rating}</span>
+            {driverAvgRate.avg.toFixed(1)}<FaStar className="me-1" />             
             </div>
             <div className="dropdown">
               <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
@@ -660,7 +722,11 @@ const ShipperDashboard = () => {
                               </button>
                             )}
                             {order.status === 'completed' && (
-                              <button className="btn btn-outline-primary btn-sm w-100">
+                              <button 
+                                className="btn btn-outline-primary btn-sm w-100"
+                                onClick={() => handleShowOrderDetail(order)}
+                              >
+                                <FaEye className="me-1" />
                                 Xem chi tiết
                               </button>
                             )}
@@ -790,9 +856,9 @@ const ShipperDashboard = () => {
                         <h5 className="mb-1">{shipperProfile.name}</h5>
                         <p className="text-muted">{shipperProfile.phone}</p>
                         <div className="d-flex justify-content-center align-items-center mb-2">
-                          <FaStar className="text-warning me-1" />
-                          <span className="fw-bold">{shipperProfile.rating}</span>
-                          <span className="text-muted ms-2">({shipperProfile.totalDeliveries} đơn)</span>
+                          <FaStar className="text-warning me-1" />  
+                          <span className="fw-bold">{driverAvgRate.avg.toFixed(1)}</span>
+                          <span className="text-muted ms-2">({driverAvgRate.count} lượt đánh giá)</span>
                         </div>
                         
                         {shipperProfile.avatar && (
@@ -950,9 +1016,8 @@ const ShipperDashboard = () => {
                       </div>
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">Đánh giá</label>
-                        <div className="input-group">
-                          <input type="text" className="form-control" value={shipperProfile.rating} readOnly />
-                          <span className="input-group-text"><FaStar className="text-warning" /></span>
+                        <div className="input-group">                         
+                          <span className="input-group-text">{driverAvgRate.avg.toFixed(1)}<FaStar className="text-warning" /></span>
                         </div>
                       </div>
                     </div>
@@ -985,6 +1050,122 @@ const ShipperDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal chi tiết đơn hàng */}
+      <Modal show={showOrderDetailModal} onHide={handleCloseOrderDetailModal} size="lg" centered>
+        <Modal.Header closeButton className="bg-primary text-white">
+          <Modal.Title>
+            <FaShippingFast className="me-2" />
+            Chi tiết đơn hàng #{selectedOrder?._id?.slice(-6)}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedOrder && (
+            <div className="row">
+              <div className="col-md-6">
+                <h6 className="fw-bold text-primary mb-3">
+                  <FaMapMarkerAlt className="me-2" />
+                  Thông tin địa điểm
+                </h6>
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong className="text-success">Điểm đón:</strong>
+                  </p>
+                  <p className="text-muted">{selectedOrder.pickupaddress}</p>
+                </div>
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong className="text-danger">Điểm đến:</strong>
+                  </p>
+                  <p className="text-muted">{selectedOrder.dropupaddress}</p>
+                </div>
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Khoảng cách:</strong>
+                  </p>
+                  <p className="text-muted">
+                    {selectedOrder.distance_km ? `${selectedOrder.distance_km.toFixed(1)} km` : 'N/A'}
+                  </p>
+                </div>
+                {selectedOrder.type === 'delivery' && selectedOrder.weight && (
+                  <div className="mb-3">
+                    <p className="mb-1">
+                      <strong>Khối lượng:</strong>
+                    </p>
+                    <p className="text-muted">{selectedOrder.weight} kg</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="col-md-6">
+                <h6 className="fw-bold text-primary mb-3">
+                  <FaClock className="me-2" />
+                  Thông tin thời gian
+                </h6>
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Thời gian nhận đơn:</strong>
+                  </p>
+                  <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
+                </div>
+                {selectedOrder.status === 'completed' && (
+                  <div className="mb-3">
+                    <p className="mb-1">
+                      <strong>Thời gian hoàn thành:</strong>
+                    </p>
+                    <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
+                  </div>
+                )}
+                
+                <h6 className="fw-bold text-primary mb-3">
+                  <FaDollarSign className="me-2" />
+                  Thông tin thanh toán
+                </h6>
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Giá tiền:</strong>
+                  </p>
+                  <p className="text-success fw-bold fs-5">
+                    {selectedOrder.price.toLocaleString()} VNĐ
+                  </p>
+                </div>
+                
+                <h6 className="fw-bold text-primary mb-3">
+                  <FaStar className="me-2" />
+                  Đánh giá từ khách hàng
+                </h6>
+                <div className="mb-3">
+                  {orderRate ? (
+                    <div>
+                      <div className="mb-2">
+                        <span className="text-warning">
+                          {[...Array(orderRate.rate)].map((_, i) => (
+                            <FaStar key={i} size={20} />
+                          ))}
+                        </span>
+                        <span className="ms-2 fw-bold">{orderRate.rate}/5</span>
+                      </div>
+                      {orderRate.comment && (
+                        <div>
+                          <p className="mb-1"><strong>Nhận xét:</strong></p>
+                          <p className="text-muted fst-italic">"{orderRate.comment}"</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-muted">Chưa có đánh giá</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseOrderDetailModal}>
+            Đóng
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

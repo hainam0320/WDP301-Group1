@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone, FaImage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
@@ -50,6 +50,10 @@ const Home = () => {
   const [rateValue, setRateValue] = useState(5);
   const [rateComment, setRateComment] = useState('');
   const [rateLoading, setRateLoading] = useState(false);
+
+  const [showShipperModal, setShowShipperModal] = useState(false);
+  const [shipperDetail, setShipperDetail] = useState(null);
+  const [shipperAvgRate, setShipperAvgRate] = useState({ avg: 0, count: 0 });
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -352,6 +356,22 @@ const Home = () => {
     }
   };
 
+  const handleShowShipperDetail = async (driver) => {
+    setShipperDetail({
+      fullName: driver.fullName || '',
+      phone: driver.phone || '',
+      avatar: driver.avatar || '',
+      licensePlateImage: driver.licensePlateImage || ''
+    });
+    setShowShipperModal(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/rate/driver/${driver._id}/average`);
+      setShipperAvgRate(res.data);
+    } catch {
+      setShipperAvgRate({ avg: 0, count: 0 });
+    }
+  };
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       {/* Header */}
@@ -609,7 +629,13 @@ const Home = () => {
                                 <div className="mb-2 p-2 bg-light rounded">
                                   <p className="mb-1">
                                     <FaUser className="text-primary me-2" />
-                                    <strong>Shipper:</strong> {order.driverId.fullName}
+                                    <strong>Shipper:</strong>{' '}
+                                    <span
+                                      style={{ cursor: 'pointer', color: '#007bff', textDecoration: 'underline' }}
+                                      onClick={() => handleShowShipperDetail(order.driverId)}
+                                    >
+                                      {order.driverId.fullName}
+                                    </span>
                                   </p>
                                   <p className="mb-0">
                                     <FaPhone className="text-success me-2" />
@@ -881,6 +907,51 @@ const Home = () => {
             {rateLoading ? 'Đang gửi...' : 'Gửi đánh giá'}
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Modal thông tin Shipper */}
+      <Modal show={showShipperModal} onHide={() => setShowShipperModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Thông tin Shipper</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {shipperDetail && (
+            <div className="text-center">
+              <img 
+  src={getImageUrl(shipperDetail.avatar)}
+  alt="Avatar" 
+  className="rounded-circle img-thumbnail"
+  style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+  onError={(e) => {
+    e.target.onerror = null;
+    e.target.src = 'https://via.placeholder.com/100';
+  }}
+/>
+              <h5>{shipperDetail.fullName}</h5>
+              <div className="d-flex justify-content-center align-items-center mb-2">
+                <FaStar className="text-warning me-1" />
+                <span className="fw-bold">{shipperAvgRate.avg.toFixed(1)}</span>
+                <span className="text-muted ms-2">({shipperAvgRate.count} lượt đánh giá)</span>
+              </div>
+              <p><FaPhone className="me-2" />{shipperDetail.phone}</p>
+              {shipperDetail.licensePlateImage && (
+                <div>
+                  <strong>Ảnh biển số xe:</strong>
+                  <img
+  src={getImageUrl(shipperDetail.licensePlateImage)}
+  alt="Biển số xe"
+  className="img-thumbnail mt-2"
+  style={{ maxHeight: 120, maxWidth: 200, objectFit: 'cover' }}
+  onError={(e) => {
+    e.target.onerror = null;
+    e.target.src = 'https://via.placeholder.com/200x120?text=No+Image';
+  }}
+/>
+                </div>
+              )}
+            </div>
+          )}
+        </Modal.Body>
       </Modal>
     </div>
   );
