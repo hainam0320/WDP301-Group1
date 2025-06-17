@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
@@ -9,6 +9,7 @@ import DeliveryMap from '../components/DeliveryMap';
 import RideMap from '../components/RideMap';
 import { useMapEvents } from 'react-leaflet';
 import axios from 'axios';
+import { Modal, Button, Form } from 'react-bootstrap';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -42,6 +43,13 @@ const Home = () => {
 
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
+
+  const [orderRates, setOrderRates] = useState({}); // { [orderId]: rateObj }
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [rateTargetOrder, setRateTargetOrder] = useState(null);
+  const [rateValue, setRateValue] = useState(5);
+  const [rateComment, setRateComment] = useState('');
+  const [rateLoading, setRateLoading] = useState(false);
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -272,6 +280,70 @@ const Home = () => {
       }
     });
     return null;
+  };
+
+  // Lấy đánh giá cho các đơn hàng hoàn thành
+  const fetchRatesForCompletedOrders = async (completedOrders) => {
+    const token = localStorage.getItem('token');
+    const newRates = {};
+    await Promise.all(completedOrders.map(async (order) => {
+      try {
+        const res = await userAPI.getOrderRate(order._id);
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          // Giả sử chỉ cho phép 1 đánh giá/user/order
+          newRates[order._id] = res.data[0];
+        }
+      } catch (err) {
+        // Không có đánh giá thì thôi
+      }
+    }));
+    setOrderRates(newRates);
+  };
+
+  // Khi vào tab history hoặc orders thay đổi, lấy đánh giá cho các đơn hàng hoàn thành
+  useEffect(() => {
+    if (activeTab === 'history' && orders.length > 0) {
+      const completedOrders = orders.filter(o => o.status === 'completed');
+      fetchRatesForCompletedOrders(completedOrders);
+    } else if (activeTab !== 'history') {
+      setOrderRates({}); // clear rates khi rời tab
+    }
+    // eslint-disable-next-line
+  }, [activeTab, orders]);
+
+  // Xử lý mở modal đánh giá
+  const handleOpenRateModal = (order) => {
+    setRateTargetOrder(order);
+    setRateValue(5);
+    setRateComment('');
+    setShowRateModal(true);
+  };
+  const handleCloseRateModal = () => {
+    setShowRateModal(false);
+    setRateTargetOrder(null);
+  };
+
+  // Gửi đánh giá
+  const handleSubmitRate = async () => {
+    if (!rateTargetOrder) return;
+    setRateLoading(true);
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const payload = {
+        userId: user._id,
+        driverId: rateTargetOrder.driverId, // cần đảm bảo order có driverId
+        orderId: rateTargetOrder._id,
+        rate: rateValue,
+        comment: rateComment
+      };
+      const res = await userAPI.createOrderRate(payload);
+      setOrderRates(prev => ({ ...prev, [rateTargetOrder._id]: res.data }));
+      setShowRateModal(false);
+    } catch (err) {
+      alert('Lỗi khi gửi đánh giá!');
+    } finally {
+      setRateLoading(false);
+    }
   };
 
   return (
@@ -589,29 +661,36 @@ const Home = () => {
                             <th>Từ</th>
                             <th>Đến</th>
                             <th>Loại</th>
-                            <th>Trạng thái</th>
+                            <th>Thời gian hoàn thành</th>
                             <th>Giá</th>
+                            <th>Đánh giá</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {orders.map(order => (
+                          {orders.filter(order => order.status === 'completed').map(order => (
                             <tr key={order._id}>
                               <td>#{order._id.slice(-6)}</td>
                               <td>{order.pickupaddress}</td>
                               <td>{order.dropupaddress}</td>
                               <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                              <td>
-                                <span className={`badge ${
-                                  order.status === 'completed' ? 'bg-success' : 
-                                  order.status === 'accepted' ? 'bg-info' :
-                                  order.status === 'delivering' ? 'bg-primary' : 'bg-warning'
-                                }`}>
-                                  {order.status === 'completed' ? 'Hoàn thành' : 
-                                   order.status === 'accepted' ? 'Đã nhận đơn' :
-                                   order.status === 'delivering' ? 'Đang giao' : 'Chờ xử lý'}
-                                </span>
-                              </td>
+                              <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                               <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
+                              <td>
+                                {order.status === 'completed' && (
+                                  orderRates[order._id] ? (
+                                    <div>
+                                      <span className="text-warning">
+                                        {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
+                                      </span>
+                                      <div className="small text-muted">{orderRates[order._id].comment}</div>
+                                    </div>
+                                  ) : (
+                                    <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
+                                      Đánh giá
+                                    </Button>
+                                  )
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -755,6 +834,48 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal đánh giá */}
+      <Modal show={showRateModal} onHide={handleCloseRateModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Đánh giá đơn hàng</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Số sao</Form.Label>
+              <div>
+                {[1,2,3,4,5].map(star => (
+                  <FaStar
+                    key={star}
+                    className={star <= rateValue ? 'text-warning' : 'text-secondary'}
+                    style={{cursor: 'pointer', fontSize: 24}}
+                    onClick={() => setRateValue(star)}
+                  />
+                ))}
+              </div>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Bình luận</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={rateComment}
+                onChange={e => setRateComment(e.target.value)}
+                placeholder="Nhập nhận xét của bạn..."
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseRateModal} disabled={rateLoading}>
+            Hủy
+          </Button>
+          <Button variant="primary" onClick={handleSubmitRate} disabled={rateLoading}>
+            {rateLoading ? 'Đang gửi...' : 'Gửi đánh giá'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
