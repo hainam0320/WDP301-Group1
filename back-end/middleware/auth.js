@@ -28,20 +28,16 @@ exports.protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
             console.log('Token decoded:', decoded);
             
-            // Kiểm tra trong bảng Driver trước nếu là route của shipper
-            let user;
-            if (req.baseUrl.includes('/api/shipper')) {
+            // Kiểm tra trong cả hai bảng User và Driver
+            let user = await User.findById(decoded.id);
+            let isDriver = false;
+
+            if (!user) {
+                // Nếu không tìm thấy trong User, kiểm tra trong Driver
                 user = await Driver.findById(decoded.id);
-                if (!user) {
-                    return res.status(401).json({
-                        success: false,
-                        error: 'Not authorized as shipper'
-                    });
-                }
-            } else {
-                // Nếu không phải route của shipper, kiểm tra trong bảng User
-                user = await User.findById(decoded.id);
-                if (!user) {
+                if (user) {
+                    isDriver = true;
+                } else {
                     return res.status(401).json({
                         success: false,
                         error: 'User not found'
@@ -52,10 +48,11 @@ exports.protect = async (req, res, next) => {
             console.log('User found:', {
                 id: user._id,
                 email: user.email,
-                model: user.constructor.modelName
+                isDriver: isDriver
             });
             
             req.user = user;
+            req.isDriver = isDriver;
             next();
         } catch (err) {
             console.error('Token verification error:', err);
@@ -78,18 +75,16 @@ exports.authorize = (...roles) => {
     return (req, res, next) => {
         console.log('=== AUTHORIZE MIDDLEWARE ===');
         console.log('Required roles:', roles);
-        console.log('User model:', req.user.constructor.modelName);
+        console.log('Is Driver:', req.isDriver);
         
-        // Nếu là Driver model, cho phép truy cập các route của shipper
-        if (req.user.constructor.modelName === 'Driver') {
+        // Nếu là Driver, cho phép truy cập các route của shipper
+        if (req.isDriver) {
             if (roles.includes('driver') || roles.includes('shipper')) {
                 console.log('Access granted: Valid driver');
                 return next();
             }
-        }
-        
-        // Nếu là User model, kiểm tra role
-        if (req.user.constructor.modelName === 'User') {
+        } else {
+            // Nếu là User, kiểm tra role
             if (req.user.isAdmin || roles.includes(req.user.role)) {
                 console.log('Access granted: Valid user role');
                 return next();

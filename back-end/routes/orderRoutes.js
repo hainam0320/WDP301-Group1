@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const {
   createOrder,
   getAllOrders,
   getOrderById,
   updateOrder,
-  deleteOrder
+  deleteOrder,
+  acceptOrder
 } = require('../controller/orderController');
 const Order = require('../model/orderModel');
 
@@ -31,5 +32,6 @@ router.post('/', createOrder);
 router.get('/:id', getOrderById);
 router.put('/:id', updateOrder);
 router.delete('/:id', deleteOrder);
+router.post('/:id/accept', authorize('shipper', 'driver'), acceptOrder); // Add authorization for shipper/driver
 
 module.exports = router;

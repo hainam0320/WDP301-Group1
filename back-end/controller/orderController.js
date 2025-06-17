@@ -128,3 +128,48 @@ exports.deleteOrder = async (req, res) => {
     res.status(500).json({ message: 'Server error while deleting order' });
   }
 };
+
+// Accept an order by driver
+exports.acceptOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const driverId = req.user._id; // Assuming the driver's ID is in the request user object
+
+    // Use findOneAndUpdate with conditions to ensure atomicity
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: orderId,
+        driverId: { $exists: false }, // Only update if no driver is assigned
+        status: 'pending' // Only update if order is still pending
+      },
+      {
+        driverId: driverId,
+        status: 'accepted'
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!order) {
+      // Check if the order was already taken
+      const existingOrder = await Order.findById(orderId);
+      if (existingOrder && existingOrder.driverId) {
+        return res.status(400).json({
+          message: 'Đơn hàng này đã được shipper khác nhận',
+          order: existingOrder
+        });
+      }
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng hoặc đơn hàng không khả dụng' });
+    }
+
+    res.json({
+      message: 'Nhận đơn hàng thành công',
+      order: order
+    });
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    res.status(500).json({ message: 'Lỗi server khi nhận đơn hàng' });
+  }
+};
