@@ -331,7 +331,7 @@ const Home = () => {
       const user = JSON.parse(localStorage.getItem('user'));
       const payload = {
         userId: user._id,
-        driverId: rateTargetOrder.driverId, // cần đảm bảo order có driverId
+        driverId: rateTargetOrder.driverId._id, // Access the driver's _id from the populated object
         orderId: rateTargetOrder._id,
         rate: rateValue,
         comment: rateComment
