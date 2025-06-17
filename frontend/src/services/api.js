@@ -61,6 +61,12 @@ export const userAPI = {
 
   // ---- Get User Orders ----
   getUserOrders: () => api.get('/orders/user'),
+
+  // ---- Get Rate for Order ----
+  getOrderRate: (orderId) => api.get(`/rate/${orderId}`),
+
+  // ---- Create Rate for Order ----
+  createOrderRate: (data) => api.post('/rate', data),
 };
 
 export const adminAPI = {

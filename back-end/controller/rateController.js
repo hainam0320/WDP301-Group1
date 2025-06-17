@@ -12,13 +12,21 @@ exports.createRate = async (req, res) => {
     res.status(500).json({ message: 'Error creating rate', error: error.message });
   }
 };
+
+// Get rates by orderId
 exports.getRatesByOrder = async (req, res) => {
   try {
-    const rates = await Rate.find({ orderId: req.params.orderId })
-      .populate('userId', 'name email')
-      .populate('driverId', 'name vehicle');
+    const { orderId } = req.params;
+    console.log('Getting rates for orderId:', orderId);
+    
+    const rates = await Rate.find({ orderId: orderId })
+      .populate('userId', 'fullName email')
+      .populate('driverId', 'fullName');
+    
+    console.log('Found rates:', rates);
     res.status(200).json(rates);
   } catch (error) {
+    console.error('Error getting rates by order:', error);
     res.status(500).json({ message: 'Error fetching rates for order', error: error.message });
   }
 };
