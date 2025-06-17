@@ -25,11 +25,10 @@ const RoutingMachine = ({ pickupCoords, deliveryCoords, onRouteFound }) => {
   useEffect(() => {
     if (!pickupCoords || !deliveryCoords) return;
 
+    // Xoá tuyến cũ nếu có
     if (routingControlRef.current) {
       try {
-        if (routingControlRef.current._map) {
-          routingControlRef.current.remove();
-        } else {
+        if (map.hasLayer(routingControlRef.current)) {
           map.removeControl(routingControlRef.current);
         }
       } catch (error) {
@@ -76,7 +75,9 @@ const RoutingMachine = ({ pickupCoords, deliveryCoords, onRouteFound }) => {
     return () => {
       if (routingControlRef.current) {
         try {
-          map.removeControl(routingControlRef.current);
+          if (map.hasLayer(routingControlRef.current)) {
+            map.removeControl(routingControlRef.current);
+          }
         } catch (error) {
           console.error('Error cleaning up route:', error);
         }

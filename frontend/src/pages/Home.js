@@ -116,15 +116,21 @@ const Home = () => {
         distance: coordinates.distance,
         estimatedPrice: calculatePrice(coordinates.distance)
       }));
-      return;
+    } else if (type === 'pickup') {
+      setOrderData(prev => ({
+        ...prev,
+        pickupLocation: location || prev.pickupLocation,
+        pickupCoordinates: coordinates || prev.pickupCoordinates
+      }));
+    } else if (type === 'dropoff') {
+      setOrderData(prev => ({
+        ...prev,
+        deliveryLocation: location || prev.deliveryLocation,
+        deliveryCoordinates: coordinates || prev.deliveryCoordinates
+      }));
     }
-
-    setOrderData(prev => ({
-      ...prev,
-      [`${type}Location`]: location,
-      [`${type}Coordinates`]: coordinates
-    }));
   };
+  
 
   const calculatePrice = (distance) => {
     if (!distance) return 0;
@@ -483,7 +489,7 @@ const Home = () => {
                       <RideMap 
                         onLocationUpdate={handleLocationUpdate}
                         pickupLocation={orderData.pickupLocation}
-                        dropoffLocation={orderData.deliveryLocation}
+                        dropoffLocahandleLocationUpdatetion={orderData.deliveryLocation}
                         isSelectingPoint={isSelectingPoint}
                         onSelectingPointChange={setIsSelectingPoint}
                       />
