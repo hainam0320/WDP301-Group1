@@ -120,15 +120,21 @@ const Home = () => {
         distance: coordinates.distance,
         estimatedPrice: calculatePrice(coordinates.distance)
       }));
-      return;
+    } else if (type === 'pickup') {
+      setOrderData(prev => ({
+        ...prev,
+        pickupLocation: location !== undefined ? location : prev.pickupLocation,
+        pickupCoordinates: coordinates !== undefined ? coordinates : prev.pickupCoordinates
+      }));
+    } else if (type === 'delivery' || type === 'dropoff') {
+      setOrderData(prev => ({
+        ...prev,
+        deliveryLocation: location !== undefined ? location : prev.deliveryLocation,
+        deliveryCoordinates: coordinates !== undefined ? coordinates : prev.deliveryCoordinates
+      }));
     }
-
-    setOrderData(prev => ({
-      ...prev,
-      [`${type}Location`]: location,
-      [`${type}Coordinates`]: coordinates
-    }));
   };
+  
 
   const calculatePrice = (distance) => {
     if (!distance) return 0;
