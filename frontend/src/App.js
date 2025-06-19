@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import ShipperDashboard from './components/ShipperDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
-
+import ConfirmOrder from './components/ConfirmOrder';
 function App() {
   return (
     <Router>
@@ -24,7 +24,14 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        
+                <Route 
+          path="/confirmOrder" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <ConfirmOrder />
+            </ProtectedRoute>
+          } 
+        />
         {/* Shipper Routes */}
         <Route 
           path="/shipper" 
