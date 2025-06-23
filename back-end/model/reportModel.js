@@ -19,17 +19,19 @@ const reportSchema = new mongoose.Schema({
     type: { 
         type: String, 
         required: true,
-        enum: ['spam', 'inappropriate', 'fraud', 'other'] // example types, adjust as needed
+        enum: ['late', 'damage', 'lost', 'inappropriate', 'fraud', 'other']
     },
     description: { 
         type: String, 
         required: true 
     },
     image: { 
-        type: String // assuming this is a URL/path to the image
+        type: String, // URL/path to the image
+        default: ''
     },
     admin_note: { 
-        type: String 
+        type: String,
+        default: ''
     },
     status: {
         type: String,
