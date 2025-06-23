@@ -156,14 +156,12 @@ const Register = () => {
         let response;
         if (accountType === 'user') {
           response = await authAPI.registerUser(formDataToSend);
+          alert('Đăng ký thành công!');
         } else {
           response = await authAPI.registerDriver(formDataToSend);
+          alert('Đăng ký tài xế thành công! Vui lòng đợi admin phê duyệt tài khoản của bạn trước khi đăng nhập.');
         }
-
-        if (response.data) {
-          alert('Đăng ký thành công!');
-          navigate('/login');
-        }
+        navigate('/login');
       } catch (error) {
         alert(error.response?.data?.message || 'Đã có lỗi xảy ra khi đăng ký');
       } finally {

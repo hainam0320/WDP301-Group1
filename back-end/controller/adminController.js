@@ -87,7 +87,7 @@ exports.getUsers = async (req, res) => {
 
     // Get drivers
     const drivers = await Driver.find()
-      .select('fullName email phone status createdAt avatar licensePlateImage')
+      .select('fullName email phone status createdAt avatar licensePlateImage cmndFront cmndBack')
       .sort('-createdAt');
 
     // Format users
@@ -112,6 +112,8 @@ exports.getUsers = async (req, res) => {
       createdAt: driver._id.getTimestamp(), // Nếu không có createdAt thì lấy từ ObjectId
       avatar: driver.avatar,
       licensePlateImage: driver.licensePlateImage,
+      cmndFront: driver.cmndFront,
+      cmndBack: driver.cmndBack,
       type: 'driver'
     }));
 
@@ -192,7 +194,9 @@ exports.updateUserStatus = async (req, res) => {
         type: 'driver',
         createdAt: driver.createdAt || driver._id.getTimestamp(),
         avatar: driver.avatar,
-        licensePlateImage: driver.licensePlateImage
+        licensePlateImage: driver.licensePlateImage,
+        cmndFront: driver.cmndFront,
+        cmndBack: driver.cmndBack
       });
     }
 
