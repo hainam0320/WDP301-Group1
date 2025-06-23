@@ -69,10 +69,16 @@ export const userAPI = {
   createOrderRate: (data) => api.post('/rate', data),
 
   // ---- Create Report ----
-  createReport: (data) => api.post('/reports', data),
+  createReport: async (data) => {
+    const response = await api.post('/reports', data);
+    return response;
+  },
   
   // ---- Get User Reports ----
-  getUserReports: () => api.get('/reports/my-reports'),
+  getUserReports: async () => {
+    const response = await api.get('/reports/my-reports');
+    return response;
+  },
 };
 
 export const adminAPI = {
@@ -93,4 +99,16 @@ export const adminAPI = {
 
   // ---- Get Revenue Data ----
   getRevenue: () => api.get('/admin/revenue'),
+
+  // Get all reports
+  getAllReports: async () => {
+    const response = await api.get('/reports/all');
+    return response;
+  },
+
+  // Update report status
+  updateReportStatus: async (reportId, data) => {
+    const response = await api.patch(`/reports/${reportId}/status`, data);
+    return response;
+  }
 };

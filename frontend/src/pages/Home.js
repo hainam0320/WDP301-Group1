@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone, FaImage, FaExclamationTriangle } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone, FaImage, FaExclamationTriangle, FaTimes } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
@@ -62,6 +62,9 @@ const Home = () => {
   const [reportDescription, setReportDescription] = useState('');
   const [reportImage, setReportImage] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+
+  const [myReports, setMyReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -407,29 +410,29 @@ const Home = () => {
     if (!file) return;
 
     try {
-      setReportLoading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await axios.post(`${BASE_URL}/api/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+        setReportLoading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await axios.post(`${BASE_URL}/api/reports/upload`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
 
-      if (response.data.filePath) {
-        setReportImage(response.data.filePath);
-        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
-      }
+        if (response.data.filePath) {
+            setReportImage(response.data.filePath);
+            setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+        }
     } catch (error) {
-      console.error('Error handling report image upload:', error);
-      setMessage({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Lỗi khi tải ảnh lên' 
-      });
+        console.error('Error handling report image upload:', error);
+        setMessage({ 
+            type: 'error', 
+            content: error.response?.data?.message || 'Lỗi khi tải ảnh lên' 
+        });
     } finally {
-      setReportLoading(false);
+        setReportLoading(false);
     }
   };
 
@@ -460,6 +463,63 @@ const Home = () => {
       });
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  // Fetch user's reports
+  const fetchMyReports = async () => {
+    try {
+      setLoadingReports(true);
+      const response = await userAPI.getUserReports();
+      setMyReports(response.data.reports);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      setMessage({ 
+        type: 'error', 
+        content: 'Lỗi khi tải danh sách báo cáo' 
+      });
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchMyReports();
+    }
+  }, [activeTab]);
+
+  const getReportStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return <span className="badge bg-warning">Chờ xử lý</span>;
+      case 'reviewed':
+        return <span className="badge bg-info">Đang xem xét</span>;
+      case 'resolved':
+        return <span className="badge bg-success">Đã giải quyết</span>;
+      case 'rejected':
+        return <span className="badge bg-danger">Đã từ chối</span>;
+      default:
+        return <span className="badge bg-secondary">Không xác định</span>;
+    }
+  };
+
+  const getReportTypeBadge = (type) => {
+    switch (type) {
+      case 'late':
+        return <span className="badge bg-warning">Trễ hẹn</span>;
+      case 'damage':
+        return <span className="badge bg-danger">Hư hỏng</span>;
+      case 'lost':
+        return <span className="badge bg-dark">Thất lạc</span>;
+      case 'inappropriate':
+        return <span className="badge bg-info">Không phù hợp</span>;
+      case 'fraud':
+        return <span className="badge bg-danger">Gian lận</span>;
+      case 'other':
+        return <span className="badge bg-secondary">Khác</span>;
+      default:
+        return <span className="badge bg-secondary">Không xác định</span>;
     }
   };
 
@@ -536,6 +596,13 @@ const Home = () => {
                 >
                   <FaUser className="me-2" />
                   Thông tin cá nhân
+                </button>
+                <button 
+                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'reports' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('reports')}
+                >
+                  <FaExclamationTriangle className="me-2" />
+                  Báo cáo của tôi
                 </button>
               </div>
             </div>
@@ -965,6 +1032,68 @@ const Home = () => {
                 </div>
               </div>
             )}
+
+            {/* My Reports Tab */}
+            {activeTab === 'reports' && (
+              <div className="card" style={cardStyle}>
+                <div className="card-header bg-danger text-white">
+                  <h4 className="mb-0"><FaExclamationTriangle className="me-2" />Báo cáo của tôi</h4>
+                </div>
+                <div className="card-body">
+                  {loadingReports ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                      </div>
+                    </div>
+                  ) : myReports.length === 0 ? (
+                    <div className="alert alert-info">
+                      Bạn chưa có báo cáo nào
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Mã đơn</th>
+                            <th>Tài xế</th>
+                            <th>Loại</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày tạo</th>
+                            <th>Phản hồi từ Admin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myReports.map(report => (
+                            <tr key={report._id}>
+                              <td>#{report.order_id?._id?.slice(-6) || 'N/A'}</td>
+                              <td>{report.reported_user_id?.fullName || 'N/A'}</td>
+                              <td>{getReportTypeBadge(report.type)}</td>
+                              <td>{getReportStatusBadge(report.status)}</td>
+                              <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
+                              <td>
+                                <div style={{maxWidth: '200px'}}>
+                                  {report.admin_note ? (
+                                    <div className="text-wrap small">
+                                      {report.admin_note}
+                                      <div className="text-muted mt-1">
+                                        {new Date(report.updatedAt).toLocaleString('vi-VN')}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted">Chưa có phản hồi</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1099,24 +1228,112 @@ const Home = () => {
               />
               {!reportDescription && <Form.Text className="text-danger">Vui lòng nhập nội dung báo cáo</Form.Text>}
             </Form.Group>
+
+            {/* Thêm phần upload ảnh */}
+            <Form.Group className="mb-3">
+              <Form.Label>Hình ảnh đính kèm</Form.Label>
+              <div className="d-flex align-items-center gap-2">
+                <div className="position-relative" style={{width: '120px', height: '120px'}}>
+                  {reportImage ? (
+                    <>
+                      <img
+                        src={getImageUrl(reportImage)}
+                        alt="Report evidence"
+                        className="img-thumbnail"
+                        style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger position-absolute top-0 end-0"
+                        onClick={() => setReportImage(null)}
+                      >
+                        <FaTimes />
+                      </button>
+                    </>
+                  ) : (
+                    <div 
+                      className="border rounded d-flex align-items-center justify-content-center"
+                      style={{width: '100%', height: '100%', cursor: 'pointer'}}
+                      onClick={() => document.getElementById('report-image-upload').click()}
+                    >
+                      <FaImage size={24} className="text-muted" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    id="report-image-upload"
+                    accept="image/*"
+                    onChange={handleReportImageChange}
+                    style={{display: 'none'}}
+                  />
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => document.getElementById('report-image-upload').click()}
+                  >
+                    <FaCamera className="me-1" />
+                    Chọn ảnh
+                  </Button>
+                  <div className="small text-muted mt-1">
+                    Hỗ trợ: JPG, PNG. Tối đa 5MB
+                  </div>
+                </div>
+              </div>
+            </Form.Group>
+
+            {/* Hiển thị trạng thái và ghi chú của admin nếu đã gửi báo cáo */}
+            {reportTargetOrder && reportTargetOrder.report && (
+              <div className="mt-4">
+                <h6 className="mb-3">Trạng thái xử lý</h6>
+                <div className="p-3 bg-light rounded">
+                  <div className="mb-2">
+                    <strong>Trạng thái:</strong>{' '}
+                    <span className={`badge ${
+                      reportTargetOrder.report.status === 'pending' ? 'bg-warning' :
+                      reportTargetOrder.report.status === 'reviewed' ? 'bg-info' :
+                      reportTargetOrder.report.status === 'resolved' ? 'bg-success' :
+                      reportTargetOrder.report.status === 'rejected' ? 'bg-danger' : 'bg-secondary'
+                    }`}>
+                      {reportTargetOrder.report.status === 'pending' ? 'Chờ xử lý' :
+                       reportTargetOrder.report.status === 'reviewed' ? 'Đang xem xét' :
+                       reportTargetOrder.report.status === 'resolved' ? 'Đã giải quyết' :
+                       reportTargetOrder.report.status === 'rejected' ? 'Đã từ chối' : 'Không xác định'}
+                    </span>
+                  </div>
+                  {reportTargetOrder.report.admin_note && (
+                    <div>
+                      <strong>Phản hồi từ admin:</strong>
+                      <p className="mb-0 mt-1">{reportTargetOrder.report.admin_note}</p>
+                    </div>
+                  )}
+                  <div className="small text-muted mt-2">
+                    Cập nhật lần cuối: {new Date(reportTargetOrder.report.updatedAt).toLocaleString('vi-VN')}
+                  </div>
+                </div>
+              </div>
+            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseReportModal} disabled={reportLoading}>
             Hủy
           </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleSubmitReport} 
-            disabled={reportLoading || !reportType || !reportDescription}
-          >
-            {reportLoading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Đang gửi...
-              </>
-            ) : 'Gửi báo cáo'}
-          </Button>
+          {(!reportTargetOrder?.report || reportTargetOrder?.report?.status === 'rejected') && (
+            <Button 
+              variant="primary" 
+              onClick={handleSubmitReport} 
+              disabled={reportLoading || !reportType || !reportDescription}
+            >
+              {reportLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Đang gửi...
+                </>
+              ) : 'Gửi báo cáo'}
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
     </div>
