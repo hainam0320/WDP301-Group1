@@ -83,7 +83,10 @@ exports.registerDriver = async (req, res) => {
         const saved = await driver.save();
         const { password: _, ...driverData } = saved._doc;
 
-        res.status(201).json({ message: 'Đăng ký tài xế thành công', driver: driverData });
+        res.status(201).json({ 
+            message: 'Đăng ký tài xế thành công. Vui lòng đợi admin phê duyệt tài khoản của bạn.', 
+            driver: driverData 
+        });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server (registerDriver)', error: err.message });
     }
@@ -117,7 +120,15 @@ exports.login = async (req, res) => {
 
         // Kiểm tra trạng thái tài khoản
         if (!account.status && !account.isAdmin) {
-            return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.' });
+            if (account.role === 'driver') {
+                return res.status(403).json({ 
+                    message: 'Tài khoản của bạn chưa được phê duyệt hoặc đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.' 
+                });
+            } else {
+                return res.status(403).json({ 
+                    message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.' 
+                });
+            }
         }
 
         // So sánh mật khẩu

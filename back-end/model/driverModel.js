@@ -9,7 +9,7 @@ const driverSchema = new mongoose.Schema({
     licensePlateImage:{type: String, required: true}, // Ảnh biển số xe
     cmndFront:{type: String, required: true}, // Ảnh CMND mặt trước
     cmndBack:{type: String, required: true}, // Ảnh CMND mặt sau
-    status:{type: Boolean, default: true},
+    status:{type: Boolean, default: false},
 });
 
 module.exports = mongoose.model('Driver', driverSchema);
