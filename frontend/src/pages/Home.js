@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone, FaImage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaCar, FaMapMarkerAlt, FaWeight,FaStar, FaRuler, FaHistory, FaBell, FaSignOutAlt, FaCamera, FaPhone, FaImage, FaExclamationTriangle } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'leaflet/dist/leaflet.css';
 import logo from '../assets/img/favicon.png';
@@ -54,6 +54,14 @@ const Home = () => {
   const [showShipperModal, setShowShipperModal] = useState(false);
   const [shipperDetail, setShipperDetail] = useState(null);
   const [shipperAvgRate, setShipperAvgRate] = useState({ avg: 0, count: 0 });
+
+  // Add new states for report functionality
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTargetOrder, setReportTargetOrder] = useState(null);
+  const [reportType, setReportType] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportImage, setReportImage] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const getImageUrl = (path) => {
     if (!path) return null;
@@ -369,6 +377,89 @@ const Home = () => {
       setShipperAvgRate(res.data);
     } catch {
       setShipperAvgRate({ avg: 0, count: 0 });
+    }
+  };
+
+  // Add report handling functions
+  const handleOpenReportModal = (order) => {
+    if (!order.driverId) {
+      setMessage({ type: 'error', content: 'Không thể báo cáo đơn hàng không có tài xế' });
+      return;
+    }
+    setReportTargetOrder(order);
+    setReportType('');
+    setReportDescription('');
+    setReportImage(null);
+    setShowReportModal(true);
+  };
+
+  const handleCloseReportModal = () => {
+    setShowReportModal(false);
+    setReportTargetOrder(null);
+    setReportType('');
+    setReportDescription('');
+    setReportImage(null);
+    setMessage({ type: '', content: '' }); // Clear any existing messages
+  };
+
+  const handleReportImageChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      setReportLoading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await axios.post(`${BASE_URL}/api/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.data.filePath) {
+        setReportImage(response.data.filePath);
+        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+      }
+    } catch (error) {
+      console.error('Error handling report image upload:', error);
+      setMessage({ 
+        type: 'error', 
+        content: error.response?.data?.message || 'Lỗi khi tải ảnh lên' 
+      });
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportTargetOrder || !reportType || !reportDescription) {
+      setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin báo cáo' });
+      return;
+    }
+
+    setReportLoading(true);
+    try {
+      const response = await userAPI.createReport({
+        order_id: reportTargetOrder._id,
+        type: reportType,
+        description: reportDescription
+      });
+
+      if (response.data.message) {
+        setMessage({ type: 'success', content: response.data.message });
+        handleCloseReportModal();
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      const errorMessage = error.response?.data?.message || 'Lỗi khi gửi báo cáo';
+      setMessage({ 
+        type: 'error', 
+        content: errorMessage
+      });
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -696,6 +787,7 @@ const Home = () => {
                             <th>Thời gian hoàn thành</th>
                             <th>Giá</th>
                             <th>Đánh giá</th>
+                            <th>Báo cáo</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -722,6 +814,16 @@ const Home = () => {
                                     </Button>
                                   )
                                 )}
+                              </td>
+                              <td>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline-danger"
+                                  onClick={() => handleOpenReportModal(order)}
+                                >
+                                  <FaExclamationTriangle className="me-1" />
+                                  Báo cáo
+                                </Button>
                               </td>
                             </tr>
                           ))}
@@ -952,6 +1054,70 @@ const Home = () => {
             </div>
           )}
         </Modal.Body>
+      </Modal>
+
+      {/* Modal báo cáo */}
+      <Modal show={showReportModal} onHide={handleCloseReportModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            Báo cáo đơn hàng {reportTargetOrder ? `#${reportTargetOrder._id.slice(-6)}` : ''}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {message.content && (
+            <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-3`}>
+              {message.content}
+            </div>
+          )}
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Loại báo cáo <span className="text-danger">*</span></Form.Label>
+              <Form.Select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                isInvalid={!reportType}
+              >
+                <option value="">Chọn loại báo cáo</option>
+                <option value="late">Đơn hàng trễ</option>
+                <option value="damage">Hàng hóa bị hư hỏng</option>
+                <option value="lost">Hàng hóa bị mất</option>
+                <option value="inappropriate">Thái độ không phù hợp</option>
+                <option value="fraud">Gian lận</option>
+                <option value="other">Khác</option>
+              </Form.Select>
+              {!reportType && <Form.Text className="text-danger">Vui lòng chọn loại báo cáo</Form.Text>}
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Nội dung báo cáo <span className="text-danger">*</span></Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải..."
+                isInvalid={!reportDescription}
+              />
+              {!reportDescription && <Form.Text className="text-danger">Vui lòng nhập nội dung báo cáo</Form.Text>}
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseReportModal} disabled={reportLoading}>
+            Hủy
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSubmitReport} 
+            disabled={reportLoading || !reportType || !reportDescription}
+          >
+            {reportLoading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Đang gửi...
+              </>
+            ) : 'Gửi báo cáo'}
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

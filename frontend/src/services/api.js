@@ -67,6 +67,12 @@ export const userAPI = {
 
   // ---- Create Rate for Order ----
   createOrderRate: (data) => api.post('/rate', data),
+
+  // ---- Create Report ----
+  createReport: (data) => api.post('/reports', data),
+  
+  // ---- Get User Reports ----
+  getUserReports: () => api.get('/reports/my-reports'),
 };
 
 export const adminAPI = {
