@@ -1207,11 +1207,11 @@ const Home = () => {
                 isInvalid={!reportType}
               >
                 <option value="">Chọn loại báo cáo</option>
-                <option value="late">Đơn hàng trễ</option>
+                {/* <option value="late">Đơn hàng trễ</option> */}
                 <option value="damage">Hàng hóa bị hư hỏng</option>
                 <option value="lost">Hàng hóa bị mất</option>
                 <option value="inappropriate">Thái độ không phù hợp</option>
-                <option value="fraud">Gian lận</option>
+                {/* <option value="fraud">Gian lận</option> */}
                 <option value="other">Khác</option>
               </Form.Select>
               {!reportType && <Form.Text className="text-danger">Vui lòng chọn loại báo cáo</Form.Text>}
@@ -1276,9 +1276,9 @@ const Home = () => {
                     <FaCamera className="me-1" />
                     Chọn ảnh
                   </Button>
-                  <div className="small text-muted mt-1">
+                  {/* <div className="small text-muted mt-1">
                     Hỗ trợ: JPG, PNG. Tối đa 5MB
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </Form.Group>
