@@ -76,6 +76,7 @@ exports.authorize = (...roles) => {
         console.log('=== AUTHORIZE MIDDLEWARE ===');
         console.log('Required roles:', roles);
         console.log('Is Driver:', req.isDriver);
+        console.log('User:', { id: req.user._id, isAdmin: req.user.isAdmin });
         
         // Nếu là Driver, cho phép truy cập các route của shipper
         if (req.isDriver) {
@@ -84,9 +85,14 @@ exports.authorize = (...roles) => {
                 return next();
             }
         } else {
-            // Nếu là User, kiểm tra role
-            if (req.user.isAdmin || roles.includes(req.user.role)) {
-                console.log('Access granted: Valid user role');
+            // Nếu là admin, cho phép truy cập
+            if (req.user.isAdmin && roles.includes('admin')) {
+                console.log('Access granted: Admin user');
+                return next();
+            }
+            // Nếu route yêu cầu role 'user' và người dùng không phải là driver
+            if (roles.includes('user') && !req.isDriver) {
+                console.log('Access granted: Regular user');
                 return next();
             }
         }

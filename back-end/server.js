@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const shipperRoutes = require('./routes/shipperRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const rateRoutes = require('./routes/rateRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 require('dotenv').config();
 const app = express();
 app.use(cors());
@@ -32,6 +33,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/shipper', shipperRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/rate', rateRoutes);
+app.use('/api/reports', reportRoutes);
+
 // Khởi động server
 const PORT = process.env.PORT || 9999;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
