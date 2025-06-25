@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaUser, FaCamera, FaEdit, FaImage, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { shipperAPI } from '../../services/api';
 import axios from 'axios';
-import Header from '../Header';
+import ShipperHeader from './ShipperHeader';
 
 const ShipperProfile = () => {
   const navigate = useNavigate();
@@ -163,7 +163,7 @@ const ShipperProfile = () => {
 
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
-      <Header />
+      <ShipperHeader />
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"
