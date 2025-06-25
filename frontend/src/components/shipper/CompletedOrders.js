@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaRoute, FaMapMarkerAlt, FaUser, FaEye, FaStar, FaArrowLeft } from 'react-icons/fa';
+import { FaCheckCircle, FaMapMarkerAlt, FaUser, FaEye, FaStar, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
 import { Modal, Button } from 'react-bootstrap';
 import ShipperHeader from './ShipperHeader';
 
-const MyOrders = () => {
+const CompletedOrders = () => {
   const navigate = useNavigate();
-  const [myOrders, setMyOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [messages, setMessages] = useState({ type: '', content: '' });
   const BASE_URL = 'http://localhost:9999';
 
   // Modal states
@@ -18,7 +17,7 @@ const MyOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderRate, setOrderRate] = useState(null);
 
-  const fetchMyOrders = async () => {
+  const fetchCompletedOrders = async () => {
     setIsLoading(true);
     setError('');
     try {
@@ -28,57 +27,20 @@ const MyOrders = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Chỉ lấy những đơn hàng chưa hoàn thành
-      const activeOrders = response.data.filter(order => order.status !== 'completed');
-      setMyOrders(activeOrders);
+      // Chỉ lấy những đơn hàng đã hoàn thành
+      const completed = response.data.filter(order => order.status === 'completed');
+      setCompletedOrders(completed);
     } catch (err) {
-      console.error('Error fetching my orders:', err);
-      setError('Không thể tải danh sách đơn hàng của bạn');
+      console.error('Error fetching completed orders:', err);
+      setError('Không thể tải danh sách đơn hàng đã hoàn thành');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMyOrders();
+    fetchCompletedOrders();
   }, []);
-
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `${BASE_URL}/api/shipper/orders/${orderId}/status`,
-        { status: newStatus },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (response.data.success) {
-        if (newStatus === 'completed') {
-          // Nếu đơn hàng được hoàn thành, loại bỏ khỏi danh sách
-          setMyOrders(myOrders.filter(order => order._id !== orderId));
-        } else {
-          // Nếu chỉ cập nhật trạng thái, cập nhật trong danh sách
-          setMyOrders(myOrders.map(order => 
-            order._id === orderId ? {...order, status: newStatus} : order
-          ));
-        }
-        setMessages({ type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' });
-      }
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      setMessages({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchOrderRate = async (orderId) => {
     try {
@@ -136,30 +98,24 @@ const MyOrders = () => {
         </button>
 
         <div className="card" style={cardStyle}>
-          <div className="card-header bg-primary text-white">
-            <h4 className="mb-0"><FaRoute className="me-2" />Đơn hàng đang thực hiện</h4>
+          <div className="card-header bg-success text-white">
+            <h4 className="mb-0"><FaCheckCircle className="me-2" />Đơn hàng đã hoàn thành</h4>
           </div>
           <div className="card-body">
-            {messages.content && (
-              <div className={`alert alert-${messages.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
-                {messages.content}
-                <button type="button" className="btn-close" onClick={() => setMessages({ type: '', content: '' })}></button>
-              </div>
-            )}
             {isLoading ? (
               <div className="text-center py-4">
-                <div className="spinner-border text-primary" role="status">
+                <div className="spinner-border text-success" role="status">
                   <span className="visually-hidden">Đang tải...</span>
                 </div>
               </div>
             ) : error ? (
               <div className="alert alert-danger">{error}</div>
-            ) : myOrders.length === 0 ? (
+            ) : completedOrders.length === 0 ? (
               <div className="text-center text-muted py-4">
-                <p>Bạn chưa có đơn hàng nào đang thực hiện</p>
+                <p>Bạn chưa có đơn hàng nào đã hoàn thành</p>
               </div>
             ) : (
-              myOrders.map(order => (
+              completedOrders.map(order => (
                 <div key={order._id} className="card mb-3">
                   <div className="card-body">
                     <div className="row align-items-center">
@@ -186,30 +142,20 @@ const MyOrders = () => {
                         )}
                       </div>
                       <div className="col-md-3">
-                        <span className={`badge fs-6 ${
-                          order.status === 'in-progress' ? 'bg-warning' : 'bg-info'
-                        }`}>
-                          {order.status === 'in-progress' ? 'Đang giao' : 'Đã nhận'}
-                        </span>
+                        <span className="badge bg-success fs-6">Hoàn thành</span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
+                        <p className="text-muted mb-0">
+                          <small>Hoàn thành: {formatDate(order.updatedAt)}</small>
+                        </p>
                       </div>
                       <div className="col-md-3">
-                        {order.status === 'accepted' && (
-                          <button 
-                            className="btn btn-warning btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'in-progress')}
-                          >
-                            Bắt đầu giao
-                          </button>
-                        )}
-                        {order.status === 'in-progress' && (
-                          <button 
-                            className="btn btn-success btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'completed')}
-                          >
-                            Hoàn thành
-                          </button>
-                        )}
+                        <button 
+                          className="btn btn-outline-primary btn-sm w-100"
+                          onClick={() => handleShowOrderDetail(order)}
+                        >
+                          <FaEye className="me-1" />
+                          Xem chi tiết
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -222,9 +168,9 @@ const MyOrders = () => {
 
       {/* Modal chi tiết đơn hàng */}
       <Modal show={showOrderDetailModal} onHide={handleCloseOrderDetailModal} size="lg" centered>
-        <Modal.Header closeButton className="bg-primary text-white">
+        <Modal.Header closeButton className="bg-success text-white">
           <Modal.Title>
-            <FaRoute className="me-2" />
+            <FaCheckCircle className="me-2" />
             Chi tiết đơn hàng #{selectedOrder?._id?.slice(-6)}
           </Modal.Title>
         </Modal.Header>
@@ -232,7 +178,7 @@ const MyOrders = () => {
           {selectedOrder && (
             <div className="row">
               <div className="col-md-6">
-                <h6 className="fw-bold text-primary mb-3">Thông tin địa điểm</h6>
+                <h6 className="fw-bold text-success mb-3">Thông tin địa điểm</h6>
                 <div className="mb-3">
                   <p className="mb-1">
                     <strong className="text-success">Điểm đón:</strong>
@@ -253,26 +199,32 @@ const MyOrders = () => {
                     {selectedOrder.distance_km ? `${selectedOrder.distance_km.toFixed(1)} km` : 'N/A'}
                   </p>
                 </div>
+                {selectedOrder.type === 'delivery' && selectedOrder.weight && (
+                  <div className="mb-3">
+                    <p className="mb-1">
+                      <strong>Khối lượng:</strong>
+                    </p>
+                    <p className="text-muted">{selectedOrder.weight} kg</p>
+                  </div>
+                )}
               </div>
               
               <div className="col-md-6">
-                <h6 className="fw-bold text-primary mb-3">Thông tin thời gian</h6>
+                <h6 className="fw-bold text-success mb-3">Thông tin thời gian</h6>
                 <div className="mb-3">
                   <p className="mb-1">
                     <strong>Thời gian nhận đơn:</strong>
                   </p>
                   <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
                 </div>
-                {selectedOrder.status === 'completed' && (
-                  <div className="mb-3">
-                    <p className="mb-1">
-                      <strong>Thời gian hoàn thành:</strong>
-                    </p>
-                    <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
-                  </div>
-                )}
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Thời gian hoàn thành:</strong>
+                  </p>
+                  <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
+                </div>
                 
-                <h6 className="fw-bold text-primary mb-3">Thông tin thanh toán</h6>
+                <h6 className="fw-bold text-success mb-3">Thông tin thanh toán</h6>
                 <div className="mb-3">
                   <p className="mb-1">
                     <strong>Giá tiền:</strong>
@@ -282,7 +234,7 @@ const MyOrders = () => {
                   </p>
                 </div>
                 
-                <h6 className="fw-bold text-primary mb-3">Đánh giá từ khách hàng</h6>
+                <h6 className="fw-bold text-success mb-3">Đánh giá từ khách hàng</h6>
                 <div className="mb-3">
                   {orderRate ? (
                     <div>
@@ -319,4 +271,4 @@ const MyOrders = () => {
   );
 };
 
-export default MyOrders; 
+export default CompletedOrders; 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaDollarSign, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
-import Header from '../Header';
+import ShipperHeader from './ShipperHeader';
 
 const Earnings = () => {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ const Earnings = () => {
 
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
-      <Header />
+      <ShipperHeader />
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"

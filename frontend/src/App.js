@@ -16,6 +16,7 @@ import AvailableOrders from './components/shipper/AvailableOrders';
 import MyOrders from './components/shipper/MyOrders';
 import Earnings from './components/shipper/Earnings';
 import ShipperProfile from './components/shipper/ShipperProfile';
+import CompletedOrders from './components/shipper/CompletedOrders';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
@@ -106,6 +107,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['driver']}>
               <MyOrders />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shipper/completed-orders" 
+          element={
+            <ProtectedRoute allowedRoles={['driver']}>
+              <CompletedOrders />
             </ProtectedRoute>
           } 
         />
