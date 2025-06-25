@@ -6,7 +6,19 @@ import Home from './pages/Home';
 import ShipperDashboard from './components/ShipperDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import NewOrder from './components/NewOrder';
+import OrderTracking from './components/OrderTracking';
+import OrderHistory from './components/OrderHistory';
+import UserProfile from './components/UserProfile';
+import MyReports from './components/MyReports';
 import ConfirmOrder from './components/ConfirmOrder';
+import AvailableOrders from './components/shipper/AvailableOrders';
+import MyOrders from './components/shipper/MyOrders';
+import Earnings from './components/shipper/Earnings';
+import ShipperProfile from './components/shipper/ShipperProfile';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+
 function App() {
   return (
     <Router>
@@ -24,7 +36,47 @@ function App() {
             </ProtectedRoute>
           } 
         />
-                <Route 
+        <Route 
+          path="/new-order" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <NewOrder />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/order-tracking" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <OrderTracking />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/order-history" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <OrderHistory />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <UserProfile />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/my-reports" 
+          element={
+            <ProtectedRoute allowedRoles={['user']}>
+              <MyReports />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/confirmOrder" 
           element={
             <ProtectedRoute allowedRoles={['user']}>
@@ -38,6 +90,38 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['driver']}>
               <ShipperDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shipper/available-orders" 
+          element={
+            <ProtectedRoute allowedRoles={['driver']}>
+              <AvailableOrders />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shipper/my-orders" 
+          element={
+            <ProtectedRoute allowedRoles={['driver']}>
+              <MyOrders />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shipper/earnings" 
+          element={
+            <ProtectedRoute allowedRoles={['driver']}>
+              <Earnings />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shipper/profile" 
+          element={
+            <ProtectedRoute allowedRoles={['driver']}>
+              <ShipperProfile />
             </ProtectedRoute>
           } 
         />
