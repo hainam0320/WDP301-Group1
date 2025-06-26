@@ -1,146 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaEdit, FaTrash, FaEye, FaPlus, FaLock, FaLockOpen, FaExclamationTriangle, FaCheck, FaTimes } from 'react-icons/fa';
+import React from 'react';
+import { useNavigate, Routes, Route, Link } from 'react-router-dom';
+import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaExclamationTriangle } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
-import { adminAPI } from '../services/api';
-import { toast } from 'react-toastify';
-import Modal from 'react-bootstrap/Modal';
-import Button from 'react-bootstrap/Button';
+
+// Import components
+import AdminDashboardHome from './admin/AdminDashboardHome';
+import UserManagement from './admin/UserManagement';
+import ShipperManagement from './admin/ShipperManagement';
+import OrderManagement from './admin/OrderManagement';
+import RevenueReport from './admin/RevenueReport';
+import ReportManagement from './admin/ReportManagement';
+import SystemSettings from './admin/SystemSettings';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  const [systemStats, setSystemStats] = useState({
-    totalUsers: 0,
-    totalShippers: 0,
-    totalOrders: 0,
-    totalRevenue: 0,
-    todayOrders: 0,
-    activeShippers: 0,
-    completionRate: 0,
-    averageRating: 0,
-    averageDeliveryTime: 0,
-    monthlyGrowth: 0
-  });
-
-  const [users, setUsers] = useState([]);
-  const [shippers, setShippers] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [revenues, setRevenues] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [adminNote, setAdminNote] = useState('');
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [activeTab]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      
-      switch(activeTab) {
-        case 'dashboard':
-          const statsData = await adminAPI.getStats();
-          setSystemStats(statsData.data);
-          break;
-          
-        case 'users':
-          const usersData = await adminAPI.getUsers();
-          setUsers(usersData.data.filter(user => user.type === 'user'));
-          break;
-
-        case 'shippers':
-          const shippersData = await adminAPI.getUsers();
-          setShippers(shippersData.data.filter(user => user.type === 'driver'));
-          break;
-          
-        case 'orders':
-          const ordersData = await adminAPI.getOrders();
-          setOrders(ordersData.data);
-          break;
-          
-        case 'revenue':
-          const revenueData = await adminAPI.getRevenue();
-          setRevenues(revenueData.data);
-          break;
-
-        case 'reports':
-          const reportsData = await adminAPI.getAllReports();
-          setReports(reportsData.data.reports);
-          break;
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Có lỗi xảy ra khi tải dữ liệu');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
-      try {
-        await adminAPI.deleteUser(userId);
-        toast.success('Xóa người dùng thành công');
-        fetchDashboardData(); // Refresh users list
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        toast.error('Có lỗi xảy ra khi xóa người dùng');
-      }
-    }
-  };
-
-  const handleViewUser = (user) => {
-    setSelectedUser(user);
-    setShowUserModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowUserModal(false);
-    setSelectedUser(null);
-  };
-
-  const toggleUserStatus = async (userId, currentStatus) => {
-    try {
-      const newStatus = currentStatus ? 'inactive' : 'active';
-      await adminAPI.updateUserStatus(userId, newStatus);
-      toast.success(`Tài khoản đã được ${newStatus === 'active' ? 'mở khóa' : 'khóa'} thành công`);
-      fetchDashboardData(); // Refresh users list
-    } catch (error) {
-      console.error('Error updating user status:', error);
-      toast.error('Có lỗi xảy ra khi cập nhật trạng thái tài khoản');
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('currentUser');
-    navigate('/login');
-  };
 
   const headerStyle = {
     background: 'linear-gradient(135deg, #dc3545, #fd7e14)',
     color: 'white'
-  };
-
-  const cardStyle = {
-    borderRadius: '15px',
-    boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-    border: 'none'
-  };
-
-  const buttonStyle = {
-    borderRadius: '10px',
-    padding: '12px 24px',
-    fontWeight: 'bold',
-    transition: 'all 0.3s ease'
   };
 
   const sidebarStyle = {
@@ -149,200 +27,10 @@ const AdminDashboard = () => {
     minHeight: '500px'
   };
 
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/150';
-    if (imagePath.startsWith('http')) return imagePath;
-    return `http://localhost:9999/${imagePath.replace(/\\/g, '/')}`;
-  };
-
-  const UserDetailsModal = () => {
-    if (!selectedUser) return null;
-
-    return (
-      <Modal show={showUserModal} onHide={handleCloseModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Thông tin chi tiết người dùng</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-4 text-center mb-3">
-              <img 
-                src={getImageUrl(selectedUser.avatar)}
-                alt="Avatar" 
-                className="rounded-circle img-thumbnail"
-                style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/150';
-                }}
-              />
-              {selectedUser.type === 'driver' && (
-                <div className="mt-3">
-                  {selectedUser.licensePlateImage && (
-                    <div className="mb-3">
-                      <p className="mb-2">Ảnh biển số xe:</p>
-                      <img 
-                        src={getImageUrl(selectedUser.licensePlateImage)}
-                        alt="Biển số xe" 
-                        className="img-thumbnail"
-                        style={{ maxWidth: '200px' }}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
-                      />
-                    </div>
-                  )}
-                  {selectedUser.cmndFront && (
-                    <div className="mb-3">
-                      <p className="mb-2">CMND mặt trước:</p>
-                      <img 
-                        src={getImageUrl(selectedUser.cmndFront)}
-                        alt="CMND mặt trước" 
-                        className="img-thumbnail"
-                        style={{ maxWidth: '200px' }}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
-                      />
-                    </div>
-                  )}
-                  {selectedUser.cmndBack && (
-                    <div className="mb-3">
-                      <p className="mb-2">CMND mặt sau:</p>
-                      <img 
-                        src={getImageUrl(selectedUser.cmndBack)}
-                        alt="CMND mặt sau" 
-                        className="img-thumbnail"
-                        style={{ maxWidth: '200px' }}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="col-md-8">
-              <table className="table">
-                <tbody>
-                  <tr>
-                    <th style={{ width: '35%' }}>Họ tên:</th>
-                    <td>{selectedUser.fullName}</td>
-                  </tr>
-                  <tr>
-                    <th>Email:</th>
-                    <td>{selectedUser.email}</td>
-                  </tr>
-                  <tr>
-                    <th>Số điện thoại:</th>
-                    <td>{selectedUser.phone}</td>
-                  </tr>
-                  <tr>
-                    <th>Vai trò:</th>
-                    <td>
-                      <span className={`badge ${selectedUser.type === 'admin' ? 'bg-danger' : selectedUser.type === 'driver' ? 'bg-success' : 'bg-primary'}`}>
-                        {selectedUser.type === 'admin' ? 'Admin' : selectedUser.type === 'driver' ? 'Shipper' : 'User'}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Trạng thái:</th>
-                    <td>
-                      <span className={`badge ${selectedUser.status ? 'bg-success' : 'bg-secondary'}`}>
-                        {selectedUser.status ? 'Đang hoạt động' : 'Đã bị khóa'}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>Ngày tham gia:</th>
-                    <td>{new Date(selectedUser.createdAt).toLocaleDateString('vi-VN')}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            Đóng
-          </Button>
-          <Button
-            variant={selectedUser.status ? 'danger' : 'success'}
-            onClick={() => {
-              toggleUserStatus(selectedUser._id, selectedUser.status);
-              handleCloseModal();
-            }}
-          >
-            {selectedUser.status ? <><FaLock className="me-2" />Khóa tài khoản</> : <><FaLockOpen className="me-2" />Mở khóa tài khoản</>}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    );
-  };
-
-  const handleViewReport = (report) => {
-    setSelectedReport(report);
-    setAdminNote('');
-    setShowReportModal(true);
-  };
-
-  const handleCloseReportModal = () => {
-    setShowReportModal(false);
-    setSelectedReport(null);
-    setAdminNote('');
-  };
-
-  const handleUpdateReportStatus = async (reportId, status) => {
-    try {
-      await adminAPI.updateReportStatus(reportId, {
-        status,
-        admin_note: adminNote
-      });
-      toast.success('Cập nhật trạng thái báo cáo thành công');
-      handleCloseReportModal();
-      fetchDashboardData();
-    } catch (error) {
-      console.error('Error updating report status:', error);
-      toast.error('Có lỗi xảy ra khi cập nhật trạng thái báo cáo');
-    }
-  };
-
-  const getReportStatusBadge = (status) => {
-    switch (status) {
-      case 'pending':
-        return <span className="badge bg-warning">Chờ xử lý</span>;
-      case 'reviewed':
-        return <span className="badge bg-info">Đang xem xét</span>;
-      case 'resolved':
-        return <span className="badge bg-success">Đã giải quyết</span>;
-      case 'rejected':
-        return <span className="badge bg-danger">Đã từ chối</span>;
-      default:
-        return <span className="badge bg-secondary">Không xác định</span>;
-    }
-  };
-
-  const getReportTypeBadge = (type) => {
-    switch (type) {
-      case 'late':
-        return <span className="badge bg-warning">Trễ hẹn</span>;
-      case 'damage':
-        return <span className="badge bg-danger">Hư hỏng</span>;
-      case 'lost':
-        return <span className="badge bg-dark">Thất lạc</span>;
-      case 'inappropriate':
-        return <span className="badge bg-info">Không phù hợp</span>;
-      case 'fraud':
-        return <span className="badge bg-danger">Gian lận</span>;
-      case 'other':
-        return <span className="badge bg-secondary">Khác</span>;
-      default:
-        return <span className="badge bg-secondary">Không xác định</span>;
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('currentUser');
+    navigate('/login');
   };
 
   return (
@@ -366,7 +54,7 @@ const AdminDashboard = () => {
                 Administrator
               </button>
               <ul className="dropdown-menu">
-                <li><button className="dropdown-item" onClick={() => setActiveTab('settings')}><FaCog className="me-2" />Cài đặt hệ thống</button></li>
+                <li><Link to="/admin/settings" className="dropdown-item"><FaCog className="me-2" />Cài đặt hệ thống</Link></li>
                 <li><hr className="dropdown-divider" /></li>
                 <li><button className="dropdown-item" onClick={handleLogout}><FaSignOutAlt className="me-2" />Đăng xuất</button></li>
               </ul>
@@ -376,655 +64,79 @@ const AdminDashboard = () => {
       </nav>
 
       <div className="container my-5">
-        {/* Stats Cards */}
-        <div className="row mb-4">
-          <div className="col-md-2 mb-3">
-            <div className="card bg-primary text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaUsers size={30} className="mb-2" />
-                <h6>Người dùng</h6>
-                <h4>{systemStats.totalUsers}</h4>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-2 mb-3">
-            <div className="card bg-success text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaShippingFast size={30} className="mb-2" />
-                <h6>Shipper</h6>
-                <h4>{systemStats.totalShippers}</h4>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-2 mb-3">
-            <div className="card bg-info text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaChartBar size={30} className="mb-2" />
-                <h6>Tổng đơn</h6>
-                <h4>{systemStats.totalOrders}</h4>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-2 mb-3">
-            <div className="card bg-warning text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaDollarSign size={30} className="mb-2" />
-                <h6>Doanh thu</h6>
-                <h6>{(systemStats.totalRevenue / 1000000).toFixed(0)}M</h6>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-2 mb-3">
-            <div className="card bg-danger text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaShippingFast size={30} className="mb-2" />
-                <h6>Hôm nay</h6>
-                <h4>{systemStats.todayOrders}</h4>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-2 mb-3">
-            <div className="card bg-dark text-white" style={cardStyle}>
-              <div className="card-body text-center">
-                <FaUsers size={30} className="mb-2" />
-                <h6>Online</h6>
-                <h4>{systemStats.activeShippers}</h4>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="row">
           {/* Sidebar */}
           <div className="col-md-3 mb-4">
             <div className="p-4" style={sidebarStyle}>
               <h5 className="fw-bold mb-4">Menu</h5>
               <div className="list-group list-group-flush">
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('dashboard')}
+                <Link 
+                  to="/admin"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaChartBar className="me-2" />
                   Tổng quan
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'users' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('users')}
+                </Link>
+                <Link 
+                  to="/admin/users"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaUsers className="me-2" />
                   Quản lý người dùng
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'shippers' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('shippers')}
+                </Link>
+                <Link 
+                  to="/admin/shippers"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaShippingFast className="me-2" />
                   Quản lý shipper
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'orders' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('orders')}
+                </Link>
+                <Link 
+                  to="/admin/orders"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaShippingFast className="me-2" />
                   Quản lý đơn hàng
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'revenue' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('revenue')}
+                </Link>
+                <Link 
+                  to="/admin/revenue"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaDollarSign className="me-2" />
                   Báo cáo doanh thu
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'reports' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('reports')}
+                </Link>
+                <Link 
+                  to="/admin/reports"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaExclamationTriangle className="me-2" />
                   Quản lý báo cáo
-                </button>
-                <button 
-                  className={`list-group-item list-group-item-action border-0 ${activeTab === 'settings' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('settings')}
+                </Link>
+                <Link 
+                  to="/admin/settings"
+                  className="list-group-item list-group-item-action border-0"
                 >
                   <FaCog className="me-2" />
                   Cài đặt hệ thống
-                </button>
+                </Link>
               </div>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="col-md-9">
-            {/* Dashboard Overview */}
-            {activeTab === 'dashboard' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-primary text-white">
-                  <h4 className="mb-0"><FaChartBar className="me-2" />Tổng quan hệ thống</h4>
-                </div>
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-md-6 mb-4">
-                      <div className="card bg-light">
-                        <div className="card-body">
-                          <h5 className="card-title">Hoạt động hôm nay</h5>
-                          <ul className="list-unstyled">
-                            <li>• {systemStats.todayOrders} đơn hàng mới</li>
-                            <li>• {systemStats.activeShippers} shipper đang hoạt động</li>
-                            <li>• 15 người dùng mới đăng ký</li>
-                            <li>• 8 đơn hàng hoàn thành</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-6 mb-4">
-                      <div className="card bg-light">
-                        <div className="card-body">
-                          <h5 className="card-title">Thống kê nhanh</h5>
-                          <ul className="list-unstyled">
-                            <li>• Tỷ lệ hoàn thành: 94.5%</li>
-                            <li>• Đánh giá trung bình: 4.7/5</li>
-                            <li>• Thời gian giao trung bình: 35 phút</li>
-                            <li>• Tăng trưởng tháng: +12%</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* User Management */}
-            {activeTab === 'users' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                  <h4 className="mb-0"><FaUsers className="me-2" />Quản lý người dùng</h4>
-                  
-                </div>
-                <div className="card-body">
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Tên</th>
-                          <th>Email</th>
-                          <th>Số điện thoại</th>
-                          <th>Trạng thái</th>
-                          <th>Ngày tham gia</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map(user => (
-                          <tr key={user._id}>
-                            <td style={{ whiteSpace: 'nowrap' }}>{user.fullName}</td>
-                            <td>{user.email}</td>
-                            <td>{user.phone}</td>
-                            <td>
-                              <span className={`badge ${user.status ? 'bg-success' : 'bg-secondary'}`}>
-                                {user.status ? 'Hoạt động' : 'Đã khóa'}
-                              </span>
-                            </td>
-                            <td>{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
-                            <td>
-                              <div className="btn-group btn-group-sm">
-                                <button 
-                                  className="btn btn-outline-primary" 
-                                  title="Xem chi tiết"
-                                  onClick={() => handleViewUser(user)}
-                                >
-                                  <FaEye />
-                                </button>
-                                <button 
-                                  className={`btn ${user.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                                  onClick={() => toggleUserStatus(user._id, user.status)}
-                                  title={user.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                                >
-                                  {user.status ? <FaLock /> : <FaLockOpen />}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Shipper Management */}
-            {activeTab === 'shippers' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                  <h4 className="mb-0"><FaShippingFast className="me-2" />Quản lý shipper</h4>
-                  <button className="btn btn-light btn-sm">
-                    <FaPlus className="me-2" />
-                    Thêm shipper
-                  </button>
-                </div>
-                <div className="card-body">
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Tên</th>
-                          <th>Email</th>
-                          <th>Số điện thoại</th>
-                          <th>Trạng thái</th>
-                          <th>Ngày tham gia</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {shippers.map(shipper => (
-                          <tr key={shipper._id}>
-                            <td style={{ whiteSpace: 'nowrap' }}>{shipper.fullName}</td>
-                            <td>{shipper.email}</td>
-                            <td>{shipper.phone}</td>
-                            <td>
-                              <span className={`badge ${shipper.status ? 'bg-success' : 'bg-secondary'}`}>
-                                {shipper.status ? 'Hoạt động' : 'Đã khóa'}
-                              </span>
-                            </td>
-                            <td>{new Date(shipper.createdAt).toLocaleDateString('vi-VN')}</td>
-                            <td>
-                              <div className="btn-group btn-group-sm">
-                                <button 
-                                  className="btn btn-outline-primary" 
-                                  title="Xem chi tiết"
-                                  onClick={() => handleViewUser(shipper)}
-                                >
-                                  <FaEye />
-                                </button>
-                                <button 
-                                  className={`btn ${shipper.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                                  onClick={() => toggleUserStatus(shipper._id, shipper.status)}
-                                  title={shipper.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
-                                >
-                                  {shipper.status ? <FaLock /> : <FaLockOpen />}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Order Management */}
-            {activeTab === 'orders' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-info text-white">
-                  <h4 className="mb-0"><FaShippingFast className="me-2" />Quản lý đơn hàng</h4>
-                </div>
-                <div className="card-body">
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>Mã đơn</th>
-                          <th>Khách hàng</th>
-                          <th>Shipper</th>
-                          <th>Tuyến đường</th>
-                          <th>Giá</th>
-                          <th>Trạng thái</th>
-                          <th>Ngày</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map(order => (
-                          <tr key={order._id}>
-                            <td>#{order._id}</td>
-                            <td>{order.customer}</td>
-                            <td>{order.shipper}</td>
-                            <td>{order.from} → {order.to}</td>
-                            <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                            <td>
-                              <span className={`badge ${
-                                order.status === 'completed' ? 'bg-success' : 
-                                order.status === 'in-progress' ? 'bg-warning' : 'bg-secondary'
-                              }`}>
-                                {order.status === 'completed' ? 'Hoàn thành' : 
-                                 order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
-                              </span>
-                            </td>
-                            <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
-                            <td>
-                              <div className="btn-group btn-group-sm">
-                                <button className="btn btn-outline-primary" title="Xem chi tiết">
-                                  <FaEye />
-                                </button>
-                                <button className="btn btn-outline-warning" title="Chỉnh sửa">
-                                  <FaEdit />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Revenue Report */}
-            {activeTab === 'revenue' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-warning text-dark">
-                  <h4 className="mb-0"><FaDollarSign className="me-2" />Báo cáo doanh thu</h4>
-                </div>
-                <div className="card-body">
-                  <div className="row mb-4">
-                    <div className="col-md-4">
-                      <div className="card bg-success text-white">
-                        <div className="card-body text-center">
-                          <h5>Doanh thu tháng này</h5>
-                          <h3>{revenues[0]?.revenue.toLocaleString()} VNĐ</h3>
-                          <small>Tăng trưởng: {revenues[0]?.growth}</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-4">
-                      <div className="card bg-info text-white">
-                        <div className="card-body text-center">
-                          <h5>Số đơn hàng</h5>
-                          <h3>{revenues[0]?.orders}</h3>
-                          <small>Đơn hàng trong tháng</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-4">
-                      <div className="card bg-primary text-white">
-                        <div className="card-body text-center">
-                          <h5>Trung bình/đơn</h5>
-                          <h3>{Math.round(revenues[0]?.revenue / revenues[0]?.orders).toLocaleString()} VNĐ</h3>
-                          <small>Giá trị trung bình</small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="table-responsive">
-                    <table className="table table-striped">
-                      <thead>
-                        <tr>
-                          <th>Thời gian</th>
-                          <th>Doanh thu</th>
-                          <th>Số đơn hàng</th>
-                          <th>Tăng trưởng</th>
-                          <th>Trung bình/đơn</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {revenues.map((revenue, index) => (
-                          <tr key={index}>
-                            <td>{revenue.month}</td>
-                            <td className="fw-bold text-success">{revenue.revenue.toLocaleString()} VNĐ</td>
-                            <td>{revenue.orders}</td>
-                            <td className="text-success">{revenue.growth}</td>
-                            <td>{Math.round(revenue.revenue / revenue.orders).toLocaleString()} VNĐ</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Reports Management */}
-            {activeTab === 'reports' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-danger text-white">
-                  <h4 className="mb-0"><FaExclamationTriangle className="me-2" />Quản lý báo cáo</h4>
-                </div>
-                <div className="card-body">
-                  {loading ? (
-                    <div className="text-center py-4">
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Đang tải...</span>
-                      </div>
-                    </div>
-                  ) : reports.length === 0 ? (
-                    <div className="alert alert-info">Không có báo cáo nào</div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead>
-                          <tr>
-                            <th>Mã đơn</th>
-                            <th>Người báo cáo</th>
-                            <th>Tài xế</th>
-                            <th>Loại</th>
-                            <th>Trạng thái</th>
-                            <th>Ngày tạo</th>
-                            <th>Thao tác</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reports.map(report => (
-                            <tr key={report._id}>
-                              <td>#{report.order_id._id.slice(-6)}</td>
-                              <td>{report.reporterID.fullName}</td>
-                              <td>{report.reported_user_id.fullName}</td>
-                              <td>{getReportTypeBadge(report.type)}</td>
-                              <td>{getReportStatusBadge(report.status)}</td>
-                              <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
-                              <td>
-                                <button 
-                                  className="btn btn-outline-primary btn-sm"
-                                  onClick={() => handleViewReport(report)}
-                                >
-                                  <FaEye className="me-1" />
-                                  Chi tiết
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* System Settings */}
-            {activeTab === 'settings' && (
-              <div className="card" style={cardStyle}>
-                <div className="card-header bg-dark text-white">
-                  <h4 className="mb-0"><FaCog className="me-2" />Cài đặt hệ thống</h4>
-                </div>
-                <div className="card-body">
-                  <form>
-                    <div className="row mb-3">
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">Tên hệ thống</label>
-                        <input type="text" className="form-control" defaultValue="Tốc Hành Hòa Lạc" />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">Email hỗ trợ</label>
-                        <input type="email" className="form-control" defaultValue="support@tochanh.com" />
-                      </div>
-                    </div>
-                    <div className="row mb-3">
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">Phí hệ thống (%)</label>
-                        <input type="number" className="form-control" defaultValue="10" />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold">Giá cơ bản (VNĐ/km)</label>
-                        <input type="number" className="form-control" defaultValue="5000" />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label fw-semibold">Thông báo bảo trì</label>
-                      <textarea className="form-control" rows="3" placeholder="Nhập thông báo bảo trì hệ thống..."></textarea>
-                    </div>
-                    <button type="submit" className="btn btn-primary" style={buttonStyle}>
-                      Lưu cài đặt
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
+            <Routes>
+              <Route path="/" element={<AdminDashboardHome />} />
+              <Route path="/users" element={<UserManagement />} />
+              <Route path="/shippers" element={<ShipperManagement />} />
+              <Route path="/orders" element={<OrderManagement />} />
+              <Route path="/revenue" element={<RevenueReport />} />
+              <Route path="/reports" element={<ReportManagement />} />
+              <Route path="/settings" element={<SystemSettings />} />
+            </Routes>
           </div>
         </div>
       </div>
-
-      {/* Report Details Modal */}
-      <Modal show={showReportModal} onHide={handleCloseReportModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Chi tiết báo cáo</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedReport && (
-            <div>
-              <div className="row mb-4">
-                <div className="col-md-6">
-                  <h6>Thông tin báo cáo</h6>
-                  <table className="table table-borderless">
-                    <tbody>
-                      <tr>
-                        <th>Mã đơn hàng:</th>
-                        <td>#{selectedReport.order_id._id.slice(-6)}</td>
-                      </tr>
-                      <tr>
-                        <th>Loại báo cáo:</th>
-                        <td>{getReportTypeBadge(selectedReport.type)}</td>
-                      </tr>
-                      <tr>
-                        <th>Trạng thái:</th>
-                        <td>{getReportStatusBadge(selectedReport.status)}</td>
-                      </tr>
-                      <tr>
-                        <th>Ngày tạo:</th>
-                        <td>{new Date(selectedReport.createdAt).toLocaleString('vi-VN')}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="col-md-6">
-                  <h6>Thông tin người liên quan</h6>
-                  <table className="table table-borderless">
-                    <tbody>
-                      <tr>
-                        <th>Người báo cáo:</th>
-                        <td>{selectedReport.reporterID.fullName}</td>
-                      </tr>
-                      <tr>
-                        <th>Email:</th>
-                        <td>{selectedReport.reporterID.email}</td>
-                      </tr>
-                      <tr>
-                        <th>Tài xế:</th>
-                        <td>{selectedReport.reported_user_id.fullName}</td>
-                      </tr>
-                      <tr>
-                        <th>Email tài xế:</th>
-                        <td>{selectedReport.reported_user_id.email}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <h6>Nội dung báo cáo</h6>
-                <p className="border rounded p-3 bg-light">{selectedReport.description}</p>
-              </div>
-
-              {selectedReport.image && (
-                <div className="mb-4">
-                  <h6>Hình ảnh đính kèm</h6>
-                  <img 
-                    src={`${process.env.REACT_APP_API_URL}/${selectedReport.image}`}
-                    alt="Report evidence" 
-                    className="img-fluid rounded"
-                    style={{maxHeight: '200px'}}
-                  />
-                </div>
-              )}
-
-              {selectedReport.status !== 'resolved' && selectedReport.status !== 'rejected' && (
-                <div className="mb-4">
-                  <h6>Ghi chú của admin</h6>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={adminNote}
-                    onChange={(e) => setAdminNote(e.target.value)}
-                    placeholder="Nhập ghi chú xử lý..."
-                  />
-                </div>
-              )}
-
-              {selectedReport.admin_note && (
-                <div className="mb-4">
-                  <h6>Ghi chú trước đó</h6>
-                  <p className="border rounded p-3 bg-light">{selectedReport.admin_note}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseReportModal}>
-            Đóng
-          </Button>
-          {selectedReport && selectedReport.status === 'pending' && (
-            <>
-              <Button 
-                variant="info" 
-                onClick={() => handleUpdateReportStatus(selectedReport._id, 'reviewed')}
-              >
-                <FaEye className="me-1" />
-                Đang xem xét
-              </Button>
-              <Button 
-                variant="success" 
-                onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
-              >
-                <FaCheck className="me-1" />
-                Giải quyết
-              </Button>
-              <Button 
-                variant="danger" 
-                onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
-              >
-                <FaTimes className="me-1" />
-                Từ chối
-              </Button>
-            </>
-          )}
-          {selectedReport && selectedReport.status === 'reviewed' && (
-            <>
-              <Button 
-                variant="success" 
-                onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
-              >
-                <FaCheck className="me-1" />
-                Giải quyết
-              </Button>
-              <Button 
-                variant="danger" 
-                onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
-              >
-                <FaTimes className="me-1" />
-                Từ chối
-              </Button>
-            </>
-          )}
-        </Modal.Footer>
-      </Modal>
-
-      <UserDetailsModal />
     </div>
   );
 };
