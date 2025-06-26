@@ -211,14 +211,14 @@ exports.updateUserStatus = async (req, res) => {
 exports.getOrders = async (req, res) => {
   try {
     const orders = await Order.find()
-      .populate('userId', 'name')
-      .populate('driverId', 'name')
+      .populate('userId', 'fullName')
+      .populate('driverId', 'fullName')
       .sort('-createdAt');
 
     const formattedOrders = orders.map(order => ({
       _id: order._id,
-      customer: order.userId.name,
-      shipper: order.driverId ? order.driverId.name : 'Pending',
+      customer: order.userId.fullName,
+      shipper: order.driverId ? order.driverId.fullName : 'Pending',
       from: order.pickupaddress,
       to: order.dropupaddress,
       price: order.price,
