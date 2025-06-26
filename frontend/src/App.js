@@ -20,6 +20,15 @@ import CompletedOrders from './components/shipper/CompletedOrders';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
+// Admin components
+import UserManagement from './components/admin/UserManagement';
+import ShipperManagement from './components/admin/ShipperManagement';
+import OrderManagement from './components/admin/OrderManagement';
+import RevenueReport from './components/admin/RevenueReport';
+import ReportManagement from './components/admin/ReportManagement';
+import SystemSettings from './components/admin/SystemSettings';
+import AdminDashboardHome from './components/admin/AdminDashboardHome';
+
 function App() {
   return (
     <Router>
@@ -136,21 +145,15 @@ function App() {
         />
         
         {/* Admin Routes */}
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/manage-users" 
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-            </ProtectedRoute>
-          } 
-        />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}>
+          <Route index element={<AdminDashboardHome />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="shippers" element={<ShipperManagement />} />
+          <Route path="orders" element={<OrderManagement />} />
+          <Route path="revenue" element={<RevenueReport />} />
+          <Route path="reports" element={<ReportManagement />} />
+          <Route path="settings" element={<SystemSettings />} />
+        </Route>
       </Routes>
     </Router>
   );
