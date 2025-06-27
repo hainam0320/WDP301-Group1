@@ -12,6 +12,7 @@ import OrderManagement from './admin/OrderManagement';
 import RevenueReport from './admin/RevenueReport';
 import ReportManagement from './admin/ReportManagement';
 import SystemSettings from './admin/SystemSettings';
+import AdminCommissionManagement from './admin/AdminCommissionManagement';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -106,6 +107,13 @@ const AdminDashboard = () => {
                   Báo cáo doanh thu
                 </Link>
                 <Link 
+                  to="/admin/commission-management"
+                  className="list-group-item list-group-item-action border-0"
+                >
+                  <FaDollarSign className="me-2" />
+                  Quản lý hoa hồng
+                </Link>
+                <Link 
                   to="/admin/reports"
                   className="list-group-item list-group-item-action border-0"
                 >
@@ -133,6 +141,7 @@ const AdminDashboard = () => {
               <Route path="/revenue" element={<RevenueReport />} />
               <Route path="/reports" element={<ReportManagement />} />
               <Route path="/settings" element={<SystemSettings />} />
+              <Route path="/commission-management" element={<AdminCommissionManagement />} />
             </Routes>
           </div>
         </div>

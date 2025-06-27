@@ -5,6 +5,10 @@ const multer = require('multer');
 const path = require('path');
 const Driver = require('../model/driverModel');
 const Order = require('../model/orderModel');
+const mongoose = require('mongoose');
+const TotalEarning = require('../model/totalEarning');
+const CompanyTransaction = require('../model/companyTransisModel');
+const DriverAssignment = require('../model/driverAssigmentModel');
 
 // Cấu hình multer cho việc upload file
 const storage = multer.diskStorage({
@@ -241,6 +245,7 @@ router.get('/orders', protect, async (req, res) => {
 // Update order status
 router.put('/orders/:orderId/status', protect, async (req, res) => {
   try {
+    console.log('=== UPDATE ORDER STATUS ===');
     // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
       return res.status(403).json({ 
@@ -273,8 +278,61 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
       });
     }
 
+    const oldStatus = order.status;
     order.status = status;
     await order.save();
+
+    console.log('Order updated:', {
+      orderId: order._id,
+      oldStatus,
+      newStatus: status,
+      price: order.price
+    });
+
+    // Nếu đơn hàng vừa được cập nhật thành completed
+    if (status === 'completed' && oldStatus !== 'completed') {
+      try {
+        console.log('Creating earnings records...');
+        
+        // Tạo bản ghi DriverAssignment
+        const driverAssignment = new DriverAssignment({
+          driverId: req.user._id,
+          orderId: order._id,
+          amount: order.price,
+          status: true,
+          date: new Date().toISOString().split('T')[0]
+        });
+        await driverAssignment.save();
+        console.log('Driver assignment created:', driverAssignment);
+
+        // Tạo bản ghi TotalEarning
+        const totalEarning = new TotalEarning({
+          driverAssigmentId: driverAssignment._id,
+          driverId: req.user._id,
+          amount: order.price,
+          date: new Date().toISOString().split('T')[0]
+        });
+        await totalEarning.save();
+        console.log('Total earning created:', totalEarning);
+
+        // Tính hoa hồng (10% giá trị đơn hàng)
+        const commissionRate = 0.1;
+        const commissionAmount = order.price * commissionRate;
+
+        // Tạo bản ghi CompanyTransaction
+        const transaction = new CompanyTransaction({
+          driverId: req.user._id,
+          total_earning_id: totalEarning._id,
+          amount: commissionAmount,
+          status: 'pending'
+        });
+        await transaction.save();
+        console.log('Commission transaction created:', transaction);
+      } catch (error) {
+        console.error('Error creating earnings records:', error);
+        // Không throw error ở đây để vẫn trả về success cho việc update order
+      }
+    }
 
     res.json({
       success: true,
@@ -284,7 +342,8 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     console.error('Error updating order status:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Error updating order status' 
+      message: 'Error updating order status',
+      error: error.message
     });
   }
 });
@@ -292,11 +351,23 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
 // Get shipper's earnings statistics
 router.get('/earnings', protect, async (req, res) => {
   try {
+    console.log('=== GET EARNINGS ===');
+    console.log('User:', req.user);
+
     // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
+      console.log('Not authorized as driver');
       return res.status(403).json({ 
         success: false,
         message: 'Not authorized as driver' 
+      });
+    }
+
+    if (!req.user._id) {
+      console.log('User ID not found');
+      return res.status(400).json({
+        success: false,
+        message: 'User ID not found'
       });
     }
 
@@ -309,35 +380,97 @@ router.get('/earnings', protect, async (req, res) => {
     const oneMonthAgo = new Date(today);
     oneMonthAgo.setMonth(today.getMonth() - 1);
 
-    // Lấy các đơn hàng đã hoàn thành
-    const completedOrders = await Order.find({
-      driverId: req.user._id,
-      status: 'completed'
+    console.log('Dates:', {
+      today: today.toISOString(),
+      oneWeekAgo: oneWeekAgo.toISOString(),
+      oneMonthAgo: oneMonthAgo.toISOString()
     });
 
-    // Tính toán thống kê
+    const driverId = new mongoose.Types.ObjectId(req.user._id);
+    console.log('Driver ID:', driverId);
+
+    // Sử dụng aggregation để tính toán
+    const stats = await Order.aggregate([
+      {
+        $match: {
+          driverId: driverId,
+          status: 'completed'
+        }
+      },
+      {
+        $facet: {
+          today: [
+            {
+              $match: {
+                updatedAt: { $gte: today }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                earnings: { $sum: '$price' },
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          thisWeek: [
+            {
+              $match: {
+                updatedAt: { $gte: oneWeekAgo }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                earnings: { $sum: '$price' },
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          thisMonth: [
+            {
+              $match: {
+                updatedAt: { $gte: oneMonthAgo }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                earnings: { $sum: '$price' },
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          total: [
+            {
+              $group: {
+                _id: null,
+                earnings: { $sum: '$price' },
+                count: { $sum: 1 }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    console.log('Aggregation results:', JSON.stringify(stats, null, 2));
+
+    // Format kết quả
     const earnings = {
-      today: 0,
-      thisWeek: 0,
-      thisMonth: 0,
-      total: 0,
-      totalDeliveries: completedOrders.length
+      today: stats[0].today[0]?.earnings || 0,
+      thisWeek: stats[0].thisWeek[0]?.earnings || 0,
+      thisMonth: stats[0].thisMonth[0]?.earnings || 0,
+      total: stats[0].total[0]?.earnings || 0,
+      deliveries: {
+        today: stats[0].today[0]?.count || 0,
+        thisWeek: stats[0].thisWeek[0]?.count || 0,
+        thisMonth: stats[0].thisMonth[0]?.count || 0,
+        total: stats[0].total[0]?.count || 0
+      }
     };
 
-    completedOrders.forEach(order => {
-      const orderDate = new Date(order.updatedAt);
-      earnings.total += order.price;
-
-      if (orderDate >= today) {
-        earnings.today += order.price;
-      }
-      if (orderDate >= oneWeekAgo) {
-        earnings.thisWeek += order.price;
-      }
-      if (orderDate >= oneMonthAgo) {
-        earnings.thisMonth += order.price;
-      }
-    });
+    console.log('Final earnings:', earnings);
 
     res.json({
       success: true,
@@ -347,7 +480,8 @@ router.get('/earnings', protect, async (req, res) => {
     console.error('Error getting earnings:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Error getting earnings statistics' 
+      message: 'Error getting earnings statistics',
+      error: error.message 
     });
   }
 });

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:9999/api'; // Cập nhật theo port backend nếu khác
+const API_BASE_URL = 'http://localhost:9999/api'; // Cập nhật port thành 9999
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,6 +14,31 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+const handleError = (error) => {
+    if (error.response) {
+        // Server trả về response với status code nằm ngoài range 2xx
+        return {
+            success: false,
+            message: error.response.data.message || 'Server error',
+            error: error.response.data
+        };
+    } else if (error.request) {
+        // Request được gửi nhưng không nhận được response
+        return {
+            success: false,
+            message: 'No response from server',
+            error: error.request
+        };
+    } else {
+        // Có lỗi khi setting up request
+        return {
+            success: false,
+            message: 'Error setting up request',
+            error: error.message
+        };
+    }
+};
 
 export const authAPI = {
   // ---- LOGIN ----
@@ -44,6 +69,12 @@ export const shipperAPI = {
     api.post('/shipper/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+
+  // ---- Complete Order ----
+  completeOrder: (orderId) => api.post(`/orders/${orderId}/complete`),
+
+  // ---- Update Order Status ----
+  updateOrderStatus: (orderId, status) => api.put(`/shipper/orders/${orderId}/status`, { status }),
 };
 
 export const userAPI = {
@@ -110,5 +141,82 @@ export const adminAPI = {
   updateReportStatus: async (reportId, data) => {
     const response = await api.patch(`/reports/${reportId}/status`, data);
     return response;
-  }
+  },
+
+  // Commission Management APIs
+  getCommissions: (filters) => api.get('/transactions/admin/commissions', { params: filters }),
+  
+  getDrivers: () => api.get('/transactions/admin/drivers'),
+  
+  confirmCommissionPayment: (transactionId, data) => 
+    api.post(`/transactions/admin/commissions/${transactionId}/confirm`, data)
 };
+
+export const transactionAPI = {
+  // Lấy danh sách hoa hồng chưa thanh toán
+  getPendingCommissions: () => api.get('/transactions/driver/pending'),
+
+  // Lấy lịch sử thanh toán hoa hồng
+  getCommissionHistory: () => api.get('/transactions/driver/history'),
+
+  // Lấy tổng quan về hoa hồng
+  getCommissionOverview: () => api.get('/transactions/driver/overview'),
+
+  // Tạo mã QR cho giao dịch
+  createQRPayment: (transactionId) => api.post(`/transactions/qr/create/${transactionId}`),
+
+  // Tạo mã QR cho nhiều giao dịch
+  createBulkQRPayment: (transactionIds) => api.post('/transactions/qr/bulk/create', { transactionIds }),
+
+  // Kiểm tra trạng thái thanh toán QR hàng loạt
+  checkBulkQRPaymentStatus: (bulkPaymentId) => api.get(`/transactions/qr/bulk/status/${bulkPaymentId}`),
+
+  // Giả lập quét mã QR và thanh toán
+  simulateQRPayment: (paymentCode) => api.post('/transactions/qr/simulate-payment', { paymentCode }),
+
+  // Kiểm tra trạng thái thanh toán QR
+  checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`)
+};
+
+// Admin Commission Management APIs
+export const getAdminCommissions = async (filters) => {
+    try {
+        const queryString = new URLSearchParams(filters).toString();
+        const response = await axios.get(`${API_BASE_URL}/transactions/admin/commissions?${queryString}`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        throw handleError(error);
+    }
+};
+
+export const getAdminCommissionStats = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/transactions/admin/commission-stats`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        throw handleError(error);
+    }
+};
+
+export const getDriverCommissionStats = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/transactions/admin/driver-commission-stats`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        throw handleError(error);
+    }
+};
+
+
