@@ -49,13 +49,13 @@ const MyOrders = () => {
     try {
       setIsLoading(true);
       
-      if (newStatus === 'completed') {
+        if (newStatus === 'completed') {
         // Sử dụng API endpoint mới để hoàn thành đơn hàng
         await shipperAPI.completeOrder(orderId);
-      } else {
+        } else {
         // Các trạng thái khác vẫn sử dụng API cũ
         await shipperAPI.updateOrderStatus(orderId, newStatus);
-      }
+        }
 
       // Refresh danh sách đơn hàng
       fetchMyOrders();

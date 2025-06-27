@@ -341,7 +341,7 @@ exports.simulateQRPayment = async (req, res) => {
         qrPayment.status = 'expired';
         await qrPayment.save();
         return res.status(400).json({ message: "Mã QR đã hết hạn." });
-      }
+    }
 
       // Cập nhật trạng thái QR payment
       qrPayment.status = 'completed';
@@ -395,8 +395,8 @@ exports.simulateQRPayment = async (req, res) => {
       }
 
       transaction.status = 'paid';
-      transaction.paid_at = new Date();
-      await transaction.save();
+    transaction.paid_at = new Date();
+    await transaction.save();
 
       res.json({
         message: "Thanh toán thành công.",
@@ -493,18 +493,9 @@ exports.createBulkQRPayment = async (req, res) => {
       await qrPayment.save();
       console.log('QR payment saved:', qrPayment);
 
-      // Cập nhật trạng thái các giao dịch
-      await CompanyTransaction.updateMany(
-        { _id: { $in: transactionIds } },
-        { 
-          $set: { 
-            status: 'processing',
-            qr_payment_id: qrPayment._id
-          }
-        }
-      );
-      console.log('Transactions updated');
-
+      // KHÔNG cập nhật trạng thái các giao dịch thành 'processing'
+      // Giữ nguyên trạng thái 'pending' cho đến khi thanh toán thành công
+      
       res.json({
         qrCode: qrCodeData,
         paymentCode: paymentCode,
@@ -545,14 +536,7 @@ exports.checkBulkQRPaymentStatus = async (req, res) => {
       qrPayment.status = 'expired';
       await qrPayment.save();
       
-      // Cập nhật trạng thái các giao dịch về pending
-      await CompanyTransaction.updateMany(
-        { _id: { $in: qrPayment.bulkTransactionIds } },
-        { 
-          $set: { status: 'pending' },
-          $unset: { qr_payment_id: "" }
-        }
-      );
+      // Không cần cập nhật lại trạng thái các giao dịch vì chúng vẫn đang ở 'pending'
       
       return res.json({ status: 'expired' });
     }

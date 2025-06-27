@@ -32,6 +32,33 @@ const CommissionManagement = () => {
     }, []);
 
     useEffect(() => {
+        // Khôi phục trạng thái QR và giao dịch đã chọn khi reload
+        const savedQRPayment = localStorage.getItem('currentQRPayment');
+        if (savedQRPayment) {
+            try {
+                const { qrData: savedQRData, selectedTransactions: savedTransactions, pendingTransactions, timestamp } = JSON.parse(savedQRPayment);
+                
+                // Kiểm tra xem dữ liệu có còn hợp lệ không (15 phút)
+                const isExpired = new Date().getTime() - timestamp > 15 * 60 * 1000;
+                
+                if (!isExpired && savedQRData && savedTransactions && pendingTransactions) {
+                    setQRData(savedQRData);
+                    setSelectedTransactions(savedTransactions);
+                    setPendingCommissions(pendingTransactions);
+                } else {
+                    // Xóa dữ liệu đã hết hạn
+                    localStorage.removeItem('currentQRPayment');
+                    fetchData(); // Tải lại dữ liệu mới nếu đã hết hạn
+                }
+            } catch (error) {
+                console.error('Error restoring payment state:', error);
+                localStorage.removeItem('currentQRPayment');
+                fetchData();
+            }
+        }
+    }, []);
+
+    useEffect(() => {
         return () => {
             if (statusCheckInterval) {
                 clearInterval(statusCheckInterval);
@@ -57,9 +84,11 @@ const CommissionManagement = () => {
                     rejectedAmount: overviewRes.data.overview.totalsByStatus?.rejected || 0
                 });
             }
+            
             if (pendingRes.data.transactions) {
                 setPendingCommissions(pendingRes.data.transactions);
             }
+            
             if (historyRes.data.transactions) {
                 setCommissionHistory(historyRes.data.transactions);
             }
@@ -72,11 +101,14 @@ const CommissionManagement = () => {
     };
 
     const handleSelectTransaction = (transactionId) => {
+        let newSelectedTransactions;
         if (selectedTransactions.includes(transactionId)) {
-            setSelectedTransactions(selectedTransactions.filter(id => id !== transactionId));
+            newSelectedTransactions = selectedTransactions.filter(id => id !== transactionId);
         } else {
-            setSelectedTransactions([...selectedTransactions, transactionId]);
+            newSelectedTransactions = [...selectedTransactions, transactionId];
         }
+        
+        setSelectedTransactions(newSelectedTransactions);
     };
 
     const handleBulkPayment = async () => {
@@ -113,6 +145,7 @@ const CommissionManagement = () => {
                         } else if (statusRes.data.status === 'expired') {
                             clearInterval(interval);
                             setError('Mã QR đã hết hạn. Vui lòng thử lại.');
+                            setQRData(null);
                         }
                     } catch (err) {
                         console.error('Error checking payment status:', err);
@@ -129,6 +162,23 @@ const CommissionManagement = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleCloseQRModal = () => {
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            setStatusCheckInterval(null);
+        }
+        
+        // Chỉ xóa QR data khi hết hạn
+        if (qrData && qrData.expiryTime && new Date(qrData.expiryTime) < new Date()) {
+            setQRData(null);
+            setError('Mã QR đã hết hạn. Vui lòng tạo mã mới.');
+        }
+        
+        setShowQRModal(false);
+        // Làm mới dữ liệu để hiển thị trạng thái mới nhất
+        fetchData();
     };
 
     const handleSimulatePayment = async () => {
@@ -348,7 +398,7 @@ const CommissionManagement = () => {
                 </div>
 
                 {/* QR Payment Modal */}
-                <Modal show={showQRModal} onHide={() => setShowQRModal(false)} centered>
+                <Modal show={showQRModal} onHide={handleCloseQRModal} centered>
                     <Modal.Header closeButton>
                         <Modal.Title>Quét mã QR để thanh toán</Modal.Title>
                     </Modal.Header>
@@ -377,7 +427,7 @@ const CommissionManagement = () => {
                     <Modal.Footer>
                         <Button 
                             variant="secondary" 
-                            onClick={() => setShowQRModal(false)}
+                            onClick={handleCloseQRModal}
                         >
                             Đóng
                         </Button>
