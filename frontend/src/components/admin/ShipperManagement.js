@@ -185,10 +185,6 @@ const ShipperManagement = () => {
     <div className="card">
       <div className="card-header bg-success text-white d-flex justify-content-between align-items-center">
         <h4 className="mb-0">Quản lý shipper</h4>
-        <button className="btn btn-light btn-sm">
-          <FaPlus className="me-2" />
-          Thêm shipper
-        </button>
       </div>
       <div className="card-body">
         {loading ? (
