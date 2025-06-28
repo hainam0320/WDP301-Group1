@@ -1,5 +1,8 @@
 /* controllers/orderController.js */
 const Order = require('../model/orderModel');
+const DriverAssigment = require('../model/driverAssigmentModel');
+const TotalEarning = require('../model/totalEarning');
+const CompanyTransaction = require('../model/companyTransisModel');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -171,5 +174,61 @@ exports.acceptOrder = async (req, res) => {
   } catch (error) {
     console.error('Error accepting order:', error);
     res.status(500).json({ message: 'Lỗi server khi nhận đơn hàng' });
+  }
+};
+exports.completeOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const driverId = req.user._id; // Shipper xác nhận hoàn tất
+
+    // 1. Cập nhật trạng thái đơn
+    const order = await Order.findOneAndUpdate(
+      { _id: orderId, driverId: driverId },
+      { status: 'completed', timeEnd: new Date().toISOString() },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ message: 'Đơn không tồn tại hoặc không thuộc tài xế này' });
+    }
+
+    // 2. Tạo DriverAssigment nếu chưa có
+    const existingAssignment = await DriverAssigment.findOne({ orderId });
+    let assignment = existingAssignment;
+
+    if (!assignment) {
+      assignment = await DriverAssigment.create({
+        driverId,
+        orderId,
+        amount: order.price,
+        date: new Date().toISOString().split("T")[0]
+      });
+    }
+
+    // 3. Tạo TotalEarning
+    const earning = await TotalEarning.create({
+      driverAssigmentId: assignment._id,
+      driverId: driverId,
+      amount: assignment.amount,
+      date: assignment.date
+    });
+
+    // 4. Tạo CompanyTransaction (hoa hồng 10%)
+    const commission = await CompanyTransaction.create({
+      driverId,
+      total_earning_id: earning._id,
+      amount: earning.amount * 0.1,
+      status: 'pending'
+    });
+
+    res.json({
+      message: 'Hoàn tất đơn và ghi nhận thu nhập thành công',
+      order,
+      earning,
+      commission
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server khi hoàn tất đơn' });
   }
 };

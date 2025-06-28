@@ -7,7 +7,8 @@ const {
   getOrderById,
   updateOrder,
   deleteOrder,
-  acceptOrder
+  acceptOrder,
+  completeOrder // 👈 thêm dòng này
 } = require('../controller/orderController');
 const Order = require('../model/orderModel');
 
@@ -18,7 +19,7 @@ router.use(protect);
 router.get('/', async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user._id })
-      .populate('driverId', 'fullName phone') // Populate driver information
+      .populate('driverId', 'fullName phone')
       .sort('-createdAt');
     res.json(orders);
   } catch (error) {
@@ -32,6 +33,9 @@ router.post('/', createOrder);
 router.get('/:id', getOrderById);
 router.put('/:id', updateOrder);
 router.delete('/:id', deleteOrder);
-router.post('/:id/accept', authorize('shipper', 'driver'), acceptOrder); // Add authorization for shipper/driver
+router.post('/:id/accept', authorize('shipper', 'driver'), acceptOrder);
+
+// ✅ Thêm route hoàn tất đơn
+router.post('/:id/complete', authorize('shipper', 'driver'), completeOrder);
 
 module.exports = router;
