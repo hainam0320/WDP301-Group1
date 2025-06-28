@@ -11,7 +11,12 @@ const Earnings = () => {
     thisWeek: 0,
     thisMonth: 0,
     total: 0,
-    totalDeliveries: 0
+    deliveries: {
+      today: 0,
+      thisWeek: 0,
+      thisMonth: 0,
+      total: 0
+    }
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,17 +26,39 @@ const Earnings = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Vui lòng đăng nhập lại');
+        return;
+      }
+
+      console.log('Fetching earnings with token:', token);
       const response = await axios.get(`${BASE_URL}/api/shipper/earnings`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      console.log('Earnings response:', response.data);
+      
       if (response.data.success) {
         setEarnings(response.data.data);
+      } else {
+        setError('Không thể tải dữ liệu: ' + (response.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error fetching earnings:', error);
-      setError('Không thể tải dữ liệu thống kê thu nhập');
+      if (error.response) {
+        // Lỗi từ server
+        console.error('Server error:', error.response.data);
+        setError(`Lỗi server: ${error.response.data.message || 'Không xác định'}`);
+      } else if (error.request) {
+        // Không nhận được response
+        console.error('No response:', error.request);
+        setError('Không thể kết nối đến server');
+      } else {
+        // Lỗi khác
+        console.error('Error:', error.message);
+        setError(`Lỗi: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +106,7 @@ const Earnings = () => {
                       <h5 className="card-title">Thu nhập hôm nay</h5>
                       <h3 className="text-success">{earnings.today.toLocaleString()} VNĐ</h3>
                       <small className="text-muted">
-                        {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                        {earnings.deliveries.today > 0 ? `${earnings.deliveries.today} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
                       </small>
                     </div>
                   </div>
@@ -90,7 +117,7 @@ const Earnings = () => {
                       <h5 className="card-title">Thu nhập tuần này</h5>
                       <h3 className="text-info">{earnings.thisWeek.toLocaleString()} VNĐ</h3>
                       <small className="text-muted">
-                        {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                        {earnings.deliveries.thisWeek > 0 ? `${earnings.deliveries.thisWeek} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
                       </small>
                     </div>
                   </div>
@@ -101,7 +128,7 @@ const Earnings = () => {
                       <h5 className="card-title">Thu nhập tháng này</h5>
                       <h3 className="text-warning">{earnings.thisMonth.toLocaleString()} VNĐ</h3>
                       <small className="text-muted">
-                        {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
+                        {earnings.deliveries.thisMonth > 0 ? `${earnings.deliveries.thisMonth} đơn hàng hoàn thành` : 'Chưa có đơn hàng nào'}
                       </small>
                     </div>
                   </div>
@@ -112,7 +139,7 @@ const Earnings = () => {
                       <h5 className="card-title">Tổng thu nhập</h5>
                       <h3 className="text-primary">{earnings.total.toLocaleString()} VNĐ</h3>
                       <small className="text-muted">
-                        {earnings.totalDeliveries > 0 ? `${earnings.totalDeliveries} đơn hàng` : 'Chưa có đơn hàng nào'}
+                        {earnings.deliveries.total > 0 ? `${earnings.deliveries.total} đơn hàng` : 'Chưa có đơn hàng nào'}
                       </small>
                     </div>
                   </div>

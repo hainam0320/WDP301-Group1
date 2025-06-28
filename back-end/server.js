@@ -9,6 +9,8 @@ const shipperRoutes = require('./routes/shipperRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const rateRoutes = require('./routes/rateRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const transactionRoutes = require("./routes/transactionRoutes");
+
 require('dotenv').config();
 const app = express();
 app.use(cors());
@@ -34,6 +36,8 @@ app.use('/api/shipper', shipperRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/rate', rateRoutes);
 app.use('/api/reports', reportRoutes);
+app.use("/api/transactions", transactionRoutes);
+
 
 // Khởi động server
 const PORT = process.env.PORT || 9999;

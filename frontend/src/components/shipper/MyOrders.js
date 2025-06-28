@@ -4,6 +4,8 @@ import { FaRoute, FaMapMarkerAlt, FaUser, FaEye, FaStar, FaArrowLeft } from 'rea
 import axios from 'axios';
 import { Modal, Button } from 'react-bootstrap';
 import ShipperHeader from './ShipperHeader';
+import { toast } from 'react-hot-toast';
+import { shipperAPI } from '../../services/api';
 
 const MyOrders = () => {
   const navigate = useNavigate();
@@ -43,38 +45,25 @@ const MyOrders = () => {
     fetchMyOrders();
   }, []);
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus) => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `${BASE_URL}/api/shipper/orders/${orderId}/status`,
-        { status: newStatus },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (response.data.success) {
+      
         if (newStatus === 'completed') {
-          // Nếu đơn hàng được hoàn thành, loại bỏ khỏi danh sách
-          setMyOrders(myOrders.filter(order => order._id !== orderId));
+        // Sử dụng API endpoint mới để hoàn thành đơn hàng
+        await shipperAPI.completeOrder(orderId);
         } else {
-          // Nếu chỉ cập nhật trạng thái, cập nhật trong danh sách
-          setMyOrders(myOrders.map(order => 
-            order._id === orderId ? {...order, status: newStatus} : order
-          ));
+        // Các trạng thái khác vẫn sử dụng API cũ
+        await shipperAPI.updateOrderStatus(orderId, newStatus);
         }
-        setMessages({ type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' });
-      }
+
+      // Refresh danh sách đơn hàng
+      fetchMyOrders();
+      
+      toast.success('Cập nhật trạng thái thành công!');
     } catch (error) {
       console.error('Error updating order status:', error);
-      setMessages({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
-      });
+      toast.error('Lỗi khi cập nhật trạng thái đơn hàng');
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +186,7 @@ const MyOrders = () => {
                         {order.status === 'accepted' && (
                           <button 
                             className="btn btn-warning btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'in-progress')}
+                            onClick={() => handleStatusChange(order._id, 'in-progress')}
                           >
                             Bắt đầu giao
                           </button>
@@ -205,7 +194,7 @@ const MyOrders = () => {
                         {order.status === 'in-progress' && (
                           <button 
                             className="btn btn-success btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'completed')}
+                            onClick={() => handleStatusChange(order._id, 'completed')}
                           >
                             Hoàn thành
                           </button>
