@@ -254,7 +254,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
       });
     }
 
-    const { status } = req.body;
+    const { status, statusDescription } = req.body;
     if (!status) {
       return res.status(400).json({
         success: false,
@@ -280,12 +280,16 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
 
     const oldStatus = order.status;
     order.status = status;
+    if (status === 'completed' && statusDescription) {
+      order.statusDescription = statusDescription;
+    }
     await order.save();
 
     console.log('Order updated:', {
       orderId: order._id,
       oldStatus,
       newStatus: status,
+      statusDescription: order.statusDescription,
       price: order.price
     });
 

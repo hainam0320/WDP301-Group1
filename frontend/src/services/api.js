@@ -146,6 +146,9 @@ export const adminAPI = {
   // ---- Get Orders List ----
   getOrders: () => api.get('/admin/orders'),
 
+  // ---- Get Shipper Orders ----
+  getShipperOrders: (shipperId, filters) => api.get(`/admin/shipper/${shipperId}/orders`, { params: filters }),
+
   // ---- Get Revenue Data ----
   getRevenue: () => api.get('/admin/revenue'),
 

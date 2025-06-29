@@ -30,8 +30,13 @@ const MyOrders = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Chỉ lấy những đơn hàng chưa hoàn thành
-      const activeOrders = response.data.filter(order => order.status !== 'completed');
+      // Chỉ lấy những đơn hàng chưa hoàn thành và thêm trạng thái mặc định
+      const activeOrders = response.data
+        .filter(order => order.status !== 'completed')
+        .map(order => ({
+          ...order,
+          selectedStatus: 'Giao thành công'
+        }));
       setMyOrders(activeOrders);
     } catch (err) {
       console.error('Error fetching my orders:', err);
@@ -48,14 +53,25 @@ const MyOrders = () => {
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const order = myOrders.find(o => o._id === orderId);
       
-        if (newStatus === 'completed') {
-        // Sử dụng API endpoint mới để hoàn thành đơn hàng
-        await shipperAPI.completeOrder(orderId);
-        } else {
-        // Các trạng thái khác vẫn sử dụng API cũ
-        await shipperAPI.updateOrderStatus(orderId, newStatus);
+      const requestData = {
+        status: newStatus
+      };
+
+      if (newStatus === 'completed') {
+        requestData.statusDescription = order.selectedStatus;
+      }
+
+      await axios.put(`${BASE_URL}/api/shipper/orders/${orderId}/status`, 
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
+      );
 
       // Refresh danh sách đơn hàng
       fetchMyOrders();
@@ -67,6 +83,16 @@ const MyOrders = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStatusDescriptionChange = (orderId, newStatusDescription) => {
+    setMyOrders(prevOrders => 
+      prevOrders.map(order => 
+        order._id === orderId 
+          ? { ...order, selectedStatus: newStatusDescription }
+          : order
+      )
+    );
   };
 
   const fetchOrderRate = async (orderId) => {
@@ -192,12 +218,23 @@ const MyOrders = () => {
                           </button>
                         )}
                         {order.status === 'in-progress' && (
-                          <button 
-                            className="btn btn-success btn-sm mb-2 w-100"
-                            onClick={() => handleStatusChange(order._id, 'completed')}
-                          >
-                            Hoàn thành
-                          </button>
+                          <>
+                            <select 
+                              className="form-select mb-2"
+                              value={order.selectedStatus}
+                              onChange={(e) => handleStatusDescriptionChange(order._id, e.target.value)}
+                            >
+                              <option value="Giao thành công">Giao thành công</option>
+                              <option value="Không liên hệ được với khách">Không liên hệ được với khách</option>
+                              <option value="Đơn hàng bị mất">Đơn hàng bị mất</option>
+                            </select>
+                            <button 
+                              className="btn btn-success btn-sm mb-2 w-100"
+                              onClick={() => handleStatusChange(order._id, 'completed')}
+                            >
+                              Hoàn thành
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -253,12 +290,20 @@ const MyOrders = () => {
                   <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
                 </div>
                 {selectedOrder.status === 'completed' && (
-                  <div className="mb-3">
-                    <p className="mb-1">
-                      <strong>Thời gian hoàn thành:</strong>
-                    </p>
-                    <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
-                  </div>
+                  <>
+                    <div className="mb-3">
+                      <p className="mb-1">
+                        <strong>Thời gian hoàn thành:</strong>
+                      </p>
+                      <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
+                    </div>
+                    <div className="mb-3">
+                      <p className="mb-1">
+                        <strong>Trạng thái hoàn thành:</strong>
+                      </p>
+                      <p className="text-muted">{selectedOrder.statusDescription || 'Giao thành công'}</p>
+                    </div>
+                  </>
                 )}
                 
                 <h6 className="fw-bold text-primary mb-3">Thông tin thanh toán</h6>

@@ -160,9 +160,9 @@ const ReportManagement = () => {
               <tbody>
                 {reports.map(report => (
                   <tr key={report._id}>
-                    <td>#{report.order_id._id.slice(-6)}</td>
-                    <td>{report.reporterID.fullName}</td>
-                    <td>{report.reported_user_id.fullName}</td>
+                    <td>#{report.order_id?._id ? report.order_id._id.slice(-6) : 'N/A'}</td>
+                    <td>{report.reporterID?.fullName || 'N/A'}</td>
+                    <td>{report.reported_user_id?.fullName || 'N/A'}</td>
                     <td>{getReportTypeBadge(report.type)}</td>
                     <td>{getReportStatusBadge(report.status)}</td>
                     <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
@@ -198,7 +198,7 @@ const ReportManagement = () => {
                     <tbody>
                       <tr>
                         <th>Mã đơn hàng:</th>
-                        <td>#{selectedReport.order_id._id.slice(-6)}</td>
+                        <td>#{selectedReport.order_id?._id ? selectedReport.order_id._id.slice(-6) : 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Loại báo cáo:</th>
@@ -221,19 +221,19 @@ const ReportManagement = () => {
                     <tbody>
                       <tr>
                         <th>Người báo cáo:</th>
-                        <td>{selectedReport.reporterID.fullName}</td>
+                        <td>{selectedReport.reporterID?.fullName || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Email:</th>
-                        <td>{selectedReport.reporterID.email}</td>
+                        <td>{selectedReport.reporterID?.email || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Tài xế:</th>
-                        <td>{selectedReport.reported_user_id.fullName}</td>
+                        <td>{selectedReport.reported_user_id?.fullName || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Email tài xế:</th>
-                        <td>{selectedReport.reported_user_id.email}</td>
+                        <td>{selectedReport.reported_user_id?.email || 'N/A'}</td>
                       </tr>
                     </tbody>
                   </table>
