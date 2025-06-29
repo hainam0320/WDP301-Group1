@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaBell, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaSignOutAlt } from 'react-icons/fa';
+import NotificationBell from './NotificationBell';
 import logo from '../assets/img/favicon.png';
 
 const Header = () => {
@@ -48,32 +49,47 @@ const Header = () => {
           <span className="navbar-brand h3 mb-0">Tốc Hành Hòa Lạc</span>
         </div>
         
-        <div className="d-flex align-items-center">
-          <div className="me-3">
-            <FaBell className="me-2" />
-            <span className="badge bg-danger">3</span>
-          </div>
-          <div className="dropdown">
-            <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
-              {userProfile.avatar ? (
-                <img 
-                  src={getImageUrl(userProfile.avatar)} 
-                  alt="Avatar" 
-                  className="rounded-circle me-2" 
-                  style={{width: '30px', height: '30px', objectFit: 'cover'}}
-                />
-              ) : (
-                <FaUser className="me-2" />
-              )}
-              {userProfile.name}
-            </button>
-            <ul className="dropdown-menu">
-              <li><button className="dropdown-item" onClick={() => navigate('/profile')}><FaUser className="me-2" />Thông tin cá nhân</button></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li><button className="dropdown-item" onClick={handleLogout}><FaSignOutAlt className="me-2" />Đăng xuất</button></li>
-            </ul>
-          </div>
-        </div>
+        <nav className="header-nav ms-auto">
+          <ul className="d-flex align-items-center">
+            <NotificationBell />
+
+            <li className="nav-item dropdown pe-3">
+              <a className="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+                {userProfile.avatar ? (
+                  <img 
+                    src={getImageUrl(userProfile.avatar)} 
+                    alt="Avatar" 
+                    className="rounded-circle" 
+                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                  />
+                ) : (
+                  <FaUser />
+                )}
+                <span className="d-none d-md-block dropdown-toggle ps-2">{userProfile.name}</span>
+              </a>
+
+              <ul className="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+                <li className="dropdown-header">
+                  <h6>{userProfile.name}</h6>
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={() => navigate('/profile')}>
+                    <FaUser className="me-2" />
+                    <span>Thông tin cá nhân</span>
+                  </a>
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={handleLogout}>
+                    <FaSignOutAlt className="me-2" />
+                    <span>Đăng xuất</span>
+                  </a>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </nav>
       </div>
     </nav>
   );

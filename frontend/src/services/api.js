@@ -199,6 +199,17 @@ export const transactionAPI = {
   checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`)
 };
 
+export const notificationAPI = {
+  // Lấy tất cả thông báo của người dùng
+  getNotifications: () => api.get('/notifications'),
+
+  // Đánh dấu một thông báo là đã đọc
+  markAsRead: (notificationId) => api.patch(`/notifications/${notificationId}/read`),
+
+  // Đánh dấu tất cả là đã đọc
+  markAllAsRead: () => api.patch('/notifications/read-all'),
+};
+
 // Admin Commission Management APIs
 export const getAdminCommissions = async (filters) => {
     try {

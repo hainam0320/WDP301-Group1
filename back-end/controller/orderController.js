@@ -3,6 +3,7 @@ const Order = require('../model/orderModel');
 const DriverAssigment = require('../model/driverAssigmentModel');
 const TotalEarning = require('../model/totalEarning');
 const CompanyTransaction = require('../model/companyTransisModel');
+const Notification = require('../model/notificationModel');
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -59,6 +60,20 @@ exports.createOrder = async (req, res) => {
     });
 
     const savedOrder = await newOrder.save();
+
+    // Thông báo cho tất cả các tài xế đang online
+    const { io, connectedUsers } = req;
+    if (connectedUsers && connectedUsers.driver) {
+      const driverSockets = Object.values(connectedUsers.driver);
+      driverSockets.forEach(socketId => {
+        io.to(socketId).emit('new_order_available', {
+          title: 'Có đơn hàng mới!',
+          message: `Một đơn hàng mới vừa được tạo gần bạn.`,
+          order: savedOrder,
+        });
+      });
+    }
+
     res.status(201).json(savedOrder);
   } catch (error) {
     console.error('Error creating order:', error);
@@ -136,7 +151,8 @@ exports.deleteOrder = async (req, res) => {
 exports.acceptOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
-    const driverId = req.user._id; // Assuming the driver's ID is in the request user object
+    const driverId = req.user._id;
+    const { io, connectedUsers } = req;
 
     // Use findOneAndUpdate with conditions to ensure atomicity
     const order = await Order.findOneAndUpdate(
@@ -167,6 +183,30 @@ exports.acceptOrder = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng hoặc đơn hàng không khả dụng' });
     }
 
+    // Tạo và lưu thông báo vào DB
+    const notification = new Notification({
+      recipient: order.userId,
+      recipientModel: 'User',
+      title: 'Tài xế đã nhận đơn!',
+      message: `Tài xế ${req.user.fullName} đang trên đường đến chỗ bạn.`,
+      type: 'ORDER_ACCEPTED',
+      link: `/order-tracking/${order._id}`
+    });
+    await notification.save();
+
+    // Gửi thông báo cho người dùng đã tạo đơn hàng
+    const userId = order.userId.toString();
+    const userSocketId = (connectedUsers && connectedUsers.user) ? connectedUsers.user[userId] : null;
+
+    if (userSocketId) {
+      io.to(userSocketId).emit('notification', {
+        title: 'Tài xế đã nhận đơn!',
+        message: `Tài xế ${req.user.fullName} đang trên đường đến chỗ bạn.`,
+        orderId: order._id,
+        type: 'ORDER_ACCEPTED'
+      });
+    }
+
     res.json({
       message: 'Nhận đơn hàng thành công',
       order: order
@@ -176,6 +216,7 @@ exports.acceptOrder = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi nhận đơn hàng' });
   }
 };
+
 exports.completeOrder = async (req, res) => {
   try {
     const orderId = req.params.id;

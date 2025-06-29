@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
+import io from 'socket.io-client';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -33,6 +34,57 @@ import SystemSettings from './components/admin/SystemSettings';
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 
 function App() {
+  const socket = useRef(null);
+
+  useEffect(() => {
+    // Lấy thông tin người dùng từ localStorage
+    const userInfo = localStorage.getItem('user');
+    const user = userInfo ? JSON.parse(userInfo) : null;
+
+    // Chỉ kết nối socket nếu người dùng đã đăng nhập
+    if (user && user._id && user.role) {
+      // Khởi tạo kết nối socket
+      socket.current = io('http://localhost:9999');
+
+      // Gửi ID và vai trò người dùng lên server khi kết nối thành công
+      socket.current.on('connect', () => {
+        console.log('Connected to socket server!');
+        socket.current.emit('registerUser', { userId: user._id, role: user.role });
+      });
+
+      // Lắng nghe sự kiện 'notification' từ server (cho user)
+      socket.current.on('notification', (data) => {
+        console.log('Notification received:', data);
+        
+        // Hiển thị thông báo bằng react-hot-toast
+        toast.success(data.message || 'Bạn có thông báo mới!', {
+          icon: '🔔',
+        });
+
+        // Gửi sự kiện để các component khác (như chuông thông báo) có thể cập nhật
+        window.dispatchEvent(new Event('new-notification'));
+      });
+
+      // Lắng nghe sự kiện 'new_order_available' từ server (cho driver)
+      if (user.role === 'driver') {
+        socket.current.on('new_order_available', (data) => {
+          console.log('New order available:', data);
+          toast.success(data.message || 'Có đơn hàng mới!', {
+            icon: '🛵',
+          });
+          // Gửi sự kiện để trang AvailableOrders có thể cập nhật
+          window.dispatchEvent(new CustomEvent('new_order_for_driver', { detail: data.order }));
+        });
+      }
+
+      // Dọn dẹp khi component unmount
+      return () => {
+        console.log('Disconnecting socket...');
+        socket.current.disconnect();
+      };
+    }
+  }, []); // Chỉ chạy 1 lần khi App mount
+
   return (
     <Router>
       <div>
