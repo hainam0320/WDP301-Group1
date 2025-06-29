@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { FaHistory, FaStar, FaExclamationTriangle, FaArrowLeft } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaHistory, FaStar, FaExclamationTriangle, FaArrowLeft, FaInfoCircle, FaTrash, FaImage } from 'react-icons/fa';
 import axios from 'axios';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
@@ -20,11 +20,13 @@ const OrderHistory = () => {
   const [reportTargetOrder, setReportTargetOrder] = useState(null);
   const [reportType, setReportType] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  const [reportImage, setReportImage] = useState(null);
+  const [reportImages, setReportImages] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
+  const [existingReport, setExistingReport] = useState(null);
   const BASE_URL = 'http://localhost:9999';
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -106,15 +108,63 @@ const OrderHistory = () => {
     }
   };
 
-  const handleOpenReportModal = (order) => {
+  const handleOpenReportModal = async (order) => {
     if (!order.driverId) {
       setMessage({ type: 'error', content: 'Không thể báo cáo đơn hàng không có tài xế' });
       return;
     }
-    setReportTargetOrder(order);
+
+    // Reset state
     setReportType('');
     setReportDescription('');
-    setReportImage(null);
+    setReportImages([]);
+    setExistingReport(null);
+    setMessage({ type: '', content: '' });
+
+    // Check for existing report
+    try {
+      const response = await userAPI.getUserReports();
+      console.log('User reports:', response.data);
+      
+      if (response.data && response.data.reports) {
+        const existingReport = response.data.reports.find(report => 
+          report.order_id && report.order_id._id === order._id
+        );
+        
+        console.log('Found existing report:', existingReport);
+
+        if (existingReport) {
+          setExistingReport(existingReport);
+          setReportType(existingReport.type || '');
+          
+          // Handle images
+          if (existingReport.image) {
+            const images = Array.isArray(existingReport.image)
+              ? existingReport.image
+              : typeof existingReport.image === 'string'
+                ? existingReport.image.split(',').filter(img => img.trim())
+                : [];
+            setReportImages(images);
+          }
+
+          // Check if report can be updated
+          if (existingReport.status === 'resolved' || existingReport.status === 'rejected') {
+            setMessage({
+              type: 'warning',
+              content: 'Báo cáo này đã được xử lý, bạn không thể cập nhật thêm'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing report:', error);
+      setMessage({ 
+        type: 'error', 
+        content: 'Lỗi khi kiểm tra báo cáo hiện có'
+      });
+    }
+
+    setReportTargetOrder(order);
     setShowReportModal(true);
   };
 
@@ -123,39 +173,9 @@ const OrderHistory = () => {
     setReportTargetOrder(null);
     setReportType('');
     setReportDescription('');
-    setReportImage(null);
+    setReportImages([]);
+    setExistingReport(null);
     setMessage({ type: '', content: '' });
-  };
-
-  const handleReportImageChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    try {
-      setReportLoading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await axios.post(`${BASE_URL}/api/reports/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.data.filePath) {
-        setReportImage(response.data.filePath);
-        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
-      }
-    } catch (error) {
-      console.error('Error handling report image upload:', error);
-      setMessage({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Lỗi khi tải ảnh lên' 
-      });
-    } finally {
-      setReportLoading(false);
-    }
   };
 
   const handleSubmitReport = async () => {
@@ -164,21 +184,69 @@ const OrderHistory = () => {
       return;
     }
 
+    // Check if report can be updated
+    if (existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')) {
+      setMessage({
+        type: 'error',
+        content: 'Không thể cập nhật báo cáo đã được xử lý'
+      });
+      return;
+    }
+
     setReportLoading(true);
     try {
-      const response = await userAPI.createReport({
+      const reportData = {
         order_id: reportTargetOrder._id,
         type: reportType,
-        description: reportDescription
-      });
+        description: reportDescription,
+        image: reportImages,
+        removedImages: [] // Add this if you're tracking removed images
+      };
 
-      if (response.data.message) {
-        setMessage({ type: 'success', content: response.data.message });
-        handleCloseReportModal();
+      console.log('Submitting report data:', reportData);
+
+      let response;
+      if (existingReport) {
+        // Update existing report
+        console.log('Updating report:', existingReport._id);
+        response = await userAPI.updateReport(existingReport._id, reportData);
+      } else {
+        // Create new report
+        console.log('Creating new report');
+        response = await userAPI.createReport(reportData);
+      }
+
+      console.log('Server response:', response);
+
+      if (response.data) {
+        setMessage({ 
+          type: 'success', 
+          content: response.data.message || 'Báo cáo đã được cập nhật thành công'
+        });
+        
+        // Refresh the reports list
+        const updatedReports = await userAPI.getUserReports();
+        const updatedReport = updatedReports.data.reports.find(r => 
+          r.order_id._id === reportTargetOrder._id
+        );
+        setExistingReport(updatedReport);
+
+        // Close modal after delay
+        setTimeout(() => {
+          handleCloseReportModal();
+        }, 1500);
       }
     } catch (error) {
       console.error('Error submitting report:', error);
-      const errorMessage = error.response?.data?.message || 'Lỗi khi gửi báo cáo';
+      console.error('Error response:', error.response);
+      
+      let errorMessage = 'Lỗi khi gửi báo cáo';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setMessage({ 
         type: 'error', 
         content: errorMessage
@@ -186,6 +254,45 @@ const OrderHistory = () => {
     } finally {
       setReportLoading(false);
     }
+  };
+
+  const handleReportImageChange = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    try {
+      setReportLoading(true);
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await userAPI.uploadReportImages(formData);
+      console.log('Upload response:', response);
+
+      if (response.data?.filePaths) {
+        setReportImages(prev => [...prev, ...response.data.filePaths]);
+        setMessage({ type: 'success', content: 'Tải ảnh lên thành công' });
+      } else {
+        throw new Error('Không nhận được đường dẫn file từ server');
+      }
+    } catch (error) {
+      console.error('Error handling report image upload:', error);
+      setMessage({ 
+        type: 'error', 
+        content: error.response?.data?.message || error.message || 'Lỗi khi tải ảnh lên' 
+      });
+    } finally {
+      setReportLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setReportImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const getImageUrl = (path) => {
@@ -201,6 +308,39 @@ const OrderHistory = () => {
     }
     
     return null;
+  };
+
+  const renderImages = (imagePaths) => {
+    if (!imagePaths) return null;
+    
+    // Convert to array if it's a string, or use existing array
+    const images = Array.isArray(imagePaths) 
+      ? imagePaths 
+      : typeof imagePaths === 'string' 
+        ? imagePaths.split(',').filter(img => img.trim())
+        : [];
+
+    if (images.length === 0) return null;
+
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {images.map((img, index) => (
+          <img
+            key={index}
+            src={getImageUrl(img)}
+            alt={`Report evidence ${index + 1}`}
+            className="img-thumbnail"
+            style={{height: '100px', objectFit: 'cover'}}
+            onClick={() => {
+              const fullUrl = getImageUrl(img);
+              if (fullUrl) {
+                window.open(fullUrl, '_blank');
+              }
+            }}
+          />
+        ))}
+      </div>
+    );
   };
 
   const cardStyle = {
@@ -337,15 +477,73 @@ const OrderHistory = () => {
           <Modal show={showReportModal} onHide={handleCloseReportModal} centered>
             <Modal.Header closeButton>
               <Modal.Title>
-                Báo cáo đơn hàng {reportTargetOrder ? `#${reportTargetOrder._id.slice(-6)}` : ''}
+                {existingReport ? 'Cập nhật báo cáo' : 'Tạo báo cáo mới'}
+                {existingReport && (
+                  <Badge bg={
+                    existingReport.status === 'pending' ? 'warning' :
+                    existingReport.status === 'reviewed' ? 'info' :
+                    existingReport.status === 'resolved' ? 'success' : 'danger'
+                  } className="ms-2">
+                    <FaInfoCircle className="me-1" />
+                    {existingReport.status === 'pending' ? 'Chờ xử lý' :
+                     existingReport.status === 'reviewed' ? 'Đang xem xét' :
+                     existingReport.status === 'resolved' ? 'Đã giải quyết' : 'Đã từ chối'}
+                  </Badge>
+                )}
               </Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {message.content && (
-                <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-3`}>
+                <div className={`alert ${
+                  message.type === 'success' ? 'alert-success' : 
+                  message.type === 'warning' ? 'alert-warning' : 
+                  'alert-danger'
+                } mb-3`}>
                   {message.content}
                 </div>
               )}
+
+              {existingReport && (
+                <div className="mb-3">
+                  <h6>Thông tin báo cáo hiện tại:</h6>
+                  <div className="border rounded p-3 bg-light mb-3">
+                    <p><strong>Loại báo cáo:</strong> {' '}
+                      <Badge bg="secondary">
+                        {existingReport.type === 'late' ? 'Trễ hẹn' :
+                         existingReport.type === 'damage' ? 'Hàng hóa bị hư hỏng' :
+                         existingReport.type === 'lost' ? 'Hàng hóa bị mất' :
+                         existingReport.type === 'inappropriate' ? 'Thái độ không phù hợp' :
+                         existingReport.type === 'fraud' ? 'Gian lận' : 'Khác'}
+                      </Badge>
+                    </p>
+                    <p><strong>Nội dung:</strong> {existingReport.description}</p>
+                    {existingReport.image && (
+                      <div>
+                        <p><strong>Hình ảnh đính kèm:</strong></p>
+                        {renderImages(existingReport.image)}
+                      </div>
+                    )}
+                    <p className="mb-0 mt-2">
+                      <strong>Trạng thái:</strong>{' '}
+                      <Badge bg={
+                        existingReport.status === 'pending' ? 'warning' :
+                        existingReport.status === 'reviewed' ? 'info' :
+                        existingReport.status === 'resolved' ? 'success' : 'danger'
+                      }>
+                        {existingReport.status === 'pending' ? 'Chờ xử lý' :
+                         existingReport.status === 'reviewed' ? 'Đang xem xét' :
+                         existingReport.status === 'resolved' ? 'Đã giải quyết' : 'Đã từ chối'}
+                      </Badge>
+                    </p>
+                    {existingReport.admin_note && (
+                      <p className="mb-0 mt-2">
+                        <strong>Ghi chú của admin:</strong> {existingReport.admin_note}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <Form>
                 <Form.Group className="mb-3">
                   <Form.Label>Loại báo cáo <span className="text-danger">*</span></Form.Label>
@@ -353,90 +551,112 @@ const OrderHistory = () => {
                     value={reportType}
                     onChange={(e) => setReportType(e.target.value)}
                     isInvalid={!reportType}
+                    disabled={existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')}
                   >
                     <option value="">Chọn loại báo cáo</option>
+                    <option value="late">Trễ hẹn</option>
                     <option value="damage">Hàng hóa bị hư hỏng</option>
                     <option value="lost">Hàng hóa bị mất</option>
                     <option value="inappropriate">Thái độ không phù hợp</option>
+                    <option value="fraud">Gian lận</option>
                     <option value="other">Khác</option>
                   </Form.Select>
-                  {!reportType && <Form.Text className="text-danger">Vui lòng chọn loại báo cáo</Form.Text>}
                 </Form.Group>
+
                 <Form.Group className="mb-3">
-                  <Form.Label>Nội dung báo cáo <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>
+                    Nội dung báo cáo
+                    <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control
                     as="textarea"
                     rows={3}
                     value={reportDescription}
                     onChange={(e) => setReportDescription(e.target.value)}
-                    placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải..."
+                    placeholder={existingReport ? 
+                      "Nhập nội dung cập nhật cho báo cáo..." :
+                      "Vui lòng mô tả chi tiết vấn đề bạn gặp phải..."}
                     isInvalid={!reportDescription}
+                    disabled={existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')}
                   />
-                  {!reportDescription && <Form.Text className="text-danger">Vui lòng nhập nội dung báo cáo</Form.Text>}
                 </Form.Group>
 
-                {/* Thêm phần upload ảnh */}
                 <Form.Group className="mb-3">
                   <Form.Label>Hình ảnh đính kèm</Form.Label>
-                  <div className="d-flex align-items-center gap-2">
-                    <div className="position-relative" style={{width: '120px', height: '120px'}}>
-                      {reportImage ? (
-                        <>
+                  <div className="mb-3">
+                    <div className="d-flex flex-wrap gap-2 mb-2">
+                      {reportImages.map((img, index) => (
+                        <div key={index} className="position-relative">
                           <img
-                            src={getImageUrl(reportImage)}
-                            alt="Report evidence"
+                            src={getImageUrl(img)}
+                            alt={`Report evidence ${index + 1}`}
                             className="img-thumbnail"
-                            style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                            style={{height: '100px', width: '100px', objectFit: 'cover'}}
                           />
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-danger position-absolute top-0 end-0"
-                            onClick={() => setReportImage(null)}
-                          >
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <div 
-                          className="border rounded d-flex align-items-center justify-content-center"
-                          style={{width: '100%', height: '100%', cursor: 'pointer'}}
-                          onClick={() => document.getElementById('report-image-upload').click()}
-                        >
-                          <FaExclamationTriangle size={24} className="text-muted" />
+                          {!(existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')) && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              className="position-absolute top-0 end-0"
+                              onClick={() => handleRemoveImage(index)}
+                              style={{padding: '2px 6px'}}
+                            >
+                              <FaTrash size={12} />
+                            </Button>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                    <div>
-                      <input
-                        type="file"
-                        id="report-image-upload"
-                        accept="image/*"
-                        onChange={handleReportImageChange}
-                        style={{display: 'none'}}
-                      />
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => document.getElementById('report-image-upload').click()}
-                      >
-                        Chọn ảnh
-                      </Button>
-                    </div>
+                    {!(existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')) && (
+                      <div className="d-flex gap-2">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={reportLoading}
+                        >
+                          <FaImage className="me-1" />
+                          Chọn thêm ảnh
+                        </Button>
+                        {reportImages.length > 0 && (
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => setReportImages([])}
+                            disabled={reportLoading}
+                          >
+                            <FaTrash className="me-1" />
+                            Xóa tất cả
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      multiple
+                      accept="image/*"
+                      onChange={handleReportImageChange}
+                      style={{display: 'none'}}
+                      disabled={existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')}
+                    />
                   </div>
                 </Form.Group>
               </Form>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={handleCloseReportModal} disabled={reportLoading}>
-                Hủy
+                Đóng
               </Button>
-              <Button 
-                variant="primary" 
-                onClick={handleSubmitReport} 
-                disabled={reportLoading || !reportType || !reportDescription}
-              >
-                {reportLoading ? 'Đang gửi...' : 'Gửi báo cáo'}
-              </Button>
+              {!(existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')) && (
+                <Button 
+                  variant="primary" 
+                  onClick={handleSubmitReport} 
+                  disabled={reportLoading || !reportType || !reportDescription}
+                >
+                  {reportLoading ? 'Đang gửi...' : existingReport ? 'Cập nhật báo cáo' : 'Gửi báo cáo'}
+                </Button>
+              )}
             </Modal.Footer>
           </Modal>
         </div>

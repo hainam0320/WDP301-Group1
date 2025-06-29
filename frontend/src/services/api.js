@@ -99,9 +99,27 @@ export const userAPI = {
   // ---- Create Rate for Order ----
   createOrderRate: (data) => api.post('/rate', data),
 
+  // ---- Upload Report Images ----
+  uploadReportImages: async (files) => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    const response = await api.post('/reports/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response;
+  },
+
   // ---- Create Report ----
   createReport: async (data) => {
     const response = await api.post('/reports', data);
+    return response;
+  },
+  
+  // ---- Update Report ----
+  updateReport: async (reportId, data) => {
+    const response = await api.put(`/reports/${reportId}`, data);
     return response;
   },
   

@@ -123,17 +123,17 @@ const Home = () => {
                 </button>
                 <button 
                   className="list-group-item list-group-item-action border-0"
-                  onClick={() => navigate('/profile')}
-                >
-                  <FaUser className="me-2" />
-                  Thông tin cá nhân
-                </button>
-                <button 
-                  className="list-group-item list-group-item-action border-0"
                   onClick={() => navigate('/my-reports')}
                 >
                   <FaExclamationTriangle className="me-2" />
                   Báo cáo của tôi
+                </button>
+                <button 
+                  className="list-group-item list-group-item-action border-0"
+                  onClick={() => navigate('/profile')}
+                >
+                  <FaUser className="me-2" />
+                  Thông tin cá nhân
                 </button>
               </div>
             </div>
