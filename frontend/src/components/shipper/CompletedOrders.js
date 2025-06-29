@@ -144,6 +144,9 @@ const CompletedOrders = () => {
                       <div className="col-md-3">
                         <span className="badge bg-success fs-6">Hoàn thành</span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
+                        <p className="mb-1 text-muted">
+                          <strong>Ghi chú:</strong> {order.statusDescription || 'Giao thành công'}
+                        </p>
                         <p className="text-muted mb-0">
                           <small>Hoàn thành: {formatDate(order.updatedAt)}</small>
                         </p>
@@ -207,6 +210,12 @@ const CompletedOrders = () => {
                     <p className="text-muted">{selectedOrder.weight} kg</p>
                   </div>
                 )}
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Trạng thái hoàn thành:</strong>
+                  </p>
+                  <p className="text-muted">{selectedOrder.statusDescription || 'Giao thành công'}</p>
+                </div>
               </div>
               
               <div className="col-md-6">

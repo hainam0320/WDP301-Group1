@@ -12,6 +12,7 @@ const orderSchema = new Schema({
   timeEnd:      { type: String },
   price:        { type: Number, required: true },
   status:       { type: String, required: true },
+  statusDescription: { type: String },
   distance_km:  { type: Number, required: true }
 }, {
   timestamps: true

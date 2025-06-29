@@ -2,6 +2,7 @@ const User = require('../model/userModel');
 const Order = require('../model/orderModel');
 const Rate = require('../model/rateModel');
 const Driver = require('../model/driverModel');
+const Report = require('../model/reportModel');
 const mongoose = require('mongoose');
 
 // Get dashboard statistics
@@ -285,5 +286,83 @@ exports.getRevenue = async (req, res) => {
   } catch (error) {
     console.error('Error getting revenue data:', error);
     res.status(500).json({ message: 'Error getting revenue data' });
+  }
+};
+
+// Get shipper orders with filters
+exports.getShipperOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate, status } = req.query;
+
+    // Validate shipper exists
+    const shipper = await Driver.findById(id);
+    if (!shipper) {
+      console.log('Shipper not found:', id);
+      return res.status(404).json({ message: 'Shipper not found' });
+    }
+
+    // Build query
+    let query = { driverId: id };
+
+    // Add date filters if provided
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = endDateTime;
+      }
+    }
+
+    // Add status filter if provided
+    if (status) {
+      query.status = status;
+    }
+
+    const orders = await Order.find(query)
+      .populate('userId', 'fullName phone')
+      .populate('driverId', 'fullName phone')
+      .sort('-createdAt');
+    
+    // Get reports for these orders
+    const orderIds = orders.map(order => order._id);
+    const reports = await Report.find({
+      order_id: { $in: orderIds }
+    });
+
+    // Create a map of order ID to report
+    const reportMap = reports.reduce((map, report) => {
+      map[report.order_id.toString()] = report;
+      return map;
+    }, {});
+    
+    // Map the orders to include only necessary fields and add report info
+    const formattedOrders = orders.map(order => ({
+      _id: order._id,
+      type: order.type,
+      pickupaddress: order.pickupaddress,
+      dropupaddress: order.dropupaddress,
+      price: order.price,
+      status: order.status,
+      statusDescription: order.statusDescription || '',
+      createdAt: order.createdAt,
+      customer: order.userId ? {
+        fullName: order.userId.fullName,
+        phone: order.userId.phone
+      } : null,
+      report: reportMap[order._id.toString()] || null
+    }));
+
+    res.json(formattedOrders);
+  } catch (error) {
+    console.error('Error getting shipper orders:', error);
+    res.status(500).json({ 
+      message: 'Error getting shipper orders',
+      error: error.message 
+    });
   }
 }; 
