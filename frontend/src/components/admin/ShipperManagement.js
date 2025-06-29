@@ -22,6 +22,8 @@ const ShipperManagement = () => {
   const [error, setError] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     fetchShippers();
@@ -31,6 +33,13 @@ const ShipperManagement = () => {
     try {
       setLoading(true);
       const shippersData = await adminAPI.getUsers();
+      // Log để kiểm tra dữ liệu
+      console.log("Dữ liệu shipper chi tiết:", shippersData.data.map(user => ({
+        id: user._id,
+        name: user.fullName,
+        createdAt: user.createdAt,
+        type: user.type
+      })));
       setShippers(shippersData.data.filter(user => user.type === 'driver'));
     } catch (error) {
       console.error('Error fetching shippers:', error);
@@ -43,6 +52,7 @@ const ShipperManagement = () => {
   const fetchShipperOrders = async (shipperId) => {
     try {
       setLoadingOrders(true);
+      setError(null); // Reset error state before new fetch
       console.log('Fetching orders for shipper:', shipperId);
       console.log('Using filters:', filterDates);
 
@@ -71,8 +81,9 @@ const ShipperManagement = () => {
       setShipperOrders(response.data);
     } catch (error) {
       console.error('Error fetching shipper orders:', error);
-      toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu đơn hàng');
-      setError(error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu đơn hàng');
+      const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu đơn hàng';
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoadingOrders(false);
     }
@@ -110,6 +121,7 @@ const ShipperManagement = () => {
     setShowActivitiesModal(false);
     setSelectedUser(null);
     setShipperOrders([]);
+    setError(null);
     setFilterDates({
       startDate: '',
       endDate: '',
@@ -132,9 +144,45 @@ const ShipperManagement = () => {
   };
 
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/150';
-    if (imagePath.startsWith('http')) return imagePath;
-    return `http://localhost:9999/${imagePath.replace(/\\/g, '/')}`;
+    if (!imagePath || typeof imagePath !== 'string') return 'https://via.placeholder.com/150';
+    return `http://localhost:9999/${imagePath}`;
+  };
+
+  const handleImageClick = (imagePath) => {
+    setSelectedImage(`http://localhost:9999/${imagePath}`);
+    setShowImageModal(true);
+  };
+
+  const renderImages = (imagePaths) => {
+    if (!imagePaths) return null;
+    
+    // Convert to array if it's a string, or use existing array
+    const images = Array.isArray(imagePaths) 
+      ? imagePaths 
+      : typeof imagePaths === 'string' 
+        ? imagePaths.split(',').filter(img => img.trim())
+        : [];
+
+    if (images.length === 0) return null;
+
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {images.map((img, index) => (
+          <img
+            key={index}
+            src={`http://localhost:9999/${img}`}
+            alt={`Evidence ${index + 1}`}
+            className="img-thumbnail"
+            style={{height: '100px', objectFit: 'cover', cursor: 'pointer'}}
+            onClick={() => handleImageClick(img)}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'https://via.placeholder.com/150';
+            }}
+          />
+        ))}
+      </div>
+    );
   };
 
   const UserDetailsModal = () => {
@@ -399,9 +447,9 @@ const ShipperManagement = () => {
                       <td>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</td>
                     </tr>
                   ))}
-                  {shipperOrders.length === 0 && (
+                  {shipperOrders.length === 0 && !loadingOrders && (
                     <tr>
-                      <td colSpan="9" className="text-center">
+                      <td colSpan="10" className="text-center">
                         {filterDates.startDate || filterDates.endDate || filterDates.status ? 
                           'Không tìm thấy đơn hàng nào phù hợp với bộ lọc' : 
                           'Shipper này chưa có đơn hàng nào'}
@@ -461,12 +509,7 @@ const ShipperManagement = () => {
                 <tr>
                   <th>Hình ảnh:</th>
                   <td>
-                    <img 
-                      src={getImageUrl(selectedReport.image)} 
-                      alt="Hình ảnh báo cáo" 
-                      className="img-fluid"
-                      style={{ maxWidth: '300px' }}
-                    />
+                    {renderImages(selectedReport.image)}
                   </td>
                 </tr>
               )}
@@ -498,7 +541,7 @@ const ShipperManagement = () => {
   `;
 
   // Add the styles to the document head
-  if (!document.getElementById('modal-styles')) {
+  if (typeof window !== 'undefined' && !document.getElementById('modal-styles')) {
     const styleSheet = document.createElement('style');
     styleSheet.id = 'modal-styles';
     styleSheet.textContent = styles;
@@ -509,7 +552,6 @@ const ShipperManagement = () => {
     <div className="card">
       <div className="card-header bg-success text-white d-flex justify-content-between align-items-center">
         <h4 className="mb-0">Quản lý shipper</h4>
-  
       </div>
       <div className="card-body">
         {loading ? (
@@ -578,8 +620,25 @@ const ShipperManagement = () => {
       <UserDetailsModal />
       <ActivitiesModal />
       <ReportModal />
+
+      {/* Image Modal */}
+      <Modal show={showImageModal} onHide={() => setShowImageModal(false)} centered size="xl">
+        <Modal.Header closeButton />
+        <Modal.Body className="text-center p-0">
+          <img 
+            src={selectedImage}
+            alt="Enlarged evidence" 
+            className="img-fluid"
+            style={{maxWidth: '100%', maxHeight: '80vh'}}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'https://via.placeholder.com/800x600?text=Image+Not+Found';
+            }}
+          />
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };
 
-export default ShipperManagement; 
+export default ShipperManagement;

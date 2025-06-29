@@ -224,9 +224,9 @@ const MyOrders = () => {
                               value={order.selectedStatus}
                               onChange={(e) => handleStatusDescriptionChange(order._id, e.target.value)}
                             >
-                              <option value="Giao thành công">Giao thành công</option>
-                              <option value="Không liên hệ được với khách">Không liên hệ được với khách</option>
-                              <option value="Đơn hàng bị mất">Đơn hàng bị mất</option>
+                              <option value="delivered_successfully">Giao thành công</option>
+                              <option value="customer_unreachable">Không liên hệ được với khách</option>
+                              <option value="order_lost">Đơn hàng bị mất</option>
                             </select>
                             <button 
                               className="btn btn-success btn-sm mb-2 w-100"

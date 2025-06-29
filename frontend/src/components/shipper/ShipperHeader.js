@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaStar, FaBell, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaStar, FaSignOutAlt } from 'react-icons/fa';
 import axios from 'axios';
 import logo from '../../assets/img/favicon.png';
+import NotificationBell from '../NotificationBell';
 
 const ShipperHeader = () => {
   const navigate = useNavigate();
@@ -71,35 +72,52 @@ const ShipperHeader = () => {
           <span className="navbar-brand h3 mb-0">Shipper Dashboard</span>
         </div>
         
-        <div className="d-flex align-items-center">
-          <div className="me-3">
-            <FaBell className="me-2" />
-            <span className="badge bg-danger">2</span>
-          </div>
-          <div className="me-3 text-white">
-            {driverAvgRate.avg.toFixed(1)}<FaStar className="me-1" />             
-          </div>
-          <div className="dropdown">
-            <button className="btn btn-outline-light dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
-              {shipperProfile.avatar && getImageUrl(shipperProfile.avatar) ? (
-                <img 
-                  src={getImageUrl(shipperProfile.avatar)} 
-                  alt="Avatar" 
-                  className="rounded-circle me-2" 
-                  style={{width: '30px', height: '30px', objectFit: 'cover'}}
-                />
-              ) : (
-                <FaUser className="me-2" />
-              )}
-              {shipperProfile.name}
-            </button>
-            <ul className="dropdown-menu">
-              <li><button className="dropdown-item" onClick={() => navigate('/shipper/profile')}><FaUser className="me-2" />Thông tin cá nhân</button></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li><button className="dropdown-item" onClick={handleLogout}><FaSignOutAlt className="me-2" />Đăng xuất</button></li>
-            </ul>
-          </div>
-        </div>
+        <nav className="header-nav ms-auto">
+          <ul className="d-flex align-items-center">
+            
+            <li className="nav-item me-3 text-white">
+              {driverAvgRate.avg.toFixed(1)}<FaStar className="ms-1" /> ({driverAvgRate.count} đánh giá)
+            </li>
+
+            <NotificationBell />
+
+            <li className="nav-item dropdown pe-3">
+              <a className="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+                {shipperProfile.avatar && getImageUrl(shipperProfile.avatar) ? (
+                  <img 
+                    src={getImageUrl(shipperProfile.avatar)} 
+                    alt="Avatar" 
+                    className="rounded-circle" 
+                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                  />
+                ) : (
+                  <FaUser />
+                )}
+                <span className="d-none d-md-block dropdown-toggle ps-2">{shipperProfile.name}</span>
+              </a>
+
+              <ul className="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+                <li className="dropdown-header">
+                  <h6>{shipperProfile.name}</h6>
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={() => navigate('/shipper/profile')}>
+                    <FaUser className="me-2" />
+                    <span>Thông tin cá nhân</span>
+                  </a>
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={handleLogout}>
+                    <FaSignOutAlt className="me-2" />
+                    <span>Đăng xuất</span>
+                  </a>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </nav>
       </div>
     </nav>
   );

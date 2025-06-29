@@ -1,5 +1,6 @@
 const Report = require('../model/reportModel');
 const Order = require('../model/orderModel');
+const Notification = require('../model/notificationModel');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -151,6 +152,7 @@ exports.getUserReports = async (req, res) => {
 exports.updateReportStatus = async (req, res) => {
     try {
         const { status, admin_note } = req.body;
+        const { io, connectedUsers } = req;
 
         if (!status) {
             return res.status(400).json({ message: 'Vui lòng cung cấp trạng thái báo cáo' });
@@ -181,6 +183,30 @@ exports.updateReportStatus = async (req, res) => {
 
         if (!updatedReport) {
             return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
+        }
+
+        // Tạo và lưu thông báo
+        const notification = new Notification({
+            recipient: updatedReport.reporterID._id,
+            recipientModel: 'User',
+            title: 'Báo cáo của bạn đã được cập nhật',
+            message: `Trạng thái mới: ${status}. ${admin_note ? `Phản hồi: ${admin_note}` : ''}`,
+            type: 'REPORT_UPDATED',
+            link: `/my-reports` // Hoặc có thể là một link chi tiết hơn
+        });
+        await notification.save();
+
+        // Gửi thông báo cho người dùng đã tạo báo cáo
+        const reporterId = updatedReport.reporterID._id.toString();
+        const userSocketId = (connectedUsers && connectedUsers.user) ? connectedUsers.user[reporterId] : null;
+
+        if (userSocketId) {
+            io.to(userSocketId).emit('notification', {
+                title: 'Báo cáo của bạn đã được cập nhật',
+                message: `Trạng thái mới: ${status}. ${admin_note ? `Phản hồi: ${admin_note}` : ''}`,
+                reportId: updatedReport._id,
+                type: 'REPORT_UPDATED'
+            });
         }
 
         res.json({

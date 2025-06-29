@@ -19,12 +19,32 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const usersData = await adminAPI.getUsers();
+      
+      // Log để kiểm tra dữ liệu
+      console.log("Dữ liệu người dùng chi tiết:", usersData.data.map(user => ({
+        id: user._id,
+        name: user.fullName,
+        createdAt: user.createdAt,
+        type: user.type
+      })));
+      
       setUsers(usersData.data.filter(user => user.type === 'user'));
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Có lỗi xảy ra khi tải dữ liệu');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    try {
+      if (!dateString) return 'Chưa có dữ liệu';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Chưa có dữ liệu';
+      return date.toLocaleDateString('vi-VN');
+    } catch (error) {
+      return 'Chưa có dữ liệu';
     }
   };
 
@@ -109,7 +129,7 @@ const UserManagement = () => {
                   </tr>
                   <tr>
                     <th>Ngày tham gia:</th>
-                    <td>{new Date(selectedUser.createdAt).toLocaleDateString('vi-VN')}</td>
+                    <td>{formatDate(selectedUser.createdAt)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -170,7 +190,7 @@ const UserManagement = () => {
                         {user.status ? 'Hoạt động' : 'Đã khóa'}
                       </span>
                     </td>
-                    <td>{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
+                    <td>{formatDate(user.createdAt)}</td>
                     <td>
                       <div className="btn-group btn-group-sm">
                         <button 
@@ -201,4 +221,4 @@ const UserManagement = () => {
   );
 };
 
-export default UserManagement; 
+export default UserManagement;
