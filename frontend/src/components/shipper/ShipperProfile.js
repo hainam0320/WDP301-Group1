@@ -390,12 +390,7 @@ const ShipperProfile = () => {
                 </div>
               </div>
 
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <label className="form-label fw-semibold">Tổng số đơn đã giao</label>
-                  <input type="text" className="form-control" value={shipperProfile.totalDeliveries} readOnly />
-                </div>
-              </div>
+            
 
               <button 
                 type="submit" 
