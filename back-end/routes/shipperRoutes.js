@@ -280,7 +280,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
 
     const oldStatus = order.status;
     order.status = status;
-    if (status === 'completed' && statusDescription) {
+    if ((status === 'completed' || status === 'failed') && statusDescription) {
       order.statusDescription = statusDescription;
     }
     await order.save();

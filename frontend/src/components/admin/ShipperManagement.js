@@ -360,7 +360,7 @@ const ShipperManagement = () => {
                     <option value="pending">Chờ xử lý</option>
                     <option value="accepted">Đã nhận</option>
                     <option value="completed">Hoàn thành</option>
-                    <option value="cancelled">Đã hủy</option>
+                    <option value="failed">Đã hủy</option>
                   </Form.Select>
                 </Form.Group>
               </div>
@@ -421,11 +421,11 @@ const ShipperManagement = () => {
                         <span className={`badge ${
                           order.status === 'completed' ? 'bg-success' :
                           order.status === 'accepted' ? 'bg-primary' :
-                          order.status === 'cancelled' ? 'bg-danger' : 'bg-warning'
+                          order.status === 'failed' ? 'bg-danger' : 'bg-warning'
                         }`}>
                           {order.status === 'completed' ? 'Hoàn thành' :
                            order.status === 'accepted' ? 'Đã nhận' :
-                           order.status === 'cancelled' ? 'Đã hủy' : 'Chờ xử lý'}
+                           order.status === 'failed' ? 'Đã hủy' : 'Chờ xử lý'}
                         </span>
                       </td>
                       <td style={{ whiteSpace: 'pre-wrap' }}>

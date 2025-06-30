@@ -391,7 +391,7 @@ const OrderHistory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.filter(order => order.status === 'completed').map(order => (
+                    {orders.filter(order => order.status === 'completed' || order.status === 'failed').map(order => (
                       <tr key={order._id}>
                         <td>#{order._id.slice(-6)}</td>
                         <td>{order.pickupaddress}</td>
@@ -400,7 +400,9 @@ const OrderHistory = () => {
                         <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                         <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
                         <td>
-                          {orderRates[order._id] ? (
+                          {order.status === 'failed' ? (
+                            <span className="badge bg-danger">Thất bại</span>
+                          ) : orderRates[order._id] ? (
                             <div>
                               <span className="text-warning">
                                 {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
