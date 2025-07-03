@@ -25,6 +25,8 @@ const OrderHistory = () => {
   const [message, setMessage] = useState({ type: '', content: '' });
   const BASE_URL = 'http://localhost:9999';
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -209,6 +211,13 @@ const OrderHistory = () => {
     border: 'none'
   };
 
+  const completedOrders = orders.filter(order => order.status === 'completed');
+  const totalPages = Math.ceil(completedOrders.length / ordersPerPage);
+  const paginatedOrders = completedOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
+  );
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <Header />
@@ -233,7 +242,7 @@ const OrderHistory = () => {
               </div>
             ) : error ? (
               <div className="alert alert-danger">{error}</div>
-            ) : orders.length === 0 ? (
+            ) : completedOrders.length === 0 ? (
               <div className="alert alert-info">Không có lịch sử đơn hàng</div>
             ) : (
               <div className="table-responsive">
@@ -251,7 +260,7 @@ const OrderHistory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.filter(order => order.status === 'completed').map(order => (
+                    {paginatedOrders.map(order => (
                       <tr key={order._id}>
                         <td>#{order._id.slice(-6)}</td>
                         <td>{order.pickupaddress}</td>
@@ -287,6 +296,29 @@ const OrderHistory = () => {
                     ))}
                   </tbody>
                 </table>
+                {totalPages > 1 && (
+                  <nav>
+                    <ul className="pagination justify-content-center">
+                      <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                          Trước
+                        </button>
+                      </li>
+                      {[...Array(totalPages)].map((_, idx) => (
+                        <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                          <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                            {idx + 1}
+                          </button>
+                        </li>
+                      ))}
+                      <li className={`page-item${currentPage === totalPages ? ' disabled' : ''}`}>
+                        <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                          Sau
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                )}
               </div>
             )}
           </div>

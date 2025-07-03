@@ -14,6 +14,8 @@ const OrderTracking = () => {
   const [shipperAvgRate, setShipperAvgRate] = useState({ avg: 0, count: 0 });
   const BASE_URL = 'http://localhost:9999';
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 3;
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -77,6 +79,15 @@ const OrderTracking = () => {
     border: 'none'
   };
 
+  const trackingOrders = orders
+    .filter(order => order.status !== 'completed')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const totalPages = Math.ceil(trackingOrders.length / ordersPerPage);
+  const paginatedOrders = trackingOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
+  );
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <Header />
@@ -101,10 +112,10 @@ const OrderTracking = () => {
               </div>
             ) : error ? (
               <div className="alert alert-danger">{error}</div>
-            ) : orders.length === 0 ? (
+            ) : trackingOrders.length === 0 ? (
               <div className="alert alert-info">Không có đơn hàng nào</div>
             ) : (
-              orders.filter(order => order.status !== 'completed').map(order => (
+              paginatedOrders.map(order => (
                 <div key={order._id} className="card mb-3">
                   <div className="card-body">
                     <div className="d-flex justify-content-between align-items-center">
@@ -150,6 +161,29 @@ const OrderTracking = () => {
                   </div>
                 </div>
               ))
+            )}
+            {totalPages > 1 && (
+              <nav>
+                <ul className="pagination justify-content-center mt-3">
+                  <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                      Trước
+                    </button>
+                  </li>
+                  {[...Array(totalPages)].map((_, idx) => (
+                    <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                        {idx + 1}
+                      </button>
+                    </li>
+                  ))}
+                  <li className={`page-item${currentPage === totalPages ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                      Sau
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             )}
           </div>
         </div>
