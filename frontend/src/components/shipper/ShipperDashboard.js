@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaDollarSign, FaHistory, FaStar, FaRoute, FaCheckCircle } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaDollarSign, FaHistory, FaStar, FaRoute, FaCheckCircle, FaPercentage } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
-import ShipperHeader from './shipper/ShipperHeader';
+import ShipperHeader from './ShipperHeader';
+import { transactionAPI } from '../../services/api';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
@@ -16,9 +17,15 @@ const ShipperDashboard = () => {
     total: 0,
     totalDeliveries: 0
   });
+  const [pendingCommissionCount, setPendingCommissionCount] = useState(0);
 
   useEffect(() => {
     fetchEarnings();
+    fetchPendingCommissions();
+
+    // Cập nhật số lượng hoa hồng mỗi 5 phút
+    const interval = setInterval(fetchPendingCommissions, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchEarnings = async () => {
@@ -34,6 +41,15 @@ const ShipperDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching earnings:', error);
+    }
+  };
+
+  const fetchPendingCommissions = async () => {
+    try {
+      const response = await transactionAPI.getPendingCommissions();
+      setPendingCommissionCount(response.data.count || 0);
+    } catch (error) {
+      console.error('Error fetching pending commissions:', error);
     }
   };
 
@@ -129,6 +145,18 @@ const ShipperDashboard = () => {
                   Thu nhập
                 </button>
                 <button 
+                  className="list-group-item list-group-item-action border-0 d-flex align-items-center justify-content-between"
+                  onClick={() => navigate('/shipper/commissions')}
+                >
+                  <span>
+                    <FaPercentage className="me-2" />
+                    Thanh toán hoa hồng
+                  </span>
+                  {pendingCommissionCount > 0 && (
+                    <span className="badge bg-danger">{pendingCommissionCount}</span>
+                  )}
+                </button>
+                <button 
                   className="list-group-item list-group-item-action border-0"
                   onClick={() => navigate('/shipper/profile')}
                 >
@@ -162,6 +190,18 @@ const ShipperDashboard = () => {
                     >
                       <FaRoute className="me-2" />
                       Đơn hàng đang thực hiện
+                    </button>
+                  </div>
+                  <div className="col-md-4">
+                    <button 
+                      className="btn btn-warning btn-lg w-100 mb-3"
+                      onClick={() => navigate('/shipper/commissions')}
+                    >
+                      <FaPercentage className="me-2" />
+                      Thanh toán hoa hồng
+                      {pendingCommissionCount > 0 && (
+                        <span className="badge bg-danger ms-2">{pendingCommissionCount}</span>
+                      )}
                     </button>
                   </div>
                 </div>

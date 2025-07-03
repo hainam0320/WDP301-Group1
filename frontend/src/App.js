@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster, toast } from 'react-hot-toast';
+import io from 'socket.io-client';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
-import ShipperDashboard from './components/ShipperDashboard';
+import ShipperDashboard from './components/shipper/ShipperDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import NewOrder from './components/NewOrder';
@@ -17,6 +19,8 @@ import MyOrders from './components/shipper/MyOrders';
 import Earnings from './components/shipper/Earnings';
 import ShipperProfile from './components/shipper/ShipperProfile';
 import CompletedOrders from './components/shipper/CompletedOrders';
+import CommissionManagement from './components/shipper/CommissionManagement';
+import AdminCommissionManagement from './components/admin/AdminCommissionManagement';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
@@ -30,131 +34,194 @@ import SystemSettings from './components/admin/SystemSettings';
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 
 function App() {
+  const socket = useRef(null);
+
+  useEffect(() => {
+    // Lấy thông tin người dùng từ localStorage
+    const userInfo = localStorage.getItem('user');
+    const user = userInfo ? JSON.parse(userInfo) : null;
+
+    // Chỉ kết nối socket nếu người dùng đã đăng nhập
+    if (user && user._id && user.role) {
+      // Khởi tạo kết nối socket
+      socket.current = io('http://localhost:9999');
+
+      // Gửi ID và vai trò người dùng lên server khi kết nối thành công
+      socket.current.on('connect', () => {
+        console.log('Connected to socket server!');
+        socket.current.emit('registerUser', { userId: user._id, role: user.role });
+      });
+
+      // Lắng nghe sự kiện 'notification' từ server (cho user)
+      socket.current.on('notification', (data) => {
+        console.log('Notification received:', data);
+        
+        // Hiển thị thông báo bằng react-hot-toast
+        toast.success(data.message || 'Bạn có thông báo mới!', {
+          icon: '🔔',
+        });
+
+        // Gửi sự kiện để các component khác (như chuông thông báo) có thể cập nhật
+        window.dispatchEvent(new Event('new-notification'));
+      });
+
+      // Lắng nghe sự kiện 'new_order_available' từ server (cho driver)
+      if (user.role === 'driver') {
+        socket.current.on('new_order_available', (data) => {
+          console.log('New order available:', data);
+          toast.success(data.message || 'Có đơn hàng mới!', {
+            icon: '🛵',
+          });
+          // Gửi sự kiện để trang AvailableOrders có thể cập nhật
+          window.dispatchEvent(new CustomEvent('new_order_for_driver', { detail: data.order }));
+        });
+      }
+
+      // Dọn dẹp khi component unmount
+      return () => {
+        console.log('Disconnecting socket...');
+        socket.current.disconnect();
+      };
+    }
+  }, []); // Chỉ chạy 1 lần khi App mount
+
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* User Routes */}
-        <Route 
-          path="/home" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <Home />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/new-order" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <NewOrder />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/order-tracking" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <OrderTracking />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/order-history" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <OrderHistory />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/profile" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <UserProfile />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/my-reports" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <MyReports />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/confirmOrder" 
-          element={
-            <ProtectedRoute allowedRoles={['user']}>
-              <ConfirmOrder />
-            </ProtectedRoute>
-          } 
-        />
-        {/* Shipper Routes */}
-        <Route 
-          path="/shipper" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <ShipperDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/shipper/available-orders" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <AvailableOrders />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/shipper/my-orders" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <MyOrders />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/shipper/completed-orders" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <CompletedOrders />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/shipper/earnings" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <Earnings />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/shipper/profile" 
-          element={
-            <ProtectedRoute allowedRoles={['driver']}>
-              <ShipperProfile />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Admin Routes */}
-        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}>
-          <Route index element={<AdminDashboardHome />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="shippers" element={<ShipperManagement />} />
-          <Route path="orders" element={<OrderManagement />} />
-          <Route path="revenue" element={<RevenueReport />} />
-          <Route path="reports" element={<ReportManagement />} />
-          <Route path="settings" element={<SystemSettings />} />
-        </Route>
-      </Routes>
+      <div>
+        <Toaster position="top-right" />
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* User Routes */}
+          <Route 
+            path="/home" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <Home />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/new-order" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <NewOrder />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/order-tracking" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <OrderTracking />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/order-history" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <OrderHistory />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <UserProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/my-reports" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <MyReports />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/confirmOrder" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <ConfirmOrder />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Shipper Routes */}
+          <Route 
+            path="/shipper" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <ShipperDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/available-orders" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <AvailableOrders />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/my-orders" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <MyOrders />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/completed-orders" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <CompletedOrders />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/earnings" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <Earnings />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/profile" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <ShipperProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shipper/commissions" 
+            element={
+              <ProtectedRoute allowedRoles={['driver']}>
+                <CommissionManagement />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Admin Routes */}
+          <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>}>
+            <Route index element={<AdminDashboardHome />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="shippers" element={<ShipperManagement />} />
+            <Route path="orders" element={<OrderManagement />} />
+            <Route path="revenue" element={<RevenueReport />} />
+            <Route path="reports" element={<ReportManagement />} />
+            <Route path="settings" element={<SystemSettings />} />
+            <Route path="commission-management" element={<AdminCommissionManagement />} />
+          </Route>
+        </Routes>
+      </div>
     </Router>
   );
 }

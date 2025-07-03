@@ -11,6 +11,8 @@ const ReportManagement = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [adminNote, setAdminNote] = useState('');
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState('');
 
   useEffect(() => {
     fetchReports();
@@ -90,6 +92,43 @@ const ReportManagement = () => {
     }
   };
 
+  const handleImageClick = (imagePath) => {
+    setSelectedImage(`http://localhost:9999/${imagePath}`);
+    setShowImageModal(true);
+  };
+
+  const renderImages = (imagePaths) => {
+    if (!imagePaths) return null;
+    
+    // Convert to array if it's a string, or use existing array
+    const images = Array.isArray(imagePaths) 
+      ? imagePaths 
+      : typeof imagePaths === 'string' 
+        ? imagePaths.split(',').filter(img => img.trim())
+        : [];
+
+    if (images.length === 0) return null;
+
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {images.map((img, index) => (
+          <img
+            key={index}
+            src={`http://localhost:9999/${img}`}
+            alt={`Report evidence ${index + 1}`}
+            className="img-thumbnail"
+            style={{height: '100px', objectFit: 'cover', cursor: 'pointer'}}
+            onClick={() => handleImageClick(img)}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'https://via.placeholder.com/200x200?text=Image+Not+Found';
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="card">
       <div className="card-header bg-danger text-white">
@@ -121,9 +160,9 @@ const ReportManagement = () => {
               <tbody>
                 {reports.map(report => (
                   <tr key={report._id}>
-                    <td>#{report.order_id._id.slice(-6)}</td>
-                    <td>{report.reporterID.fullName}</td>
-                    <td>{report.reported_user_id.fullName}</td>
+                    <td>#{report.order_id?._id ? report.order_id._id.slice(-6) : 'N/A'}</td>
+                    <td>{report.reporterID?.fullName || 'N/A'}</td>
+                    <td>{report.reported_user_id?.fullName || 'N/A'}</td>
                     <td>{getReportTypeBadge(report.type)}</td>
                     <td>{getReportStatusBadge(report.status)}</td>
                     <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
@@ -159,7 +198,7 @@ const ReportManagement = () => {
                     <tbody>
                       <tr>
                         <th>Mã đơn hàng:</th>
-                        <td>#{selectedReport.order_id._id.slice(-6)}</td>
+                        <td>#{selectedReport.order_id?._id ? selectedReport.order_id._id.slice(-6) : 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Loại báo cáo:</th>
@@ -182,19 +221,19 @@ const ReportManagement = () => {
                     <tbody>
                       <tr>
                         <th>Người báo cáo:</th>
-                        <td>{selectedReport.reporterID.fullName}</td>
+                        <td>{selectedReport.reporterID?.fullName || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Email:</th>
-                        <td>{selectedReport.reporterID.email}</td>
+                        <td>{selectedReport.reporterID?.email || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Tài xế:</th>
-                        <td>{selectedReport.reported_user_id.fullName}</td>
+                        <td>{selectedReport.reported_user_id?.fullName || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Email tài xế:</th>
-                        <td>{selectedReport.reported_user_id.email}</td>
+                        <td>{selectedReport.reported_user_id?.email || 'N/A'}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -206,15 +245,10 @@ const ReportManagement = () => {
                 <p className="border rounded p-3 bg-light">{selectedReport.description}</p>
               </div>
 
-              {selectedReport.image && (
+              {selectedReport && selectedReport.image && (
                 <div className="mb-4">
                   <h6>Hình ảnh đính kèm</h6>
-                  <img 
-                    src={`${process.env.REACT_APP_API_URL}/${selectedReport.image}`}
-                    alt="Report evidence" 
-                    className="img-fluid rounded"
-                    style={{maxHeight: '200px'}}
-                  />
+                  {renderImages(selectedReport.image)}
                 </div>
               )}
 
@@ -288,6 +322,23 @@ const ReportManagement = () => {
             </>
           )}
         </Modal.Footer>
+      </Modal>
+
+      {/* Image Modal */}
+      <Modal show={showImageModal} onHide={() => setShowImageModal(false)} centered size="xl">
+        <Modal.Header closeButton />
+        <Modal.Body className="text-center p-0">
+          <img 
+            src={selectedImage}
+            alt="Enlarged report evidence" 
+            className="img-fluid"
+            style={{maxWidth: '100%', maxHeight: '80vh'}}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = 'https://via.placeholder.com/800x600?text=Image+Not+Found';
+            }}
+          />
+        </Modal.Body>
       </Modal>
     </div>
   );

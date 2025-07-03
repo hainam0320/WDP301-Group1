@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaRoute, FaMapMarkerAlt, FaUser, FaEye, FaStar, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button, Form } from 'react-bootstrap';
 import ShipperHeader from './ShipperHeader';
+import { toast } from 'react-hot-toast';
+import { shipperAPI } from '../../services/api';
 
 const MyOrders = () => {
   const navigate = useNavigate();
@@ -17,6 +19,9 @@ const MyOrders = () => {
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderRate, setOrderRate] = useState(null);
+  const [showFailureModal, setShowFailureModal] = useState(false);
+  const [failureReason, setFailureReason] = useState('');
+  const [orderToFail, setOrderToFail] = useState(null);
 
   const fetchMyOrders = async () => {
     setIsLoading(true);
@@ -28,8 +33,13 @@ const MyOrders = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Chỉ lấy những đơn hàng chưa hoàn thành
-      const activeOrders = response.data.filter(order => order.status !== 'completed');
+      // Chỉ lấy những đơn hàng chưa hoàn thành và chưa thất bại
+      const activeOrders = response.data
+        .filter(order => order.status !== 'completed' && order.status !== 'failed')
+        .map(order => ({
+          ...order,
+          selectedStatus: 'Giao thành công'
+        }));
       setMyOrders(activeOrders);
     } catch (err) {
       console.error('Error fetching my orders:', err);
@@ -43,13 +53,22 @@ const MyOrders = () => {
     fetchMyOrders();
   }, []);
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus) => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `${BASE_URL}/api/shipper/orders/${orderId}/status`,
-        { status: newStatus },
+      const order = myOrders.find(o => o._id === orderId);
+      
+      const requestData = {
+        status: newStatus
+      };
+
+      if (newStatus === 'completed') {
+        requestData.statusDescription = order.selectedStatus;
+      }
+
+      await axios.put(`${BASE_URL}/api/shipper/orders/${orderId}/status`, 
+        requestData,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -57,27 +76,26 @@ const MyOrders = () => {
         }
       );
 
-      if (response.data.success) {
-        if (newStatus === 'completed') {
-          // Nếu đơn hàng được hoàn thành, loại bỏ khỏi danh sách
-          setMyOrders(myOrders.filter(order => order._id !== orderId));
-        } else {
-          // Nếu chỉ cập nhật trạng thái, cập nhật trong danh sách
-          setMyOrders(myOrders.map(order => 
-            order._id === orderId ? {...order, status: newStatus} : order
-          ));
-        }
-        setMessages({ type: 'success', content: 'Cập nhật trạng thái đơn hàng thành công!' });
-      }
+      // Refresh danh sách đơn hàng
+      fetchMyOrders();
+      
+      toast.success('Cập nhật trạng thái thành công!');
     } catch (error) {
       console.error('Error updating order status:', error);
-      setMessages({ 
-        type: 'error', 
-        content: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật trạng thái' 
-      });
+      toast.error('Lỗi khi cập nhật trạng thái đơn hàng');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStatusDescriptionChange = (orderId, newStatusDescription) => {
+    setMyOrders(prevOrders => 
+      prevOrders.map(order => 
+        order._id === orderId 
+          ? { ...order, selectedStatus: newStatusDescription }
+          : order
+      )
+    );
   };
 
   const fetchOrderRate = async (orderId) => {
@@ -121,6 +139,50 @@ const MyOrders = () => {
     borderRadius: '15px',
     boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
     border: 'none'
+  };
+
+  const handleShowFailureModal = (order) => {
+    setOrderToFail(order);
+    setShowFailureModal(true);
+  };
+
+  const handleCloseFailureModal = () => {
+    setShowFailureModal(false);
+    setFailureReason('');
+    setOrderToFail(null);
+  };
+
+  const handleFailureSubmit = async () => {
+    if (!failureReason.trim()) {
+      toast.error('Vui lòng nhập lý do thất bại');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      
+      await axios.put(`${BASE_URL}/api/shipper/orders/${orderToFail._id}/status`, 
+        {
+          status: 'failed',
+          statusDescription: failureReason
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      handleCloseFailureModal();
+      fetchMyOrders();
+      toast.success('Đã cập nhật trạng thái đơn hàng');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Lỗi khi cập nhật trạng thái đơn hàng');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -197,18 +259,26 @@ const MyOrders = () => {
                         {order.status === 'accepted' && (
                           <button 
                             className="btn btn-warning btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'in-progress')}
+                            onClick={() => handleStatusChange(order._id, 'in-progress')}
                           >
                             Bắt đầu giao
                           </button>
                         )}
                         {order.status === 'in-progress' && (
-                          <button 
-                            className="btn btn-success btn-sm mb-2 w-100"
-                            onClick={() => updateOrderStatus(order._id, 'completed')}
-                          >
-                            Hoàn thành
-                          </button>
+                          <>
+                            <button 
+                              className="btn btn-success btn-sm mb-2 w-100"
+                              onClick={() => handleStatusChange(order._id, 'completed')}
+                            >
+                              Giao thành công
+                            </button>
+                            <button 
+                              className="btn btn-danger btn-sm mb-2 w-100"
+                              onClick={() => handleShowFailureModal(order)}
+                            >
+                              Giao hàng thất bại
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -264,12 +334,20 @@ const MyOrders = () => {
                   <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
                 </div>
                 {selectedOrder.status === 'completed' && (
-                  <div className="mb-3">
-                    <p className="mb-1">
-                      <strong>Thời gian hoàn thành:</strong>
-                    </p>
-                    <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
-                  </div>
+                  <>
+                    <div className="mb-3">
+                      <p className="mb-1">
+                        <strong>Thời gian hoàn thành:</strong>
+                      </p>
+                      <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
+                    </div>
+                    <div className="mb-3">
+                      <p className="mb-1">
+                        <strong>Trạng thái hoàn thành:</strong>
+                      </p>
+                      <p className="text-muted">{selectedOrder.statusDescription || 'Giao thành công'}</p>
+                    </div>
+                  </>
                 )}
                 
                 <h6 className="fw-bold text-primary mb-3">Thông tin thanh toán</h6>
@@ -312,6 +390,35 @@ const MyOrders = () => {
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseOrderDetailModal}>
             Đóng
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal nhập lý do thất bại */}
+      <Modal show={showFailureModal} onHide={handleCloseFailureModal} centered>
+        <Modal.Header closeButton className="bg-danger text-white">
+          <Modal.Title>Lý do giao hàng thất bại</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group>
+              <Form.Label>Vui lòng nhập lý do thất bại:</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={failureReason}
+                onChange={(e) => setFailureReason(e.target.value)}
+                placeholder="Nhập lý do thất bại..."
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseFailureModal}>
+            Hủy
+          </Button>
+          <Button variant="danger" onClick={handleFailureSubmit}>
+            Xác nhận
           </Button>
         </Modal.Footer>
       </Modal>

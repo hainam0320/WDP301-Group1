@@ -26,8 +26,16 @@ const reportSchema = new mongoose.Schema({
         required: true 
     },
     image: { 
-        type: String, // URL/path to the image
-        default: ''
+        type: String,
+        default: '',
+        get: function(v) {
+            if (!v) return [];
+            return Array.isArray(v) ? v : v.split(',').filter(img => img.trim());
+        },
+        set: function(v) {
+            if (!v) return '';
+            return Array.isArray(v) ? v.join(',') : v;
+        }
     },
     admin_note: { 
         type: String,
@@ -39,7 +47,9 @@ const reportSchema = new mongoose.Schema({
         default: 'pending'
     }
 }, {
-    timestamps: true // adds createdAt and updatedAt fields
+    timestamps: true, // adds createdAt and updatedAt fields
+    toJSON: { getters: true }, // Enable getters when converting to JSON
+    toObject: { getters: true } // Enable getters when converting to object
 });
 
 module.exports = mongoose.model('Report', reportSchema);

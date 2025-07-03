@@ -7,7 +7,8 @@ const {
   getOrders,
   getRevenue,
   deleteUser,
-  updateUserStatus
+  updateUserStatus,
+  getShipperOrders
 } = require('../controller/adminController');
 
 // Protect all routes and require admin role
@@ -24,6 +25,9 @@ router.patch('/users/:id/status', updateUserStatus);
 
 // Order management
 router.get('/orders', getOrders);
+
+// Get shipper orders with filters
+router.get('/shipper/:id/orders', getShipperOrders);
 
 // Revenue reports
 router.get('/revenue', getRevenue);

@@ -17,7 +17,20 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+        files: 5 // Maximum 5 files at once
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept images only
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+            return cb(new Error('Chỉ chấp nhận file ảnh!'), false);
+        }
+        cb(null, true);
+    }
+});
 
 // Create a new report (requires user authentication)
 router.post('/', protect, authorize('user'), reportController.createReport);
@@ -27,43 +40,46 @@ router.get('/all', protect, authorize('admin'), reportController.getAllReports);
 
 // Get reports by authenticated user
 router.get('/my-reports', protect, authorize('user'), async (req, res) => {
-  try {
-    const reports = await Report.find({ reporterID: req.user._id })
-      .populate('order_id')
-      .populate('reported_user_id', 'fullName')
-      .sort({ createdAt: -1 });
+    try {
+        const reports = await Report.find({ reporterID: req.user._id })
+            .populate('order_id')
+            .populate('reported_user_id', 'fullName')
+            .sort({ createdAt: -1 });
 
-    res.json({ reports });
-  } catch (error) {
-    console.error('Error fetching user reports:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
+        res.json({ reports });
+    } catch (error) {
+        console.error('Error fetching user reports:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 
 // Update report status (requires admin authentication)
 router.patch('/:id/status', protect, authorize('admin'), reportController.updateReportStatus);
 
-// Upload file route
-router.post('/upload', protect, upload.single('file'), (req, res) => {
+// Update report with additional information (requires user authentication)
+router.put('/:id', protect, authorize('user'), reportController.updateReport);
+
+// Upload file route - now supports multiple files
+router.post('/upload', protect, upload.array('files', 5), (req, res) => {
     try {
-        if (!req.file) {
+        if (!req.files || req.files.length === 0) {
             return res.status(400).json({ 
                 success: false,
-                message: 'No file uploaded' 
+                message: 'Không có file nào được tải lên' 
             });
         }
         
-        // Return the relative file path
-        const filePath = `uploads/${req.file.filename}`;
+        // Return the relative file paths
+        const filePaths = req.files.map(file => `uploads/${file.filename}`);
         res.json({ 
             success: true,
-            filePath 
+            filePaths 
         });
     } catch (error) {
-        console.error('Error uploading file:', error);
+        console.error('Error uploading files:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error uploading file',
+            message: error.message || 'Lỗi khi tải file lên',
             error: error.message 
         });
     }

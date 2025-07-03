@@ -1,5 +1,22 @@
 const Report = require('../model/reportModel');
 const Order = require('../model/orderModel');
+const Notification = require('../model/notificationModel');
+const fs = require('fs').promises;
+const path = require('path');
+
+// Helper function to delete image files
+const deleteImageFiles = async (imagePaths) => {
+    if (!imagePaths) return;
+    
+    const images = imagePaths.split(',').filter(img => img.trim());
+    for (const imagePath of images) {
+        try {
+            await fs.unlink(path.join(__dirname, '..', imagePath));
+        } catch (error) {
+            console.error(`Error deleting image ${imagePath}:`, error);
+        }
+    }
+};
 
 // Create a new report
 exports.createReport = async (req, res) => {
@@ -135,6 +152,7 @@ exports.getUserReports = async (req, res) => {
 exports.updateReportStatus = async (req, res) => {
     try {
         const { status, admin_note } = req.body;
+        const { io, connectedUsers } = req;
 
         if (!status) {
             return res.status(400).json({ message: 'Vui lòng cung cấp trạng thái báo cáo' });
@@ -167,6 +185,30 @@ exports.updateReportStatus = async (req, res) => {
             return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
         }
 
+        // Tạo và lưu thông báo
+        const notification = new Notification({
+            recipient: updatedReport.reporterID._id,
+            recipientModel: 'User',
+            title: 'Báo cáo của bạn đã được cập nhật',
+            message: `Trạng thái mới: ${status}. ${admin_note ? `Phản hồi: ${admin_note}` : ''}`,
+            type: 'REPORT_UPDATED',
+            link: `/my-reports` // Hoặc có thể là một link chi tiết hơn
+        });
+        await notification.save();
+
+        // Gửi thông báo cho người dùng đã tạo báo cáo
+        const reporterId = updatedReport.reporterID._id.toString();
+        const userSocketId = (connectedUsers && connectedUsers.user) ? connectedUsers.user[reporterId] : null;
+
+        if (userSocketId) {
+            io.to(userSocketId).emit('notification', {
+                title: 'Báo cáo của bạn đã được cập nhật',
+                message: `Trạng thái mới: ${status}. ${admin_note ? `Phản hồi: ${admin_note}` : ''}`,
+                reportId: updatedReport._id,
+                type: 'REPORT_UPDATED'
+            });
+        }
+
         res.json({
             message: 'Cập nhật trạng thái báo cáo thành công',
             report: updatedReport
@@ -174,5 +216,84 @@ exports.updateReportStatus = async (req, res) => {
     } catch (error) {
         console.error('Error updating report status:', error);
         res.status(500).json({ message: 'Lỗi server khi cập nhật trạng thái báo cáo' });
+    }
+};
+
+// Update report (for user to add additional information)
+exports.updateReport = async (req, res) => {
+    try {
+        const reportId = req.params.id;
+        const { type, description, image, removedImages } = req.body;
+        const userId = req.user._id;
+
+        console.log('Update report request:', { reportId, type, description, image, removedImages });
+
+        // Find the existing report
+        const existingReport = await Report.findById(reportId);
+        if (!existingReport) {
+            return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
+        }
+
+        // Check if the user owns this report
+        if (existingReport.reporterID.toString() !== userId.toString()) {
+            return res.status(403).json({ message: 'Bạn không có quyền cập nhật báo cáo này' });
+        }
+
+        // Check if report can still be updated
+        if (existingReport.status === 'resolved' || existingReport.status === 'rejected') {
+            return res.status(400).json({ 
+                message: 'Không thể cập nhật báo cáo đã được giải quyết hoặc từ chối' 
+            });
+        }
+
+        // Handle removed images if any
+        if (removedImages && Array.isArray(removedImages) && removedImages.length > 0) {
+            await deleteImageFiles(removedImages.join(','));
+        }
+
+        // Prepare update data
+        const updateData = {
+            type: type || existingReport.type,
+            description: description || existingReport.description,
+            status: 'pending', // Reset status to pending when user adds new information
+            updatedAt: Date.now()
+        };
+
+        // Handle image update
+        if (image !== undefined) {
+            updateData.image = Array.isArray(image) ? image.join(',') : image;
+        }
+
+        console.log('Update data:', updateData);
+
+        // Update the report
+        const updatedReport = await Report.findByIdAndUpdate(
+            reportId,
+            updateData,
+            { 
+                new: true,
+                runValidators: true 
+            }
+        ).populate('reporterID', 'fullName email')
+         .populate('reported_user_id', 'fullName email')
+         .populate('order_id');
+
+        if (!updatedReport) {
+            return res.status(404).json({ message: 'Không tìm thấy báo cáo để cập nhật' });
+        }
+
+        console.log('Updated report:', updatedReport);
+
+        res.json({
+            message: 'Cập nhật báo cáo thành công',
+            report: updatedReport
+        });
+
+    } catch (error) {
+        console.error('Error updating report:', error);
+        res.status(500).json({ 
+            message: 'Lỗi server khi cập nhật báo cáo',
+            error: error.message 
+        });
     }
 }; 

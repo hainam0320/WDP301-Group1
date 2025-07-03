@@ -33,7 +33,20 @@ const AvailableOrders = () => {
 
   useEffect(() => {
     fetchAvailableOrders();
-  }, []);
+
+    const handleNewOrder = (event) => {
+        console.log('Received new order event, refreshing list...');
+        fetchAvailableOrders();
+        // Optional: Add a more prominent sound or visual cue
+        new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e));
+    };
+
+    window.addEventListener('new_order_for_driver', handleNewOrder);
+
+    return () => {
+        window.removeEventListener('new_order_for_driver', handleNewOrder);
+    };
+  }, []); // The dependency array is empty, so fetchAvailableOrders is not recreated
 
   const acceptOrder = async (orderId) => {
     try {
