@@ -190,13 +190,37 @@ export const transactionAPI = {
   createBulkQRPayment: (transactionIds) => api.post('/transactions/qr/bulk/create', { transactionIds }),
 
   // Kiểm tra trạng thái thanh toán QR hàng loạt
-  checkBulkQRPaymentStatus: (bulkPaymentId) => api.get(`/transactions/qr/bulk/status/${bulkPaymentId}`),
+  checkBulkQRPaymentStatus: (bulkBillId) => api.get(`/transactions/qr/bulk/status/${bulkBillId}`),
 
   // Giả lập quét mã QR và thanh toán
   simulateQRPayment: (paymentCode) => api.post('/transactions/qr/simulate-payment', { paymentCode }),
 
   // Kiểm tra trạng thái thanh toán QR
-  checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`)
+  checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`),
+
+  // Lấy danh sách bulk bills của tài xế
+  getDriverBulkBills: () => api.get('/transactions/driver/bulk-bills'),
+
+  // Lấy chi tiết bulk bill của tài xế
+  getDriverBulkBillDetails: (bulkBillId) => api.get(`/transactions/driver/bulk-bills/${bulkBillId}`),
+
+  // Admin - Lấy danh sách bulk bills
+  getAdminBulkBills: (filters = {}) => api.get('/transactions/admin/bulk-bills', { params: filters }),
+
+  // Admin - Xác nhận thanh toán bulk bill
+  adminConfirmBulkPayment: (bulkBillId, data) => api.post(`/transactions/admin/bulk-bills/${bulkBillId}/confirm`, data),
+
+  // Admin - Lấy chi tiết bulk bill
+  getAdminBulkBillDetails: (bulkBillId) => api.get(`/transactions/admin/bulk-bills/${bulkBillId}`),
+
+  // Admin - Lấy danh sách hoa hồng
+  getAdminCommissions: (filters = {}) => api.get('/transactions/admin/commissions', { params: filters }),
+
+  // Admin - Lấy thống kê hoa hồng
+  getAdminCommissionStats: () => api.get('/transactions/admin/commission-stats'),
+
+  // Admin - Lấy thống kê hoa hồng theo tài xế
+  getDriverCommissionStats: () => api.get('/transactions/admin/driver-commission-stats')
 };
 
 export const notificationAPI = {
@@ -207,7 +231,7 @@ export const notificationAPI = {
   markAsRead: (notificationId) => api.patch(`/notifications/${notificationId}/read`),
 
   // Đánh dấu tất cả là đã đọc
-  markAllAsRead: () => api.patch('/notifications/read-all'),
+  markAllAsRead: () => api.patch('/notifications/read-all')
 };
 
 // Admin Commission Management APIs

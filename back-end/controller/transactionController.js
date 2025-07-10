@@ -1,6 +1,7 @@
 const CompanyTransaction = require("../model/companyTransisModel");
 const TotalEarning = require("../model/totalEarning");
 const QRPayment = require("../model/qrPaymentModel");
+const BulkBill = require("../model/bulkBillModel");
 const qrcode = require('qrcode');
 const crypto = require('crypto');
 const Driver = require('../model/driverModel');
@@ -302,37 +303,25 @@ exports.createQRPayment = async (req, res) => {
   }
 };
 
-// Giả lập quét mã QR và thanh toán
+// Xử lý thanh toán QR
 exports.simulateQRPayment = async (req, res) => {
   try {
     const { paymentCode } = req.body;
-    console.log('Payment code received:', paymentCode);
-
-    // Giải mã dữ liệu thanh toán từ base64
-    let paymentData;
-    try {
-      const decodedString = Buffer.from(paymentCode, 'base64').toString();
-      paymentData = JSON.parse(decodedString);
-      console.log('Decoded payment data:', paymentData);
-    } catch (error) {
-      console.error("Lỗi giải mã payment code:", error);
-      return res.status(400).json({ message: "Mã thanh toán không hợp lệ." });
-    }
-
-    // Kiểm tra dữ liệu bắt buộc
-    if ((!paymentData.transactionId && !paymentData.transactionIds) || !paymentData.amount) {
-      return res.status(400).json({ message: "Dữ liệu thanh toán không hợp lệ." });
-    }
+    const paymentData = JSON.parse(Buffer.from(paymentCode, 'base64').toString());
 
     // Xử lý thanh toán hàng loạt
-    if (paymentData.transactionIds) {
-      // Tìm QR payment cho bulk payment
-      const qrPayment = await QRPayment.findOne({
-        bulkTransactionIds: { $in: paymentData.transactionIds },
-        status: 'pending'
-      });
+    if (paymentData.bulkBillId) {
+      // Tìm bill tổng
+      const bulkBill = await BulkBill.findById(paymentData.bulkBillId)
+        .populate('transactions');
 
-      if (!qrPayment) {
+      if (!bulkBill) {
+        return res.status(404).json({ message: "Không tìm thấy thông tin thanh toán." });
+      }
+
+      // Tìm QR payment
+      const qrPayment = await QRPayment.findById(bulkBill.qr_payment_id);
+      if (!qrPayment || qrPayment.status !== 'pending') {
         return res.status(404).json({ message: "Không tìm thấy thông tin thanh toán hoặc mã QR đã hết hạn." });
       }
 
@@ -341,16 +330,21 @@ exports.simulateQRPayment = async (req, res) => {
         qrPayment.status = 'expired';
         await qrPayment.save();
         return res.status(400).json({ message: "Mã QR đã hết hạn." });
-    }
+      }
 
       // Cập nhật trạng thái QR payment
       qrPayment.status = 'completed';
       qrPayment.completedAt = new Date();
       await qrPayment.save();
 
-      // Cập nhật trạng thái các giao dịch thành 'paid' (chờ admin xác nhận)
+      // Cập nhật trạng thái bill tổng và các transaction
+      bulkBill.status = 'paid';
+      bulkBill.paid_at = new Date();
+      await bulkBill.save();
+
+      // Cập nhật trạng thái các transaction thành 'paid'
       await CompanyTransaction.updateMany(
-        { _id: { $in: paymentData.transactionIds } },
+        { _id: { $in: bulkBill.transactions } },
         { 
           $set: { 
             status: 'paid',
@@ -361,51 +355,115 @@ exports.simulateQRPayment = async (req, res) => {
 
       res.json({
         message: "Thanh toán thành công.",
-        transactions: paymentData.transactionIds,
-        amount: paymentData.amount,
-        paidAt: qrPayment.completedAt
+        bulkBillId: bulkBill._id,
+        amount: bulkBill.total_amount,
+        paidAt: bulkBill.paid_at
       });
     } else {
-      // Xử lý thanh toán đơn lẻ
-      const qrPayment = await QRPayment.findOne({
-        transactionId: paymentData.transactionId,
-        status: 'pending'
-      });
+      // Xử lý thanh toán đơn lẻ (giữ nguyên code cũ)
+      const { paymentCode } = req.body;
+      console.log('Payment code received:', paymentCode);
 
-      if (!qrPayment) {
-        return res.status(404).json({ message: "Không tìm thấy thông tin thanh toán hoặc mã QR đã hết hạn." });
+      // Giải mã dữ liệu thanh toán từ base64
+      let paymentData;
+      try {
+        const decodedString = Buffer.from(paymentCode, 'base64').toString();
+        paymentData = JSON.parse(decodedString);
+        console.log('Decoded payment data:', paymentData);
+      } catch (error) {
+        console.error("Lỗi giải mã payment code:", error);
+        return res.status(400).json({ message: "Mã thanh toán không hợp lệ." });
       }
 
-      // Kiểm tra thời gian hết hạn
-      if (new Date() > qrPayment.expiryTime) {
-        qrPayment.status = 'expired';
-        await qrPayment.save();
-        return res.status(400).json({ message: "Mã QR đã hết hạn." });
+      // Kiểm tra dữ liệu bắt buộc
+      if ((!paymentData.transactionId && !paymentData.transactionIds) || !paymentData.amount) {
+        return res.status(400).json({ message: "Dữ liệu thanh toán không hợp lệ." });
       }
 
-      // Cập nhật trạng thái QR payment
-      qrPayment.status = 'completed';
-      qrPayment.completedAt = new Date();
-      await qrPayment.save();
+      // Xử lý thanh toán hàng loạt
+      if (paymentData.transactionIds) {
+        // Tìm QR payment cho bulk payment
+        const qrPayment = await QRPayment.findOne({
+          bulkTransactionIds: { $in: paymentData.transactionIds },
+          status: 'pending'
+        });
 
-      // Cập nhật trạng thái giao dịch thành 'paid' (chờ admin xác nhận)
-      const transaction = await CompanyTransaction.findById(paymentData.transactionId);
-      if (!transaction) {
-        return res.status(404).json({ message: "Không tìm thấy giao dịch." });
-      }
-
-      transaction.status = 'paid';
-    transaction.paid_at = new Date();
-    await transaction.save();
-
-      res.json({
-        message: "Thanh toán thành công.",
-        transaction: {
-          id: transaction._id,
-          amount: transaction.amount,
-          paidAt: transaction.paid_at
+        if (!qrPayment) {
+          return res.status(404).json({ message: "Không tìm thấy thông tin thanh toán hoặc mã QR đã hết hạn." });
         }
-      });
+
+        // Kiểm tra thời gian hết hạn
+        if (new Date() > qrPayment.expiryTime) {
+          qrPayment.status = 'expired';
+          await qrPayment.save();
+          return res.status(400).json({ message: "Mã QR đã hết hạn." });
+        }
+
+        // Cập nhật trạng thái QR payment
+        qrPayment.status = 'completed';
+        qrPayment.completedAt = new Date();
+        await qrPayment.save();
+
+        // Cập nhật trạng thái giao dịch thành 'paid' (chờ admin xác nhận)
+        const transaction = await CompanyTransaction.findById(paymentData.transactionId);
+        if (!transaction) {
+          return res.status(404).json({ message: "Không tìm thấy giao dịch." });
+        }
+
+        transaction.status = 'paid';
+      transaction.paid_at = new Date();
+      await transaction.save();
+
+        res.json({
+          message: "Thanh toán thành công.",
+          transaction: {
+            id: transaction._id,
+            amount: transaction.amount,
+            paidAt: transaction.paid_at
+          }
+        });
+      } else {
+        // Xử lý thanh toán đơn lẻ
+        const qrPayment = await QRPayment.findOne({
+          transactionId: paymentData.transactionId,
+          status: 'pending'
+        });
+
+        if (!qrPayment) {
+          return res.status(404).json({ message: "Không tìm thấy thông tin thanh toán hoặc mã QR đã hết hạn." });
+        }
+
+        // Kiểm tra thời gian hết hạn
+        if (new Date() > qrPayment.expiryTime) {
+          qrPayment.status = 'expired';
+          await qrPayment.save();
+          return res.status(400).json({ message: "Mã QR đã hết hạn." });
+        }
+
+        // Cập nhật trạng thái QR payment
+        qrPayment.status = 'completed';
+        qrPayment.completedAt = new Date();
+        await qrPayment.save();
+
+        // Cập nhật trạng thái giao dịch thành 'paid' (chờ admin xác nhận)
+        const transaction = await CompanyTransaction.findById(paymentData.transactionId);
+        if (!transaction) {
+          return res.status(404).json({ message: "Không tìm thấy giao dịch." });
+        }
+
+        transaction.status = 'paid';
+      transaction.paid_at = new Date();
+      await transaction.save();
+
+        res.json({
+          message: "Thanh toán thành công.",
+          transaction: {
+            id: transaction._id,
+            amount: transaction.amount,
+            paidAt: transaction.paid_at
+          }
+        });
+      }
     }
   } catch (error) {
     console.error("Lỗi thanh toán:", error);
@@ -444,6 +502,7 @@ exports.createBulkQRPayment = async (req, res) => {
   try {
     console.log('=== CREATE BULK QR PAYMENT ===');
     const { transactionIds } = req.body;
+    const driverId = req.user._id;
     console.log('Transaction IDs:', transactionIds);
 
     if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
@@ -462,10 +521,19 @@ exports.createBulkQRPayment = async (req, res) => {
 
     const totalAmount = transactions.reduce((sum, trans) => sum + trans.amount, 0);
 
+    // Tạo bill tổng
+    const bulkBill = new BulkBill({
+      driverId,
+      transactions: transactionIds,
+      total_amount: totalAmount,
+      status: 'pending'
+    });
+    await bulkBill.save();
+
     // Tạo dữ liệu thanh toán
     const paymentData = {
       amount: totalAmount,
-      transactionIds: transactionIds,
+      bulkBillId: bulkBill._id,
       timestamp: Date.now()
     };
     console.log('Payment data:', paymentData);
@@ -483,7 +551,7 @@ exports.createBulkQRPayment = async (req, res) => {
       // Lưu thông tin QR payment
       console.log('Creating QR payment record...');
       const qrPayment = new QRPayment({
-        transactionId: transactionIds[0], // Sử dụng ID đầu tiên làm reference
+        bulkBillId: bulkBill._id,
         qrCode: qrCodeData,
         paymentCode: paymentCode,
         amount: totalAmount,
@@ -493,15 +561,16 @@ exports.createBulkQRPayment = async (req, res) => {
       await qrPayment.save();
       console.log('QR payment saved:', qrPayment);
 
-      // KHÔNG cập nhật trạng thái các giao dịch thành 'processing'
-      // Giữ nguyên trạng thái 'pending' cho đến khi thanh toán thành công
+      // Cập nhật QR payment ID vào bill tổng
+      bulkBill.qr_payment_id = qrPayment._id;
+      await bulkBill.save();
       
       res.json({
         qrCode: qrCodeData,
         paymentCode: paymentCode,
         amount: totalAmount,
         expiryTime: qrPayment.expiryTime,
-        bulkPaymentId: qrPayment._id
+        bulkBillId: bulkBill._id
       });
 
     } catch (error) {
@@ -545,6 +614,75 @@ exports.checkBulkQRPaymentStatus = async (req, res) => {
   } catch (error) {
     console.error("Lỗi kiểm tra trạng thái:", error);
     res.status(500).json({ message: "Lỗi server." });
+  }
+};
+
+// Xác nhận thanh toán hàng loạt (cho admin)
+exports.adminConfirmBulkPayment = async (req, res) => {
+  try {
+    const { bulkBillId } = req.params;
+    const { status, remarks } = req.body;
+    const adminId = req.user._id;
+
+    // Kiểm tra bill tổng
+    const bulkBill = await BulkBill.findById(bulkBillId)
+      .populate('transactions');
+      
+    if (!bulkBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy thông tin thanh toán'
+      });
+    }
+
+    // Chỉ cho phép xác nhận các bill đã thanh toán (status = 'paid')
+    if (bulkBill.status !== 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bill không ở trạng thái chờ xác nhận'
+      });
+    }
+
+    // Chỉ cho phép chuyển sang trạng thái 'confirmed' hoặc 'rejected'
+    if (!['confirmed', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái không hợp lệ'
+      });
+    }
+
+    // Cập nhật trạng thái bill tổng
+    bulkBill.status = status;
+    bulkBill.confirmed_at = new Date();
+    bulkBill.confirmed_by = adminId;
+    bulkBill.remarks = remarks;
+    await bulkBill.save();
+
+    // Cập nhật trạng thái các transaction
+    await CompanyTransaction.updateMany(
+      { _id: { $in: bulkBill.transactions } },
+      { 
+        $set: { 
+          status: status,
+          confirmed_at: new Date(),
+          confirmed_by: adminId,
+          remarks: remarks
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: status === 'confirmed' ? 'Đã xác nhận thanh toán' : 'Đã từ chối thanh toán',
+      data: bulkBill
+    });
+  } catch (error) {
+    console.error('Error confirming bulk payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xác nhận thanh toán',
+      error: error.message
+    });
   }
 };
 
@@ -946,6 +1084,418 @@ exports.getDriversList = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error getting drivers list',
+      error: error.message
+    });
+  }
+};
+
+// Lấy danh sách bill tổng của tài xế
+exports.getDriverBulkBills = async (req, res) => {
+  try {
+    const driverId = req.user._id;
+
+    const bills = await BulkBill.find({ driverId })
+      .populate('transactions')
+      .sort('-createdAt');
+
+    res.json({
+      success: true,
+      bills: bills
+    });
+  } catch (error) {
+    console.error('Error fetching bulk bills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bill tổng',
+      error: error.message
+    });
+  }
+};
+
+// Lấy danh sách bill tổng cho admin
+exports.getAdminBulkBills = async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      driverName,
+      status
+    } = req.query;
+
+    // Xây dựng query filters
+    let filters = {};
+    
+    if (startDate || endDate) {
+      filters.createdAt = {};
+      if (startDate) filters.createdAt.$gte = new Date(startDate);
+      if (endDate) filters.createdAt.$lte = new Date(endDate);
+    }
+    
+    if (status) filters.status = status;
+
+    // Lấy danh sách bulk bills
+    let query = BulkBill.find(filters)
+      .populate('driverId', 'fullName email phone')
+      .populate('qr_payment_id')
+      .sort('-createdAt');
+
+    // Nếu có filter theo tên tài xế
+    if (driverName) {
+      const driverRegex = new RegExp(driverName, 'i');
+      query = query.populate({
+        path: 'driverId',
+        match: { fullName: { $regex: driverRegex } }
+      });
+    }
+
+    let bills = await query;
+
+    // Lọc lại bills nếu có filter theo tên tài xế
+    if (driverName) {
+      bills = bills.filter(bill => bill.driverId);
+    }
+
+    // Tính toán thống kê
+    const stats = {
+      totalAmount: bills.reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      pendingAmount: bills.filter(bill => bill.status === 'pending').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      paidAmount: bills.filter(bill => bill.status === 'paid').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      confirmedAmount: bills.filter(bill => bill.status === 'confirmed').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      rejectedAmount: bills.filter(bill => bill.status === 'rejected').reduce((sum, bill) => sum + (bill.total_amount || 0), 0)
+    };
+
+    res.json({
+      success: true,
+      bills,
+      stats
+    });
+  } catch (error) {
+    console.error('Error getting admin bulk bills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bulk bills',
+      error: error.message
+    });
+  }
+};
+
+// Admin - Lấy danh sách bulk bills
+exports.getAdminBulkBills = async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      driverName,
+      status
+    } = req.query;
+
+    // Xây dựng query filters
+    let filters = {};
+    
+    if (startDate || endDate) {
+      filters.createdAt = {};
+      if (startDate) filters.createdAt.$gte = new Date(startDate);
+      if (endDate) filters.createdAt.$lte = new Date(endDate);
+    }
+    
+    if (status) filters.status = status;
+
+    // Lấy danh sách bulk bills
+    let query = BulkBill.find(filters)
+      .populate('driverId', 'fullName email phone')
+      .populate('qr_payment_id')
+      .sort('-createdAt');
+
+    // Nếu có filter theo tên tài xế
+    if (driverName) {
+      const driverRegex = new RegExp(driverName, 'i');
+      query = query.populate({
+        path: 'driverId',
+        match: { fullName: { $regex: driverRegex } }
+      });
+    }
+
+    let bills = await query;
+
+    // Lọc lại bills nếu có filter theo tên tài xế
+    if (driverName) {
+      bills = bills.filter(bill => bill.driverId);
+    }
+
+    // Tính toán thống kê
+    const stats = {
+      totalAmount: bills.reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      pendingAmount: bills.filter(bill => bill.status === 'pending').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      paidAmount: bills.filter(bill => bill.status === 'paid').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      confirmedAmount: bills.filter(bill => bill.status === 'confirmed').reduce((sum, bill) => sum + (bill.total_amount || 0), 0),
+      rejectedAmount: bills.filter(bill => bill.status === 'rejected').reduce((sum, bill) => sum + (bill.total_amount || 0), 0)
+    };
+
+    res.json({
+      success: true,
+      bills,
+      stats
+    });
+  } catch (error) {
+    console.error('Error getting admin bulk bills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bulk bills',
+      error: error.message
+    });
+  }
+};
+
+// Admin - Lấy chi tiết bulk bill
+exports.getAdminBulkBillDetails = async (req, res) => {
+  try {
+    const { bulkBillId } = req.params;
+
+    const bill = await BulkBill.findById(bulkBillId)
+      .populate('driverId', 'fullName email phone')
+      .populate('qr_payment_id')
+      .populate({
+        path: 'transactions',
+        populate: {
+          path: 'total_earning_id',
+          populate: {
+            path: 'driverAssigmentId',
+            populate: {
+              path: 'orderId'
+            }
+          }
+        }
+      });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bulk bill'
+      });
+    }
+
+    res.json({
+      success: true,
+      bill
+    });
+  } catch (error) {
+    console.error('Error getting bulk bill details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy chi tiết bulk bill',
+      error: error.message
+    });
+  }
+};
+
+// Admin - Xác nhận thanh toán bulk bill
+exports.adminConfirmBulkPayment = async (req, res) => {
+  try {
+    const { bulkBillId } = req.params;
+    const { status, remarks } = req.body;
+    const adminId = req.user._id;
+
+    // Kiểm tra bulk bill
+    const bill = await BulkBill.findById(bulkBillId);
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bulk bill'
+      });
+    }
+
+    // Chỉ cho phép xác nhận các bill đã thanh toán (status = 'paid')
+    if (bill.status !== 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bill không ở trạng thái chờ xác nhận'
+      });
+    }
+
+    // Chỉ cho phép chuyển sang trạng thái 'confirmed' hoặc 'rejected'
+    if (!['confirmed', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái không hợp lệ'
+      });
+    }
+
+    // Cập nhật trạng thái bulk bill
+    bill.status = status;
+    bill.confirmed_at = new Date();
+    bill.confirmed_by = adminId;
+    bill.remarks = remarks;
+    await bill.save();
+
+    // Cập nhật trạng thái các giao dịch con
+    await CompanyTransaction.updateMany(
+      { _id: { $in: bill.transactions } },
+      { 
+        $set: { 
+          status,
+          confirmed_at: new Date(),
+          confirmed_by: adminId,
+          remarks
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: status === 'confirmed' ? 'Đã xác nhận thanh toán' : 'Đã từ chối thanh toán',
+      data: bill
+    });
+  } catch (error) {
+    console.error('Error confirming bulk payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xác nhận thanh toán',
+      error: error.message
+    });
+  }
+};
+
+// Cập nhật trạng thái thanh toán QR
+exports.updateQRPaymentStatus = async (req, res) => {
+    try {
+        const { paymentCode } = req.params;
+        const qrPayment = await QRPayment.findOne({ paymentCode });
+        
+        if (!qrPayment) {
+            return res.status(404).json({ message: "Không tìm thấy giao dịch." });
+        }
+
+        // Cập nhật trạng thái QR payment
+        qrPayment.status = 'completed';
+        qrPayment.completedAt = new Date();
+        await qrPayment.save();
+
+        if (qrPayment.bulkPayment) {
+            // Cập nhật trạng thái bill tổng
+            const bulkBill = await BulkBill.findById(qrPayment.bulkBillId);
+            if (bulkBill) {
+                bulkBill.status = 'paid';
+                bulkBill.paid_at = new Date();
+                await bulkBill.save();
+
+                // Cập nhật trạng thái tất cả các giao dịch trong bill
+                await CompanyTransaction.updateMany(
+                    { _id: { $in: qrPayment.bulkTransactionIds } },
+                    { 
+                        $set: { 
+                            status: 'paid',
+                            paid_at: new Date(),
+                            qr_payment_id: qrPayment._id,
+                            bulk_bill_id: bulkBill._id
+                        }
+                    }
+                );
+            }
+        } else {
+            // Cập nhật trạng thái giao dịch đơn lẻ
+            const transaction = await CompanyTransaction.findById(qrPayment.transactionId);
+            if (transaction) {
+                transaction.status = 'paid';
+                transaction.paid_at = new Date();
+                transaction.qr_payment_id = qrPayment._id;
+                await transaction.save();
+            }
+        }
+
+        res.json({ 
+            success: true,
+            message: "Cập nhật trạng thái thanh toán thành công.",
+            status: 'completed'
+        });
+    } catch (error) {
+        console.error("Lỗi cập nhật trạng thái thanh toán:", error);
+        res.status(500).json({ message: "Lỗi server." });
+    }
+};
+
+// Driver - Lấy danh sách bulk bills
+exports.getDriverBulkBills = async (req, res) => {
+  try {
+    const driverId = req.user._id;
+
+    // Lấy danh sách bulk bills của driver
+    const bills = await BulkBill.find({ driverId })
+      .populate('qr_payment_id')
+      .sort('-createdAt');
+
+    res.json({
+      success: true,
+      bills
+    });
+  } catch (error) {
+    console.error('Error getting driver bulk bills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bulk bills',
+      error: error.message
+    });
+  }
+};
+
+// Driver - Lấy chi tiết bulk bill
+exports.getDriverBulkBillDetails = async (req, res) => {
+  try {
+    const { bulkBillId } = req.params;
+    const driverId = req.user._id;
+
+    const bill = await BulkBill.findOne({ _id: bulkBillId, driverId })
+      .populate('qr_payment_id')
+      .populate({
+        path: 'transactions',
+        select: '_id amount status createdAt paid_at confirmed_at remarks',
+        populate: {
+          path: 'total_earning_id',
+          select: 'amount',
+          populate: {
+            path: 'driverAssigmentId',
+            select: 'orderId',
+            populate: {
+              path: 'orderId',
+              select: 'orderCode'
+            }
+          }
+        }
+      });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bulk bill'
+      });
+    }
+
+    res.json({
+      success: true,
+      bill: {
+        _id: bill._id,
+        total_amount: bill.total_amount,
+        status: bill.status,
+        createdAt: bill.createdAt,
+        paid_at: bill.paid_at,
+        confirmed_at: bill.confirmed_at,
+        remarks: bill.remarks,
+        transactions: bill.transactions.map(trans => ({
+          _id: trans._id,
+          amount: trans.amount,
+          status: trans.status,
+          createdAt: trans.createdAt,
+          paid_at: trans.paid_at,
+          confirmed_at: trans.confirmed_at,
+          remarks: trans.remarks,
+          order_code: trans.total_earning_id?.driverAssigmentId?.orderId?.orderCode
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error getting bulk bill details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy chi tiết bulk bill',
       error: error.message
     });
   }
