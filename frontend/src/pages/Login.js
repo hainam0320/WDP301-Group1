@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
+import axios from 'axios'; // Added for forgot password flow
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -12,6 +13,13 @@ function Login() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStep, setForgotStep] = useState(1); // 1: nhập email, 2: nhập mã + mật khẩu mới
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -50,6 +58,35 @@ function Login() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleSendForgotCode = async (e) => {
+    e.preventDefault();
+    setForgotMsg('');
+    try {
+      await axios.post('http://localhost:9999/api/users/forgot-password/send', { email: forgotEmail });
+      setForgotStep(2);
+      setForgotMsg('Đã gửi mã xác thực về email.');
+    } catch (err) {
+      setForgotMsg(err.response?.data?.message || 'Lỗi gửi mã');
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setForgotMsg('');
+    try {
+      await axios.post('http://localhost:9999/api/users/forgot-password/reset', {
+        email: forgotEmail,
+        code: forgotCode,
+        newPassword: forgotNewPass
+      });
+      setForgotMsg('Đặt lại mật khẩu thành công! Bạn có thể đăng nhập lại.');
+      setShowForgot(false);
+      setForgotStep(1);
+    } catch (err) {
+      setForgotMsg(err.response?.data?.message || 'Lỗi đặt lại mật khẩu');
+    }
   };
 
   // Styling
@@ -209,6 +246,32 @@ function Login() {
             </p>
           </div>
         </form>
+
+        <div className="text-center mt-3">
+          <a href="/forgot-password" className="btn btn-link">Quên mật khẩu?</a>
+        </div>
+
+        {showForgot && (
+          <div className="mt-4">
+            {forgotStep === 1 ? (
+              <form onSubmit={handleSendForgotCode}>
+                <label>Nhập email để nhận mã xác thực:</label>
+                <input type="email" className="form-control my-2" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required />
+                <button className="btn btn-primary" type="submit">Gửi mã</button>
+                {forgotMsg && <div className="text-info mt-2">{forgotMsg}</div>}
+              </form>
+            ) : (
+              <form onSubmit={handleResetPassword}>
+                <label>Mã xác thực:</label>
+                <input type="text" className="form-control my-2" value={forgotCode} onChange={e => setForgotCode(e.target.value)} required />
+                <label>Mật khẩu mới:</label>
+                <input type="password" className="form-control my-2" value={forgotNewPass} onChange={e => setForgotNewPass(e.target.value)} required />
+                <button className="btn btn-success" type="submit">Đặt lại mật khẩu</button>
+                {forgotMsg && <div className="text-info mt-2">{forgotMsg}</div>}
+              </form>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -177,64 +177,67 @@ const RideMap = ({ onLocationUpdate, pickupLocation, dropoffLocation, isSelectin
 
   return (
     <div className="position-relative">
-      <div className="mb-3">
-        <div className="input-group mb-2">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Điểm đón..."
-            value={pickupLocation}
-            onChange={(e) => {
-              onLocationUpdate('pickup', e.target.value, null);
-              handleSearch(e.target.value, 'pickup');
-            }}
-          />
-          <button
-            className={`btn ${isSelectingPoint === 'pickup' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => onSelectingPointChange(isSelectingPoint === 'pickup' ? null : 'pickup')}
-            title="Chọn điểm trên bản đồ"
-          >
-            <FaMapMarkerAlt />
-          </button>
-        </div>
-        {searchResults.pickup.length > 0 && (
-          <div className="position-absolute w-100 bg-white rounded border shadow z-3">
-            {searchResults.pickup.map((r, i) => (
-              <button key={i} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(r, 'pickup')}>
-                {r.display_name}
-              </button>
-            ))}
+      <div className="d-flex gap-3 mb-3 position-relative" style={{zIndex: 10}}>
+        <div className="flex-fill position-relative">
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Điểm đón..."
+              value={pickupLocation}
+              onChange={(e) => {
+                onLocationUpdate('pickup', e.target.value, null);
+                handleSearch(e.target.value, 'pickup');
+              }}
+            />
+            <button
+              className={`btn ${isSelectingPoint === 'pickup' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => onSelectingPointChange(isSelectingPoint === 'pickup' ? null : 'pickup')}
+              title="Chọn điểm trên bản đồ"
+            >
+              <FaMapMarkerAlt />
+            </button>
           </div>
-        )}
-
-        <div className="input-group mt-3">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Điểm đến..."
-            value={dropoffLocation}
-            onChange={(e) => {
-              onLocationUpdate('dropoff', e.target.value, null);
-              handleSearch(e.target.value, 'dropoff');
-            }}
-          />
-          <button
-            className={`btn ${isSelectingPoint === 'dropoff' ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => onSelectingPointChange(isSelectingPoint === 'dropoff' ? null : 'dropoff')}
-            title="Chọn điểm trên bản đồ"
-          >
-            <FaMapMarkerAlt />
-          </button>
+          {searchResults.pickup.length > 0 && (
+            <div className="position-absolute w-100 bg-white rounded border shadow z-3" style={{top: '100%', left: 0}}>
+              {searchResults.pickup.map((r, i) => (
+                <button key={i} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(r, 'pickup')}>
+                  {r.display_name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {searchResults.dropoff.length > 0 && (
-          <div className="position-absolute w-100 bg-white rounded border shadow z-3">
-            {searchResults.dropoff.map((r, i) => (
-              <button key={i} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(r, 'dropoff')}>
-                {r.display_name}
-              </button>
-            ))}
+        <div className="flex-fill position-relative">
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Điểm đến..."
+              value={dropoffLocation}
+              onChange={(e) => {
+                onLocationUpdate('dropoff', e.target.value, null);
+                handleSearch(e.target.value, 'dropoff');
+              }}
+            />
+            <button
+              className={`btn ${isSelectingPoint === 'dropoff' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => onSelectingPointChange(isSelectingPoint === 'dropoff' ? null : 'dropoff')}
+              title="Chọn điểm trên bản đồ"
+            >
+              <FaMapMarkerAlt />
+            </button>
           </div>
-        )}
+          {searchResults.dropoff.length > 0 && (
+            <div className="position-absolute w-100 bg-white rounded border shadow z-3" style={{top: '100%', left: 0}}>
+              {searchResults.dropoff.map((r, i) => (
+                <button key={i} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(r, 'dropoff')}>
+                  {r.display_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {isSelectingPoint && (

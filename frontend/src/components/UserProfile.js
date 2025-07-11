@@ -3,6 +3,7 @@ import { FaUser, FaCamera, FaArrowLeft } from 'react-icons/fa';
 import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import axios from 'axios';
 
 const UserProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +18,11 @@ const UserProfile = () => {
     avatar: ''
   });
 
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [showVerifyForm, setShowVerifyForm] = useState(false);
+  const [verifyCode, setVerifyCode] = useState('');
+  const [verifyMsg, setVerifyMsg] = useState('');
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,6 +35,7 @@ const UserProfile = () => {
         email: user.email || '',
         avatar: user.avatar || ''
       });
+      setEmailVerified(!!user.emailVerified);
     }
   }, []);
 
@@ -118,6 +125,51 @@ const UserProfile = () => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Gửi mã xác thực email
+  const handleSendVerifyCode = async () => {
+    setVerifyMsg('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        'http://localhost:9999/api/users/verify-email/send',
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setShowVerifyForm(true);
+      setVerifyMsg('Đã gửi mã xác thực về email.');
+    } catch (err) {
+      setVerifyMsg(err.response?.data?.message || 'Lỗi gửi mã xác thực');
+    }
+  };
+
+  // Xác nhận mã xác thực
+  const handleConfirmVerifyCode = async (e) => {
+    e.preventDefault();
+    setVerifyMsg('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        'http://localhost:9999/api/users/verify-email/confirm',
+        { code: verifyCode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Gọi lại API lấy user mới nhất
+      const res = await axios.get('http://localhost:9999/api/users/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Nếu API trả về user ở res.data.data:
+      // const user = res.data.data;
+      // Nếu trả về user ở res.data:
+      const user = res.data;
+      localStorage.setItem('user', JSON.stringify(user));
+      setEmailVerified(user.emailVerified); // <-- cập nhật đúng trạng thái từ backend
+      setShowVerifyForm(false);
+      setVerifyMsg('Xác thực email thành công!');
+    } catch (err) {
+      setVerifyMsg(err.response?.data?.message || 'Lỗi xác thực mã');
     }
   };
 
@@ -245,6 +297,33 @@ const UserProfile = () => {
                     required
                     readOnly
                   />
+                  <div className="mt-2">
+                    {emailVerified ? (
+                      <span className="badge bg-success">Đã xác thực</span>
+                    ) : (
+                      <>
+                        <span className="badge bg-warning text-dark">Chưa xác thực</span>
+                        <button type="button" className="btn btn-sm btn-outline-primary ms-2" onClick={handleSendVerifyCode} disabled={showVerifyForm}>
+                          Gửi mã xác thực
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {showVerifyForm && !emailVerified && (
+                    <form className="mt-2 d-flex align-items-center" onSubmit={handleConfirmVerifyCode}>
+                      <input
+                        type="text"
+                        className="form-control form-control-sm me-2"
+                        placeholder="Nhập mã xác thực"
+                        value={verifyCode}
+                        onChange={e => setVerifyCode(e.target.value)}
+                        required
+                        style={{maxWidth: '120px'}}
+                      />
+                      <button type="submit" className="btn btn-sm btn-success">Xác nhận</button>
+                    </form>
+                  )}
+                  {verifyMsg && <div className="small mt-1 text-info">{verifyMsg}</div>}
                 </div>
               </div>
               <div className="row mb-3">

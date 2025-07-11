@@ -158,4 +158,24 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
     }
 });
 
+// Lấy profile user hiện tại
+router.get('/profile', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ message: 'Server Error', error: err.message });
+    }
+});
+
+// Xác thực email
+const userController = require('../controller/userController');
+router.post('/verify-email/send', protect, userController.sendEmailVerification);
+router.post('/verify-email/confirm', protect, userController.verifyEmailCode);
+router.post('/forgot-password/send', userController.sendForgotPasswordCode);
+router.post('/forgot-password/reset', userController.resetPassword);
+
 module.exports = router; 
