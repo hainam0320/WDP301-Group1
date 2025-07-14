@@ -183,44 +183,35 @@ export const transactionAPI = {
   // Lấy tổng quan về hoa hồng
   getCommissionOverview: () => api.get('/transactions/driver/overview'),
 
-  // Tạo mã QR cho giao dịch
-  createQRPayment: (transactionId) => api.post(`/transactions/qr/create/${transactionId}`),
-
-  // Tạo mã QR cho nhiều giao dịch
-  createBulkQRPayment: (transactionIds) => api.post('/transactions/qr/bulk/create', { transactionIds }),
-
-  // Kiểm tra trạng thái thanh toán QR hàng loạt
-  checkBulkQRPaymentStatus: (bulkBillId) => api.get(`/transactions/qr/bulk/status/${bulkBillId}`),
-
-  // Giả lập quét mã QR và thanh toán
-  simulateQRPayment: (paymentCode) => api.post('/transactions/qr/simulate-payment', { paymentCode }),
-
-  // Kiểm tra trạng thái thanh toán QR
-  checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`),
+  // Tạo hóa đơn tổng cho nhiều giao dịch
+  createBulkBill: (transactionIds) => api.post('/transactions/bulk-bill/create', { transactionIds }),
 
   // Lấy danh sách bulk bills của tài xế
   getDriverBulkBills: () => api.get('/transactions/driver/bulk-bills'),
 
-  // Lấy chi tiết bulk bill của tài xế
-  getDriverBulkBillDetails: (bulkBillId) => api.get(`/transactions/driver/bulk-bills/${bulkBillId}`),
-
-  // Admin - Lấy danh sách bulk bills
-  getAdminBulkBills: (filters = {}) => api.get('/transactions/admin/bulk-bills', { params: filters }),
+  // Lấy danh sách bulk bills cho admin
+  getAdminBulkBills: (filters = {}) => {
+    const queryParams = new URLSearchParams();
+    if (filters.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters.endDate) queryParams.append('endDate', filters.endDate);
+    if (filters.driverName) queryParams.append('driverName', filters.driverName);
+    if (filters.status) queryParams.append('status', filters.status);
+    
+    const queryString = queryParams.toString();
+    return api.get(`/transactions/admin/bulk-bills${queryString ? `?${queryString}` : ''}`);
+  },
 
   // Admin - Xác nhận thanh toán bulk bill
   adminConfirmBulkPayment: (bulkBillId, data) => api.post(`/transactions/admin/bulk-bills/${bulkBillId}/confirm`, data),
 
-  // Admin - Lấy chi tiết bulk bill
-  getAdminBulkBillDetails: (bulkBillId) => api.get(`/transactions/admin/bulk-bills/${bulkBillId}`),
+  // Cập nhật trạng thái thanh toán QR
+  updateBulkQRPaymentStatus: (paymentCode, status) => {
+    console.log('Sending payment status update:', { paymentCode, status });
+    return api.post(`/transactions/qr/payment/${encodeURIComponent(paymentCode)}/status`, { status });
+  },
 
-  // Admin - Lấy danh sách hoa hồng
-  getAdminCommissions: (filters = {}) => api.get('/transactions/admin/commissions', { params: filters }),
-
-  // Admin - Lấy thống kê hoa hồng
-  getAdminCommissionStats: () => api.get('/transactions/admin/commission-stats'),
-
-  // Admin - Lấy thống kê hoa hồng theo tài xế
-  getDriverCommissionStats: () => api.get('/transactions/admin/driver-commission-stats')
+  // Lấy chi tiết bulk bill cho admin
+  getAdminBulkBillDetails: (billId) => api.get(`/transactions/admin/bulk-bills/${billId}`)
 };
 
 export const notificationAPI = {
