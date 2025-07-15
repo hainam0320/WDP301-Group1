@@ -269,8 +269,11 @@ exports.getAdminBulkBills = async (req, res) => {
       };
     }
     
+    // Chỉ lấy các bills không phải pending, trừ khi status được chỉ định rõ
     if (status) {
       query.status = status;
+    } else {
+      query.status = { $ne: 'pending' };
     }
 
     // Nếu có tên tài xế, tìm driver ID trước
@@ -563,6 +566,54 @@ exports.updateBulkQRPaymentStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật trạng thái thanh toán: ' + error.message
+    });
+  }
+};
+
+// Hủy hóa đơn tổng khi đóng QR không thanh toán
+exports.cancelBulkBill = async (req, res) => {
+  try {
+    const { bulkBillId } = req.params;
+    const driverId = req.user._id;
+
+    // Tìm bulk bill
+    const bulkBill = await BulkBill.findOne({
+      _id: bulkBillId,
+      driverId: driverId,
+      status: "pending" // Chỉ hủy được bill đang pending
+    });
+
+    if (!bulkBill) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy hóa đơn tổng hoặc không có quyền hủy"
+      });
+    }
+
+    // Tìm và hủy QR payment liên quan
+    if (bulkBill.qr_payment_id) {
+      await QRPayment.findByIdAndUpdate(
+        bulkBill.qr_payment_id,
+        {
+          status: "cancelled",
+          completedAt: new Date()
+        }
+      );
+    }
+
+    // Xóa bulk bill
+    await BulkBill.findByIdAndDelete(bulkBillId);
+
+    res.json({
+      success: true,
+      message: "Đã hủy hóa đơn tổng thành công"
+    });
+  } catch (error) {
+    console.error("Lỗi khi hủy hóa đơn tổng:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi hủy hóa đơn tổng",
+      error: error.message
     });
   }
 };
