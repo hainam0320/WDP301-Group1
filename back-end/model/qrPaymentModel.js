@@ -5,6 +5,10 @@ const qrPaymentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'CompanyTransaction'
   },
+  bulkBillId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BulkBill'
+  },
   qrCode: { 
     type: String, 
     required: true 
@@ -48,16 +52,18 @@ const qrPaymentSchema = new mongoose.Schema({
 
 // Tạo index cho các trường quan trọng
 qrPaymentSchema.index({ transactionId: 1 });
-qrPaymentSchema.index({ paymentCode: 1 }, { unique: true });
-qrPaymentSchema.index({ status: 1, expiryTime: 1 });
+qrPaymentSchema.index({ bulkBillId: 1 });
 qrPaymentSchema.index({ bulkTransactionIds: 1 }, { sparse: true });
 
 // Middleware để xử lý trước khi lưu
 qrPaymentSchema.pre('save', function(next) {
-  // Nếu là bulk payment, transactionId không bắt buộc
-  if (this.bulkPayment && this.bulkTransactionIds && this.bulkTransactionIds.length > 0) {
-    this.transactionId = this.bulkTransactionIds[0];
-  } else if (!this.bulkPayment && !this.transactionId) {
+  // Nếu là bulk payment, cần có bulkBillId
+  if (this.bulkPayment && !this.bulkBillId) {
+    next(new Error('BulkBillId is required for bulk payments'));
+    return;
+  }
+  // Nếu không phải bulk payment, cần có transactionId
+  if (!this.bulkPayment && !this.transactionId) {
     next(new Error('TransactionId is required for non-bulk payments'));
     return;
   }
