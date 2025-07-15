@@ -22,6 +22,9 @@ const CommissionManagement = () => {
         pendingAmount: 0,
         paidAmount: 0
     });
+    const [pendingPage, setPendingPage] = useState(1);
+    const [historyPage, setHistoryPage] = useState(1);
+    const itemsPerPage = 5;
 
     useEffect(() => {
         fetchData();
@@ -268,7 +271,7 @@ const CommissionManagement = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingCommissions.map(transaction => (
+                                {paginatedPending.map(transaction => (
                                     <tr key={transaction._id}>
                                         <td>
                                             <Form.Check
@@ -294,7 +297,7 @@ const CommissionManagement = () => {
                                         </td>
                                     </tr>
                                 ))}
-                                {pendingCommissions.length === 0 && (
+                                {paginatedPending.length === 0 && (
                                     <tr>
                                         <td colSpan={6} className="text-center py-3">
                                             Không có giao dịch nào chờ thanh toán
@@ -323,7 +326,7 @@ const CommissionManagement = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {bulkBills.filter(bill => bill.status !== 'pending').map(bill => (
+                            {paginatedHistory.map(bill => (
                                 <tr key={bill._id}>
                                     <td>{bill._id}</td>
                                     <td>{bill.transactions.length}</td>
@@ -343,7 +346,7 @@ const CommissionManagement = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {bulkBills.filter(bill => bill.status !== 'pending').length === 0 && (
+                            {paginatedHistory.length === 0 && (
                                 <tr>
                                     <td colSpan={8} className="text-center py-3">
                                         Không có lịch sử thanh toán
@@ -493,43 +496,43 @@ const CommissionManagement = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {pendingCommissions.map(transaction => {
+                                        {paginatedPending.map(transaction => {
                                             const overdue = isOverdue(transaction.createdAt);
                                             return (
                                                 <tr key={transaction._id} className={`border-bottom${overdue ? ' bg-danger bg-opacity-25' : ''}`}> 
-                                                    <td>
-                                                        <Form.Check
-                                                            type="checkbox"
-                                                            onChange={() => handleSelectTransaction(transaction._id)}
-                                                            checked={selectedTransactions.includes(transaction._id)}
-                                                        />
-                                                    </td>
+                                                <td>
+                                                    <Form.Check
+                                                        type="checkbox"
+                                                        onChange={() => handleSelectTransaction(transaction._id)}
+                                                        checked={selectedTransactions.includes(transaction._id)}
+                                                    />
+                                                </td>
                                                     <td className="text-primary fw-medium">
                                                         {transaction._id}
                                                         {overdue && <FaExclamationTriangle className="ms-2 text-danger" title="Quá hạn 3 ngày" />}
                                                     </td>
-                                                    <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
-                                                    <td>{getStatusBadge(transaction.status)}</td>
-                                                    <td>
-                                                        <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                        <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
-                                                    </td>
-                                                    <td>
-                                                        <Button 
-                                                            variant="outline-primary"
-                                                            size="sm"
-                                                            onClick={() => handleBulkPayment([transaction._id])}
-                                                            disabled={isLoading}
-                                                            className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
-                                                        >
-                                                            <FaQrcode />
-                                                            Thanh toán
-                                                        </Button>
-                                                    </td>
-                                                </tr>
+                                                <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
+                                                <td>{getStatusBadge(transaction.status)}</td>
+                                                <td>
+                                                    <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                    <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                                </td>
+                                                <td>
+                                                    <Button 
+                                                        variant="outline-primary"
+                                                        size="sm"
+                                                        onClick={() => handleBulkPayment([transaction._id])}
+                                                        disabled={isLoading}
+                                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                                                    >
+                                                        <FaQrcode />
+                                                        Thanh toán
+                                                    </Button>
+                                                </td>
+                                            </tr>
                                             );
                                         })}
-                                        {pendingCommissions.length === 0 && (
+                                        {paginatedPending.length === 0 && (
                                             <tr>
                                                 <td colSpan={6} className="text-center py-5">
                                                     <div className="text-muted">
@@ -557,7 +560,7 @@ const CommissionManagement = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {bulkBills.filter(bill => bill.status === 'completed' || bill.status === 'confirmed' || bill.status === 'paid' || bill.status === 'rejected').map(bill => (
+                                    {paginatedHistory.map(bill => (
                                         <tr key={bill._id} className="border-bottom">
                                             <td className="text-primary fw-medium">{bill._id}</td>
                                             <td className="fw-medium">{bill.transactions?.length || 0}</td>
@@ -580,7 +583,7 @@ const CommissionManagement = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {bulkBills.filter(bill => bill.status === 'completed' || bill.status === 'confirmed' || bill.status === 'paid' || bill.status === 'rejected').length === 0 && (
+                                    {paginatedHistory.length === 0 && (
                                         <tr>
                                             <td colSpan={6} className="text-center py-5">
                                                 <div className="text-muted">
@@ -596,6 +599,44 @@ const CommissionManagement = () => {
                     )}
                 </Card.Body>
             </Card>
+
+            {/* Pagination controls cho pending */}
+            {totalPendingPages > 1 && (
+              <nav className="d-flex justify-content-center my-3">
+                <ul className="pagination">
+                  <li className={`page-item${pendingPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPendingPage(pendingPage - 1)}>&laquo;</button>
+                  </li>
+                  {Array.from({ length: totalPendingPages }, (_, i) => (
+                    <li key={i} className={`page-item${pendingPage === i + 1 ? ' active' : ''}`}>
+                      <button className="page-link" onClick={() => setPendingPage(i + 1)}>{i + 1}</button>
+                    </li>
+                  ))}
+                  <li className={`page-item${pendingPage === totalPendingPages ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setPendingPage(pendingPage + 1)}>&raquo;</button>
+                  </li>
+                </ul>
+              </nav>
+            )}
+
+            {/* Pagination controls cho history */}
+            {totalHistoryPages > 1 && (
+              <nav className="d-flex justify-content-center my-3">
+                <ul className="pagination">
+                  <li className={`page-item${historyPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setHistoryPage(historyPage - 1)}>&laquo;</button>
+                  </li>
+                  {Array.from({ length: totalHistoryPages }, (_, i) => (
+                    <li key={i} className={`page-item${historyPage === i + 1 ? ' active' : ''}`}>
+                      <button className="page-link" onClick={() => setHistoryPage(i + 1)}>{i + 1}</button>
+                    </li>
+                  ))}
+                  <li className={`page-item${historyPage === totalHistoryPages ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setHistoryPage(historyPage + 1)}>&raquo;</button>
+                  </li>
+                </ul>
+              </nav>
+            )}
 
             {/* QR Modal */}
             <Modal 

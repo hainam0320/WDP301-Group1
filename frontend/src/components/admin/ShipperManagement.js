@@ -89,11 +89,14 @@ const ShipperManagement = () => {
     }
   };
 
-  const toggleUserStatus = async (userId, currentStatus) => {
+  const toggleUserStatus = async (userId, currentStatus, type) => {
     try {
-      const newStatus = currentStatus ? 'inactive' : 'active';
-      await adminAPI.updateUserStatus(userId, newStatus);
-      toast.success(`Tài khoản đã được ${newStatus === 'active' ? 'mở khóa' : 'khóa'} thành công`);
+      if (type === 'driver') {
+        await adminAPI.updateDriverStatus(userId, !currentStatus);
+      } else {
+        await adminAPI.updateUserStatus(userId, !currentStatus ? 'active' : 'inactive');
+      }
+      toast.success('Cập nhật trạng thái thành công');
       fetchShippers();
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -299,7 +302,7 @@ const ShipperManagement = () => {
           <Button
             variant={selectedUser.status ? 'danger' : 'success'}
             onClick={() => {
-              toggleUserStatus(selectedUser._id, selectedUser.status);
+              toggleUserStatus(selectedUser._id, selectedUser.status, selectedUser.type);
               handleCloseModal();
             }}
           >
@@ -603,7 +606,7 @@ const ShipperManagement = () => {
                         </button>
                         <button 
                           className={`btn ${shipper.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                          onClick={() => toggleUserStatus(shipper._id, shipper.status)}
+                          onClick={() => toggleUserStatus(shipper._id, shipper.status, shipper.type)}
                           title={shipper.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                         >
                           {shipper.status ? <FaLock /> : <FaLockOpen />}

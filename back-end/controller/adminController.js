@@ -4,6 +4,7 @@ const Rate = require('../model/rateModel');
 const Driver = require('../model/driverModel');
 const Report = require('../model/reportModel');
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
 
 // Get dashboard statistics
 exports.getStats = async (req, res) => {
@@ -205,6 +206,41 @@ exports.updateUserStatus = async (req, res) => {
   } catch (error) {
     console.error('Error updating user status:', error);
     res.status(500).json({ message: 'Error updating user status', error: error.message });
+  }
+};
+
+// Update driver status and send email if locked
+exports.updateDriverStatus = async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { status } = req.body; // true/false
+
+    const driver = await Driver.findById(driverId);
+    if (!driver) return res.status(404).json({ message: 'Không tìm thấy tài xế' });
+
+    driver.status = status;
+    await driver.save();
+
+    // Nếu bị khóa thì gửi email
+    if (!status) {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: driver.email,
+        subject: 'Tài khoản của bạn đã bị khóa',
+        text: `Xin chào ${driver.fullName},\n\nTài khoản của bạn đã bị khóa bởi quản trị viên. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.\n\nHỏa Tốc Hòa Lạc`
+      });
+    }
+
+    res.json({ message: 'Cập nhật trạng thái thành công' });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };
 
