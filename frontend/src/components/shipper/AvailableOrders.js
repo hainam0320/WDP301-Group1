@@ -14,6 +14,8 @@ const AvailableOrders = () => {
   const [showCommissionModal, setShowCommissionModal] = useState(false);
   const [commissionMessage, setCommissionMessage] = useState('');
   const BASE_URL = 'http://localhost:9999';
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
 
   const fetchAvailableOrders = async () => {
     setIsLoading(true);
@@ -100,6 +102,12 @@ const AvailableOrders = () => {
     transition: 'all 0.3s ease'
   };
 
+  const totalPages = Math.ceil(availableOrders.length / ordersPerPage);
+  const paginatedOrders = availableOrders.slice(
+    (currentPage - 1) * ordersPerPage,
+    currentPage * ordersPerPage
+  );
+
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <ShipperHeader />
@@ -154,7 +162,7 @@ const AvailableOrders = () => {
                 <p>Hiện tại không có đơn hàng khả dụng</p>
               </div>
             ) : (
-              availableOrders.map(order => (
+              paginatedOrders.map(order => (
                 <div key={order._id} className="card mb-3">
                   <div className="card-body">
                     <div className="row align-items-center">
@@ -199,6 +207,30 @@ const AvailableOrders = () => {
                   </div>
                 </div>
               ))
+            )}
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <nav>
+                <ul className="pagination justify-content-center mt-4">
+                  <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                      Trước
+                    </button>
+                  </li>
+                  {[...Array(totalPages)].map((_, idx) => (
+                    <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                        {idx + 1}
+                      </button>
+                    </li>
+                  ))}
+                  <li className={`page-item${currentPage === totalPages ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                      Sau
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             )}
           </div>
         </div>

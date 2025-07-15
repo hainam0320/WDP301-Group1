@@ -170,7 +170,10 @@ export const adminAPI = {
   getDrivers: () => api.get('/transactions/admin/drivers'),
   
   confirmCommissionPayment: (transactionId, data) => 
-    api.post(`/transactions/admin/commissions/${transactionId}/confirm`, data)
+    api.post(`/transactions/admin/commissions/${transactionId}/confirm`, data),
+
+  // ---- Update Driver Status ----
+  updateDriverStatus: (driverId, status) => api.patch(`/admin/drivers/${driverId}/status`, { status }),
 };
 
 export const transactionAPI = {

@@ -8,7 +8,8 @@ const {
   getRevenue,
   deleteUser,
   updateUserStatus,
-  getShipperOrders
+  getShipperOrders,
+  updateDriverStatus
 } = require('../controller/adminController');
 
 // Protect all routes and require admin role
@@ -22,6 +23,8 @@ router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.delete('/users/:id', deleteUser);
 router.patch('/users/:id/status', updateUserStatus);
+// Driver management
+router.patch('/drivers/:driverId/status', updateDriverStatus);
 
 // Order management
 router.get('/orders', getOrders);
