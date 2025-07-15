@@ -360,7 +360,7 @@ const ShipperManagement = () => {
                     <option value="pending">Chờ xử lý</option>
                     <option value="accepted">Đã nhận</option>
                     <option value="completed">Hoàn thành</option>
-                    <option value="cancelled">Đã hủy</option>
+                    <option value="failed">Thất bại</option>
                   </Form.Select>
                 </Form.Group>
               </div>
@@ -395,7 +395,7 @@ const ShipperManagement = () => {
                     <th style={{ width: '100px' }}>Giá (VNĐ)</th>
                     <th style={{ width: '100px' }}>Trạng thái</th>
                     <th style={{ width: '20%' }}>Ghi chú của shipper</th>
-                    <th style={{ width: '15%' }}>Báo cáo</th>
+                    <th style={{ width: '15%' }}>Khiếu nại của khách hàng</th>
                     <th style={{ width: '100px' }}>Thời gian</th>
                   </tr>
                 </thead>
@@ -421,11 +421,11 @@ const ShipperManagement = () => {
                         <span className={`badge ${
                           order.status === 'completed' ? 'bg-success' :
                           order.status === 'accepted' ? 'bg-primary' :
-                          order.status === 'cancelled' ? 'bg-danger' : 'bg-warning'
+                          order.status === 'failed' ? 'bg-danger' : 'bg-warning'
                         }`}>
                           {order.status === 'completed' ? 'Hoàn thành' :
                            order.status === 'accepted' ? 'Đã nhận' :
-                           order.status === 'cancelled' ? 'Đã hủy' : 'Chờ xử lý'}
+                           order.status === 'failed' ? 'Thất bại' : 'Chờ xử lý'}
                         </span>
                       </td>
                       <td style={{ whiteSpace: 'pre-wrap' }}>
@@ -441,7 +441,7 @@ const ShipperManagement = () => {
                             Xem chi tiết
                           </Button>
                         ) : (
-                          <span className="text-muted">Không có báo cáo</span>
+                          <span className="text-muted">Không có khiếu nại</span>
                         )}
                       </td>
                       <td>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</td>
@@ -486,7 +486,7 @@ const ShipperManagement = () => {
     return (
       <Modal show={showReportModal} onHide={handleCloseReportModal}>
         <Modal.Header closeButton>
-          <Modal.Title>Chi tiết báo cáo</Modal.Title>
+          <Modal.Title>Chi tiết khiếu nại</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <table className="table">

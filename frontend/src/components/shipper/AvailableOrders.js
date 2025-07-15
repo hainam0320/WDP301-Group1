@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaShippingFast, FaMapMarkerAlt, FaCheck, FaClock, FaUser, FaRoute, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
 import ShipperHeader from './ShipperHeader';
+import { Modal, Button } from 'react-bootstrap';
 
 const AvailableOrders = () => {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ const AvailableOrders = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState({ type: '', content: '' });
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [commissionMessage, setCommissionMessage] = useState('');
   const BASE_URL = 'http://localhost:9999';
 
   const fetchAvailableOrders = async () => {
@@ -25,6 +28,12 @@ const AvailableOrders = () => {
       setAvailableOrders(response.data);
     } catch (err) {
       console.error('Error fetching available orders:', err);
+      // Nếu bị chặn do hoa hồng quá hạn
+      if (err.response && err.response.status === 403 && err.response.data?.message?.includes('hoa hồng')) {
+        setCommissionMessage(err.response.data.message);
+        setShowCommissionModal(true);
+        return;
+      }
       setError('Không thể tải danh sách đơn hàng khả dụng');
     } finally {
       setIsLoading(false);
@@ -94,6 +103,23 @@ const AvailableOrders = () => {
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <ShipperHeader />
+      {/* Modal cảnh báo hoa hồng quá hạn */}
+      <Modal show={showCommissionModal} onHide={() => { setShowCommissionModal(false); navigate('/shipper/commissions'); }} centered>
+        <Modal.Header closeButton className="bg-warning text-dark">
+          <Modal.Title>Thanh toán hoa hồng quá hạn</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex align-items-center">
+            <span className="me-3" style={{fontSize:'2rem'}}>&#9888;</span>
+            <span>{commissionMessage || 'Bạn có đơn hoa hồng chưa thanh toán quá 3 ngày. Vui lòng thanh toán trước khi nhận đơn mới.'}</span>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="warning" onClick={() => { setShowCommissionModal(false); navigate('/shipper/commissions'); }}>
+            Đi đến trang thanh toán hoa hồng
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"

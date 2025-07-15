@@ -176,6 +176,21 @@ router.get('/available', protect, async (req, res) => {
       });
     }
 
+    // Kiểm tra hoa hồng chưa thanh toán quá 3 ngày
+    const now = new Date();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const oldPending = await CompanyTransaction.findOne({
+      driverId: req.user._id,
+      status: 'pending',
+      createdAt: { $lte: threeDaysAgo }
+    });
+    if (oldPending) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn có đơn hoa hồng chưa thanh toán quá 3 ngày. Vui lòng thanh toán trước khi nhận đơn mới.'
+      });
+    }
+
     const availableOrders = await Order.find({ 
       status: 'pending',
       driverId: { $exists: false }
@@ -280,7 +295,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
 
     const oldStatus = order.status;
     order.status = status;
-    if (status === 'completed' && statusDescription) {
+    if ((status === 'completed' || status === 'failed') && statusDescription) {
       order.statusDescription = statusDescription;
     }
     await order.save();

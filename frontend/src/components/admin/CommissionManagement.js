@@ -1,227 +1,390 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Row, Col, Button, Badge, Form, InputGroup } from 'react-bootstrap';
-import { FaSearch, FaFileDownload, FaCheckCircle, FaTimesCircle, FaChartBar } from 'react-icons/fa';
-import { adminAPI } from '../../services/api';
-import { toast } from 'react-hot-toast';
+import { Table, Button, Form, Row, Col, Badge, Modal } from 'react-bootstrap';
+import { FaCheck, FaTimes, FaEye } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import { transactionAPI } from '../../services/api';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 const CommissionManagement = () => {
-  const [commissions, setCommissions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    status: 'all',
-    startDate: '',
-    endDate: '',
-    driverId: '',
-    searchTerm: ''
-  });
-  const [stats, setStats] = useState({
-    totalCommission: 0,
-    pendingAmount: 0,
-    completedAmount: 0,
-    totalTransactions: 0
-  });
+    const [bills, setBills] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [filters, setFilters] = useState({
+        startDate: null,
+        endDate: null,
+        driverId: '',
+        status: ''
+    });
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedBill, setSelectedBill] = useState(null);
+    const [remarks, setRemarks] = useState('');
 
-  useEffect(() => {
-    fetchCommissions();
-  }, [filters]);
+    // Thống kê
+    const [stats, setStats] = useState({
+        totalAmount: 0,
+        pendingAmount: 0,
+        paidAmount: 0,
+        confirmedAmount: 0,
+        rejectedAmount: 0
+    });
 
-  const fetchCommissions = async () => {
-    try {
-      setLoading(true);
-      const response = await adminAPI.getCommissions(filters);
-      setCommissions(response.data.commissions);
-      setStats(response.data.stats);
-    } catch (error) {
-      console.error('Error fetching commissions:', error);
-      toast.error('Không thể tải dữ liệu hoa hồng');
-    } finally {
-      setLoading(false);
-    }
-  };
+    useEffect(() => {
+        fetchBills();
+    }, [filters]);
 
-  const handleConfirmPayment = async (commissionId) => {
-    try {
-      await adminAPI.confirmCommissionPayment(commissionId);
-      toast.success('Xác nhận thanh toán thành công');
-      fetchCommissions();
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      toast.error('Không thể xác nhận thanh toán');
-    }
-  };
+    const fetchBills = async () => {
+        try {
+            setLoading(true);
+            const response = await transactionAPI.getAdminBulkBills(filters);
+            if (response.data.success) {
+                setBills(response.data.bills || []);
+                setStats(response.data.stats);
+            } else {
+                toast.error('Không thể tải danh sách bill');
+            }
+        } catch (error) {
+            console.error('Error fetching bills:', error);
+            toast.error('Không thể tải danh sách bill');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+    const handleViewDetails = async (bill) => {
+        try {
+            setLoading(true);
+            const response = await transactionAPI.getAdminBulkBillDetails(bill._id);
+            if (response.data.success) {
+                setSelectedBill(response.data.bill);
+                setShowDetailsModal(true);
+            } else {
+                toast.error('Không thể tải chi tiết bill');
+            }
+        } catch (error) {
+            console.error('Error fetching bill details:', error);
+            toast.error('Không thể tải chi tiết bill');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-  };
+    const handleConfirmPayment = async (billId, status) => {
+        try {
+            setLoading(true);
+            const response = await transactionAPI.adminConfirmBulkPayment(billId, {
+                status,
+                remarks: remarks
+            });
+            
+            if (response.data.success) {
+                toast.success(status === 'confirmed' ? 'Đã xác nhận thanh toán' : 'Đã từ chối thanh toán');
+                setShowDetailsModal(false);
+                setRemarks('');
+                fetchBills();
+            } else {
+                toast.error('Không thể xác nhận thanh toán');
+            }
+        } catch (error) {
+            console.error('Error confirming payment:', error);
+            toast.error('Không thể xác nhận thanh toán');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('vi-VN');
-  };
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount).replace('₫', 'd');
+    };
 
-  return (
-    <div className="p-4">
-      <h2 className="mb-4">Quản lý hoa hồng</h2>
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleString('vi-VN');
+    };
 
-      {/* Stats Cards */}
-      <Row className="mb-4">
-        <Col md={3}>
-          <Card className="bg-primary text-white">
-            <Card.Body>
-              <h6>Tổng hoa hồng</h6>
-              <h4>{formatCurrency(stats.totalCommission)}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="bg-warning text-white">
-            <Card.Body>
-              <h6>Chờ thanh toán</h6>
-              <h4>{formatCurrency(stats.pendingAmount)}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="bg-success text-white">
-            <Card.Body>
-              <h6>Đã thanh toán</h6>
-              <h4>{formatCurrency(stats.completedAmount)}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="bg-info text-white">
-            <Card.Body>
-              <h6>Tổng giao dịch</h6>
-              <h4>{stats.totalTransactions}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'pending':
+                return <Badge bg="warning">Chờ thanh toán</Badge>;
+            case 'paid':
+                return <Badge bg="info">Đã thanh toán - Chờ xác nhận</Badge>;
+            case 'confirmed':
+                return <Badge bg="success">Đã xác nhận</Badge>;
+            case 'rejected':
+                return <Badge bg="danger">Đã từ chối</Badge>;
+            default:
+                return <Badge bg="secondary">{status}</Badge>;
+        }
+    };
 
-      {/* Filters */}
-      <Card className="mb-4">
-        <Card.Body>
-          <Row>
-            <Col md={3}>
-              <Form.Group>
-                <Form.Label>Trạng thái</Form.Label>
-                <Form.Select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                >
-                  <option value="all">Tất cả</option>
-                  <option value="pending">Chờ thanh toán</option>
-                  <option value="completed">Đã thanh toán</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={3}>
-              <Form.Group>
-                <Form.Label>Từ ngày</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={3}>
-              <Form.Group>
-                <Form.Label>Đến ngày</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={3}>
-              <Form.Group>
-                <Form.Label>Tìm kiếm</Form.Label>
-                <InputGroup>
-                  <Form.Control
-                    placeholder="Tìm theo mã, tên tài xế..."
-                    value={filters.searchTerm}
-                    onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
-                  />
-                  <Button variant="outline-secondary">
-                    <FaSearch />
-                  </Button>
-                </InputGroup>
-              </Form.Group>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+    return (
+        <div className="container-fluid py-4">
+            <h2 className="mb-4">Quản lý hoa hồng</h2>
 
-      {/* Commission Table */}
-      <Card>
-        <Card.Body>
-          <div className="d-flex justify-content-between mb-3">
-            <h5>Danh sách hoa hồng</h5>
-            <Button variant="success">
-              <FaFileDownload className="me-2" />
-              Xuất báo cáo
-            </Button>
-          </div>
-          <Table responsive>
-            <thead>
-              <tr>
-                <th>Mã giao dịch</th>
-                <th>Tài xế</th>
-                <th>Số tiền</th>
-                <th>Ngày tạo</th>
-                <th>Trạng thái</th>
-                <th>Phương thức</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commissions.map(commission => (
-                <tr key={commission._id}>
-                  <td>{commission._id}</td>
-                  <td>{commission.driverName}</td>
-                  <td>{formatCurrency(commission.amount)}</td>
-                  <td>{formatDate(commission.createdAt)}</td>
-                  <td>
-                    <Badge bg={commission.status === 'completed' ? 'success' : 'warning'}>
-                      {commission.status === 'completed' ? 'Đã thanh toán' : 'Chờ thanh toán'}
-                    </Badge>
-                  </td>
-                  <td>
-                    {commission.paymentMethod === 'qr' ? (
-                      <Badge bg="info">QR Code</Badge>
-                    ) : (
-                      <Badge bg="secondary">Khác</Badge>
+            {/* Thống kê */}
+            <div className="row mb-4">
+                <div className="col">
+                    <div className="card bg-primary text-white">
+                        <div className="card-body">
+                            <h6>Tổng tiền</h6>
+                            <h4>{formatCurrency(stats.totalAmount)}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div className="col">
+                    <div className="card bg-warning text-white">
+                        <div className="card-body">
+                            <h6>Chờ thanh toán</h6>
+                            <h4>{formatCurrency(stats.pendingAmount)}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div className="col">
+                    <div className="card bg-info text-white">
+                        <div className="card-body">
+                            <h6>Đã thanh toán</h6>
+                            <h4>{formatCurrency(stats.paidAmount)}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div className="col">
+                    <div className="card bg-success text-white">
+                        <div className="card-body">
+                            <h6>Đã xác nhận</h6>
+                            <h4>{formatCurrency(stats.confirmedAmount)}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div className="col">
+                    <div className="card bg-danger text-white">
+                        <div className="card-body">
+                            <h6>Đã từ chối</h6>
+                            <h4>{formatCurrency(stats.rejectedAmount)}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bộ lọc */}
+            <div className="card mb-4">
+                <div className="card-body">
+                    <Row className="align-items-end">
+                        <Col md={3}>
+                            <Form.Group>
+                                <Form.Label>Từ ngày</Form.Label>
+                                <DatePicker
+                                    selected={filters.startDate}
+                                    onChange={date => setFilters(prev => ({ ...prev, startDate: date }))}
+                                    className="form-control"
+                                    dateFormat="dd/MM/yyyy"
+                                    placeholderText="dd/mm/yyyy"
+                                />
+                            </Form.Group>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Group>
+                                <Form.Label>Đến ngày</Form.Label>
+                                <DatePicker
+                                    selected={filters.endDate}
+                                    onChange={date => setFilters(prev => ({ ...prev, endDate: date }))}
+                                    className="form-control"
+                                    dateFormat="dd/MM/yyyy"
+                                    placeholderText="dd/mm/yyyy"
+                                />
+                            </Form.Group>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Group>
+                                <Form.Label>Tài xế</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    placeholder="Email tài xế"
+                                    value={filters.driverId}
+                                    onChange={e => setFilters(prev => ({ ...prev, driverId: e.target.value }))}
+                                />
+                            </Form.Group>
+                        </Col>
+                        <Col md={2}>
+                            <Form.Group>
+                                <Form.Label>Trạng thái</Form.Label>
+                                <Form.Select
+                                    value={filters.status}
+                                    onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                                >
+                                    <option value="">Tất cả</option>
+                                    <option value="pending">Chờ thanh toán</option>
+                                    <option value="paid">Đã thanh toán - Chờ xác nhận</option>
+                                    <option value="confirmed">Đã xác nhận</option>
+                                    <option value="rejected">Đã từ chối</option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
+                        <Col md={1}>
+                            <Button variant="primary" onClick={() => fetchBills()}>
+                                Lọc
+                            </Button>
+                        </Col>
+                    </Row>
+                </div>
+            </div>
+
+            {/* Danh sách bills */}
+            <div className="card">
+                <div className="card-body">
+                    <Table responsive>
+                        <thead>
+                            <tr>
+                                <th>Mã bill</th>
+                                <th>Tài xế</th>
+                                <th>Số tiền</th>
+                                <th>Ngày tạo</th>
+                                <th>Ngày thanh toán</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {bills.map(bill => (
+                                <tr key={bill._id}>
+                                    <td>{bill._id}</td>
+                                    <td>
+                                        {bill.driverId?.email}<br />
+                                        <small>{bill.driverId?.name}</small>
+                                    </td>
+                                    <td>{formatCurrency(bill.total_amount)}</td>
+                                    <td>{formatDate(bill.createdAt)}</td>
+                                    <td>{bill.paid_at ? formatDate(bill.paid_at) : '-'}</td>
+                                    <td>{getStatusBadge(bill.status)}</td>
+                                    <td>
+                                        <Button
+                                            variant="outline-primary"
+                                            size="sm"
+                                            onClick={() => handleViewDetails(bill)}
+                                            className="me-2"
+                                        >
+                                            <FaEye /> Chi tiết
+                                        </Button>
+                                        {bill.status === 'paid' && (
+                                            <>
+                                                <Button
+                                                    variant="outline-success"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedBill(bill);
+                                                        setShowDetailsModal(true);
+                                                    }}
+                                                    className="me-2"
+                                                >
+                                                    <FaCheck /> Xác nhận
+                                                </Button>
+                                                <Button
+                                                    variant="outline-danger"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedBill(bill);
+                                                        setShowDetailsModal(true);
+                                                    }}
+                                                >
+                                                    <FaTimes /> Từ chối
+                                                </Button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                </div>
+            </div>
+
+            {/* Modal chi tiết */}
+            <Modal show={showDetailsModal} onHide={() => setShowDetailsModal(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Chi tiết bill</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {selectedBill && (
+                        <>
+                            <div className="mb-3">
+                                <h5>Thông tin chung</h5>
+                                <p>
+                                    <strong>Mã bill:</strong> {selectedBill._id}<br />
+                                    <strong>Tài xế:</strong> {selectedBill.driverId?.email} ({selectedBill.driverId?.name})<br />
+                                    <strong>Tổng tiền:</strong> {formatCurrency(selectedBill.total_amount)}<br />
+                                    <strong>Trạng thái:</strong> {getStatusBadge(selectedBill.status)}<br />
+                                    <strong>Ngày tạo:</strong> {formatDate(selectedBill.createdAt)}<br />
+                                    {selectedBill.paid_at && <><strong>Ngày thanh toán:</strong> {formatDate(selectedBill.paid_at)}<br /></>}
+                                    {selectedBill.confirmed_at && <><strong>Ngày xác nhận:</strong> {formatDate(selectedBill.confirmed_at)}<br /></>}
+                                    {selectedBill.remarks && <><strong>Ghi chú:</strong> {selectedBill.remarks}<br /></>}
+                                </p>
+                            </div>
+
+                            {selectedBill.status === 'paid' && (
+                                <div className="mb-3">
+                                    <Form.Group>
+                                        <Form.Label>Ghi chú</Form.Label>
+                                        <Form.Control
+                                            as="textarea"
+                                            rows={3}
+                                            value={remarks}
+                                            onChange={(e) => setRemarks(e.target.value)}
+                                            placeholder="Nhập ghi chú (nếu có)"
+                                        />
+                                    </Form.Group>
+                                </div>
+                            )}
+
+                            <div className="mb-3">
+                                <h5>Danh sách giao dịch</h5>
+                                <Table responsive>
+                                    <thead>
+                                        <tr>
+                                            <th>Mã giao dịch</th>
+                                            <th>Số tiền</th>
+                                            <th>Ngày tạo</th>
+                                            <th>Trạng thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedBill.transactions?.map(transaction => (
+                                            <tr key={transaction._id}>
+                                                <td>{transaction._id}</td>
+                                                <td>{formatCurrency(transaction.amount)}</td>
+                                                <td>{formatDate(transaction.createdAt)}</td>
+                                                <td>{getStatusBadge(transaction.status)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </Table>
+                            </div>
+                        </>
                     )}
-                  </td>
-                  <td>
-                    {commission.status === 'pending' && (
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={() => handleConfirmPayment(commission._id)}
-                      >
-                        <FaCheckCircle className="me-1" />
-                        Xác nhận
-                      </Button>
+                </Modal.Body>
+                <Modal.Footer>
+                    {selectedBill?.status === 'paid' && (
+                        <>
+                            <Button
+                                variant="success"
+                                onClick={() => handleConfirmPayment(selectedBill._id, 'confirmed')}
+                            >
+                                <FaCheck /> Xác nhận thanh toán
+                            </Button>
+                            <Button
+                                variant="danger"
+                                onClick={() => handleConfirmPayment(selectedBill._id, 'rejected')}
+                            >
+                                <FaTimes /> Từ chối thanh toán
+                            </Button>
+                        </>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Card.Body>
-      </Card>
-    </div>
-  );
+                    <Button variant="secondary" onClick={() => setShowDetailsModal(false)}>
+                        Đóng
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+        </div>
+    );
 };
 
 export default CommissionManagement; 

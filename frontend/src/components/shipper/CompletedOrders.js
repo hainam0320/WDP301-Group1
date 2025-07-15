@@ -27,9 +27,11 @@ const CompletedOrders = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Chỉ lấy những đơn hàng đã hoàn thành
-      const completed = response.data.filter(order => order.status === 'completed');
-      setCompletedOrders(completed);
+      // Lấy những đơn hàng đã hoàn thành hoặc thất bại
+      const finishedOrders = response.data.filter(order => 
+        order.status === 'completed' || order.status === 'failed'
+      );
+      setCompletedOrders(finishedOrders);
     } catch (err) {
       console.error('Error fetching completed orders:', err);
       setError('Không thể tải danh sách đơn hàng đã hoàn thành');
@@ -142,13 +144,19 @@ const CompletedOrders = () => {
                         )}
                       </div>
                       <div className="col-md-3">
-                        <span className="badge bg-success fs-6">Hoàn thành</span>
+                        <span className={`badge fs-6 ${
+                          order.status === 'failed' ? 'bg-danger' : 'bg-success'
+                        }`}>
+                          {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
+                        </span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
                         <p className="mb-1 text-muted">
                           <strong>Ghi chú:</strong> {order.statusDescription || 'Giao thành công'}
                         </p>
                         <p className="text-muted mb-0">
-                          <small>Hoàn thành: {formatDate(order.updatedAt)}</small>
+                          <small>
+                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}: {formatDate(order.updatedAt)}
+                          </small>
                         </p>
                       </div>
                       <div className="col-md-3">

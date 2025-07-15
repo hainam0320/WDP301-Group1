@@ -6,6 +6,8 @@ import { toast } from 'react-toastify';
 const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 3;
 
   useEffect(() => {
     fetchOrders();
@@ -52,37 +54,63 @@ const OrderManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {orders.map(order => (
-                  <tr key={order._id}>
-                    <td>#{order._id}</td>
-                    <td>{order.customer}</td>
-                    <td>{order.shipper}</td>
-                    <td>{order.from} → {order.to}</td>
-                    <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                    <td>
-                      <span className={`badge ${
-                        order.status === 'completed' ? 'bg-success' : 
-                        order.status === 'in-progress' ? 'bg-warning' : 'bg-secondary'
-                      }`}>
-                        {order.status === 'completed' ? 'Hoàn thành' : 
-                         order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
-                      </span>
-                    </td>
-                    <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
-                    <td>
-                      <div className="btn-group btn-group-sm">
-                        <button className="btn btn-outline-primary" title="Xem chi tiết">
-                          <FaEye />
-                        </button>
-                        <button className="btn btn-outline-warning" title="Chỉnh sửa">
-                          <FaEdit />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {orders
+                  .slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage)
+                  .map(order => (
+                    <tr key={order._id}>
+                      <td>#{order._id}</td>
+                      <td>{order.customer}</td>
+                      <td>{order.shipper}</td>
+                      <td>{order.from} → {order.to}</td>
+                      <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
+                      <td>
+                        <span className={`badge ${
+                          order.status === 'completed' ? 'bg-success' : 
+                          order.status === 'in-progress' ? 'bg-warning' : 'bg-secondary'
+                        }`}>
+                          {order.status === 'completed' ? 'Hoàn thành' : 
+                           order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
+                        </span>
+                      </td>
+                      <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button className="btn btn-outline-primary" title="Xem chi tiết">
+                            <FaEye />
+                          </button>
+                          <button className="btn btn-outline-warning" title="Chỉnh sửa">
+                            <FaEdit />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+            {/* Pagination */}
+            {orders.length > ordersPerPage && (
+              <nav>
+                <ul className="pagination justify-content-center">
+                  <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                      Trước
+                    </button>
+                  </li>
+                  {[...Array(Math.ceil(orders.length / ordersPerPage))].map((_, idx) => (
+                    <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                      <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                        {idx + 1}
+                      </button>
+                    </li>
+                  ))}
+                  <li className={`page-item${currentPage === Math.ceil(orders.length / ordersPerPage) ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === Math.ceil(orders.length / ordersPerPage)}>
+                      Sau
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            )}
           </div>
         )}
       </div>

@@ -1,214 +1,177 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaQrcode, FaSpinner } from 'react-icons/fa';
-import { Modal, Button } from 'react-bootstrap';
+import { Table, Button, Form, Modal, Alert, Badge, Card, Row, Col, Nav } from 'react-bootstrap';
+import { FaQrcode, FaCheck, FaTimes, FaFileInvoiceDollar, FaEye, FaArrowLeft, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import { transactionAPI } from '../../services/api';
-import ShipperHeader from './ShipperHeader';
-import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const CommissionManagement = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('pending');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [overview, setOverview] = useState({
-        totalCommission: 0,
-        pendingAmount: 0,
-        confirmedAmount: 0,
-        rejectedAmount: 0
-    });
     const [pendingCommissions, setPendingCommissions] = useState([]);
-    const [commissionHistory, setCommissionHistory] = useState([]);
+    const [bulkBills, setBulkBills] = useState([]);
     const [selectedTransactions, setSelectedTransactions] = useState([]);
-
-    // QR Payment states
     const [showQRModal, setShowQRModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedBill, setSelectedBill] = useState(null);
     const [qrData, setQRData] = useState(null);
-    const [paymentStatus, setPaymentStatus] = useState(null);
-    const [statusCheckInterval, setStatusCheckInterval] = useState(null);
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('pending');
+    const [stats, setStats] = useState({
+        totalAmount: 0,
+        pendingAmount: 0,
+        paidAmount: 0
+    });
 
     useEffect(() => {
         fetchData();
-    }, []);
-
-    useEffect(() => {
-        // Khôi phục trạng thái QR và giao dịch đã chọn khi reload
-        const savedQRPayment = localStorage.getItem('currentQRPayment');
-        if (savedQRPayment) {
-            try {
-                const { qrData: savedQRData, selectedTransactions: savedTransactions, pendingTransactions, timestamp } = JSON.parse(savedQRPayment);
-                
-                // Kiểm tra xem dữ liệu có còn hợp lệ không (15 phút)
-                const isExpired = new Date().getTime() - timestamp > 15 * 60 * 1000;
-                
-                if (!isExpired && savedQRData && savedTransactions && pendingTransactions) {
-                    setQRData(savedQRData);
-                    setSelectedTransactions(savedTransactions);
-                    setPendingCommissions(pendingTransactions);
-                } else {
-                    // Xóa dữ liệu đã hết hạn
-                    localStorage.removeItem('currentQRPayment');
-                    fetchData(); // Tải lại dữ liệu mới nếu đã hết hạn
-                }
-            } catch (error) {
-                console.error('Error restoring payment state:', error);
-                localStorage.removeItem('currentQRPayment');
-                fetchData();
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
-            }
-        };
-    }, [statusCheckInterval]);
+    }, [activeTab]);
 
     const fetchData = async () => {
-        setIsLoading(true);
-        setError('');
         try {
-            const [overviewRes, pendingRes, historyRes] = await Promise.all([
-                transactionAPI.getCommissionOverview(),
+            setIsLoading(true);
+            setError('');
+            
+            // Luôn lấy cả pending transactions và bulk bills để tính toán stats chính xác
+            const [pendingResponse, bulkResponse] = await Promise.all([
                 transactionAPI.getPendingCommissions(),
-                transactionAPI.getCommissionHistory()
+                transactionAPI.getDriverBulkBills()
             ]);
 
-            if (overviewRes.data.overview) {
-                setOverview({
-                    totalCommission: overviewRes.data.overview.totalCommission || 0,
-                    pendingAmount: overviewRes.data.overview.totalPending || 0,
-                    confirmedAmount: overviewRes.data.overview.totalsByStatus?.confirmed || 0,
-                    rejectedAmount: overviewRes.data.overview.totalsByStatus?.rejected || 0
-                });
+            const pendingTransactions = pendingResponse.data.transactions || [];
+            const bills = bulkResponse.data.data || [];
+
+            // Cập nhật state tùy theo tab
+            if (activeTab === 'pending') {
+                setPendingCommissions(pendingTransactions);
+                setBulkBills(bills);
+            } else {
+                setBulkBills(bills);
             }
-            
-            if (pendingRes.data.transactions) {
-                setPendingCommissions(pendingRes.data.transactions);
-            }
-            
-            if (historyRes.data.transactions) {
-                setCommissionHistory(historyRes.data.transactions);
-            }
+
+            // Tính toán stats
+            // 1. Tính tổng tiền chờ thanh toán từ các giao dịch pending
+            const pendingAmount = pendingTransactions
+                .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+
+            // 2. Tính tổng tiền đã thanh toán từ các bill đã confirmed hoặc completed
+            const paidAmount = bills
+                .filter(bill => bill.status === 'completed' || bill.status === 'confirmed')
+                .reduce((sum, bill) => sum + (bill.total_amount || 0), 0);
+
+            // 3. Tổng hoa hồng = Chờ thanh toán + Đã thanh toán
+            const totalAmount = pendingAmount + paidAmount;
+
+            setStats({
+                totalAmount,
+                pendingAmount,
+                paidAmount
+            });
+
         } catch (err) {
-            console.error('Error fetching commission data:', err);
+            console.error('Error fetching data:', err);
             setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleSelectTransaction = (transactionId) => {
-        let newSelectedTransactions;
-        if (selectedTransactions.includes(transactionId)) {
-            newSelectedTransactions = selectedTransactions.filter(id => id !== transactionId);
-        } else {
-            newSelectedTransactions = [...selectedTransactions, transactionId];
-        }
-        
-        setSelectedTransactions(newSelectedTransactions);
-    };
-
-    const handleBulkPayment = async () => {
+    const handleBulkPayment = async (transactionIds = selectedTransactions) => {
         try {
-            if (selectedTransactions.length === 0) {
-                setError('Vui lòng chọn ít nhất một giao dịch để thanh toán');
+            if (!transactionIds || transactionIds.length === 0) {
+                toast.error('Vui lòng chọn ít nhất một giao dịch để thanh toán');
                 return;
             }
 
-            setError('');
             setIsLoading(true);
-
-            const response = await transactionAPI.createBulkQRPayment(selectedTransactions);
+            setError('');
             
-            if (response.data) {
-                setQRData(response.data);
-                setShowQRModal(true);
-                
-                const interval = setInterval(async () => {
-                    try {
-                        const statusRes = await transactionAPI.checkBulkQRPaymentStatus(response.data.bulkPaymentId);
-                        setPaymentStatus(statusRes.data.status);
-                        
-                        if (statusRes.data.status === 'completed') {
-                            clearInterval(interval);
-                            await fetchData();
-                            toast.success('Thanh toán thành công!');
-                            setTimeout(() => {
-                                setShowQRModal(false);
-                                setSelectedTransactions([]);
-                                setQRData(null);
-                                setPaymentStatus(null);
-                            }, 2000);
-                        } else if (statusRes.data.status === 'expired') {
-                            clearInterval(interval);
-                            setError('Mã QR đã hết hạn. Vui lòng thử lại.');
-                            setQRData(null);
-                        }
-                    } catch (err) {
-                        console.error('Error checking payment status:', err);
-                        clearInterval(interval);
-                        setError('Lỗi kiểm tra trạng thái thanh toán');
-                    }
-                }, 3000);
+            const response = await transactionAPI.createBulkBill(transactionIds);
+            
+            if (response.data && response.data.data) {
+                const { qrPayment } = response.data.data;
+                console.log('QR Payment data:', qrPayment);
 
-                setStatusCheckInterval(interval);
+                // Ensure we have a valid payment code
+                if (!qrPayment.paymentCode) {
+                    setError('Không nhận được mã thanh toán hợp lệ');
+                    return;
+                }
+
+                setQRData({
+                    qrCode: qrPayment.qrCode,
+                    amount: qrPayment.amount,
+                    paymentCode: qrPayment.paymentCode.trim() // Ensure no whitespace
+                });
+                
+                setShowQRModal(true);
+                setSelectedTransactions([]);
+                // Refresh data after creating bulk bill
+                fetchData();
             }
         } catch (err) {
-            console.error('Error creating bulk QR payment:', err);
-            setError(err.response?.data?.message || 'Không thể tạo mã QR thanh toán');
+            console.error('Error creating bulk payment:', err);
+            setError('Không thể tạo thanh toán: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleSelectTransaction = (transactionId) => {
+        setSelectedTransactions(prev => {
+            if (prev.includes(transactionId)) {
+                return prev.filter(id => id !== transactionId);
+            } else {
+                return [...prev, transactionId];
+            }
+        });
+    };
+
     const handleCloseQRModal = () => {
-        if (statusCheckInterval) {
-            clearInterval(statusCheckInterval);
-            setStatusCheckInterval(null);
-        }
-        
-        // Chỉ xóa QR data khi hết hạn
-        if (qrData && qrData.expiryTime && new Date(qrData.expiryTime) < new Date()) {
-            setQRData(null);
-            setError('Mã QR đã hết hạn. Vui lòng tạo mã mới.');
-        }
-        
         setShowQRModal(false);
-        // Làm mới dữ liệu để hiển thị trạng thái mới nhất
+        setQRData(null);
         fetchData();
     };
 
     const handleSimulatePayment = async () => {
         try {
+            if (!qrData || !qrData.paymentCode) {
+                setError('Không tìm thấy mã thanh toán');
+                return;
+            }
+
             setError('');
             setIsLoading(true);
             
-            await transactionAPI.simulateQRPayment(qrData.paymentCode);
-            setPaymentStatus('completed');
+            console.log('Payment data:', qrData);
+            console.log('Simulating payment with code:', qrData.paymentCode);
             
-            setTimeout(async () => {
+            const response = await transactionAPI.updateBulkQRPaymentStatus(
+                qrData.paymentCode.trim(), // Ensure no whitespace
+                'completed'
+            );
+            
+            if (response.data && response.data.success) {
+                toast.success('Thanh toán thành công!');
                 await fetchData();
                 setShowQRModal(false);
-                setSelectedTransactions([]);
                 setQRData(null);
-                setPaymentStatus(null);
-            }, 2000);
-            
+            } else {
+                setError('Lỗi khi xử lý thanh toán: ' + (response.data?.message || 'Unknown error'));
+            }
         } catch (err) {
-            console.error('Error simulating payment:', err);
-            setError('Lỗi khi giả lập thanh toán');
+            console.error('Error processing payment:', err);
+            setError('Lỗi khi xử lý thanh toán: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsLoading(false);
         }
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-            .format(amount)
-            .replace('₫', 'đ');
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount).replace('₫', 'd');
     };
 
     const formatDate = (dateString) => {
@@ -216,116 +179,299 @@ const CommissionManagement = () => {
     };
 
     const getStatusBadge = (status) => {
-        const badges = {
-            pending: <span className="badge bg-warning">Chờ thanh toán</span>,
-            paid: <span className="badge bg-info">Chờ xác nhận</span>,
-            confirmed: <span className="badge bg-success">Đã xác nhận</span>,
-            rejected: <span className="badge bg-danger">Đã từ chối</span>
-        };
-        return badges[status] || <span className="badge bg-secondary">Không xác định</span>;
+        switch (status) {
+            case 'completed':
+                return <Badge bg="success" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã hoàn thành</Badge>;
+            case 'confirmed':
+                return <Badge bg="primary" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã xác nhận</Badge>;
+            case 'rejected':
+                return <Badge bg="danger" className="px-3 py-2"><FaTimesCircle className="me-1" /> Đã từ chối</Badge>;
+            case 'paid':
+                return <Badge bg="info" className="px-3 py-2"><FaHourglassHalf className="me-1" /> Đã thanh toán - Chờ xác nhận</Badge>;
+            case 'pending':
+                return <Badge bg="warning" className="px-3 py-2"><FaClock className="me-1" /> Chờ thanh toán</Badge>;
+            default:
+                return <Badge bg="secondary" className="px-3 py-2">{status}</Badge>;
+        }
+    };
+
+    const handleViewDetails = async (billId) => {
+        try {
+            setIsLoading(true);
+            setError('');
+            const response = await transactionAPI.getDriverBulkBills();
+            const bill = response.data.data.find(b => b._id === billId);
+            if (bill) {
+                setSelectedBill(bill);
+                setShowDetailsModal(true);
+            } else {
+                toast.error('Không thể tải chi tiết bill');
+            }
+        } catch (err) {
+            console.error('Error fetching bill details:', err);
+            toast.error('Không thể tải chi tiết bill');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Helper: check if commission is overdue (>= 3 days)
+    const isOverdue = (createdAt) => {
+        if (!createdAt) return false;
+        const now = new Date();
+        const created = new Date(createdAt);
+        const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+        return diffDays >= 3;
+    };
+
+    const renderContent = () => {
+        if (activeTab === 'pending') {
+            return (
+                <>
+                    {selectedTransactions.length > 0 && (
+                        <div className="p-3 border-bottom">
+                            <Button 
+                                variant="primary"
+                                onClick={() => handleBulkPayment()}
+                                disabled={isLoading}
+                            >
+                                <FaQrcode className="me-2" />
+                                Thanh toán {selectedTransactions.length} khoản đã chọn
+                            </Button>
+                        </div>
+                    )}
+                    <div className="table-responsive">
+                        <Table className="mb-0">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <Form.Check
+                                            type="checkbox"
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedTransactions(pendingCommissions.map(t => t._id));
+                                                } else {
+                                                    setSelectedTransactions([]);
+                                                }
+                                            }}
+                                            checked={
+                                                pendingCommissions.length > 0 &&
+                                                selectedTransactions.length === pendingCommissions.length
+                                            }
+                                        />
+                                    </th>
+                                    <th>Mã giao dịch</th>
+                                    <th>Số tiền</th>
+                                    <th>Trạng thái</th>
+                                    <th>Ngày tạo</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pendingCommissions.map(transaction => (
+                                    <tr key={transaction._id}>
+                                        <td>
+                                            <Form.Check
+                                                type="checkbox"
+                                                onChange={() => handleSelectTransaction(transaction._id)}
+                                                checked={selectedTransactions.includes(transaction._id)}
+                                            />
+                                        </td>
+                                        <td>{transaction._id}</td>
+                                        <td>{formatCurrency(transaction.amount)}</td>
+                                        <td>{getStatusBadge(transaction.status)}</td>
+                                        <td>{formatDate(transaction.createdAt)}</td>
+                                        <td>
+                                            <Button 
+                                                variant="primary"
+                                                size="sm"
+                                                onClick={() => handleBulkPayment([transaction._id])}
+                                                disabled={isLoading}
+                                            >
+                                                <FaQrcode className="me-1" />
+                                                Thanh toán
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {pendingCommissions.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="text-center py-3">
+                                            Không có giao dịch nào chờ thanh toán
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </Table>
+                    </div>
+                </>
+            );
+        } else {
+            return (
+                <div className="table-responsive">
+                    <Table className="mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã Bill</th>
+                                <th>Số giao dịch</th>
+                                <th>Tổng tiền</th>
+                                <th>Trạng thái</th>
+                                <th>Ngày tạo</th>
+                                <th>Ngày xác nhận</th>
+                                <th>Ghi chú</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {bulkBills.filter(bill => bill.status !== 'pending').map(bill => (
+                                <tr key={bill._id}>
+                                    <td>{bill._id}</td>
+                                    <td>{bill.transactions.length}</td>
+                                    <td>{formatCurrency(bill.total_amount)}</td>
+                                    <td>{getStatusBadge(bill.status)}</td>
+                                    <td>{formatDate(bill.createdAt)}</td>
+                                    <td>{bill.confirmed_at ? formatDate(bill.confirmed_at) : '-'}</td>
+                                    <td className="text-muted small">{bill.remarks || '-'}</td>
+                                    <td>
+                                        <Button
+                                            variant="info"
+                                            size="sm"
+                                            onClick={() => handleViewDetails(bill._id)}
+                                        >
+                                            <FaEye />
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {bulkBills.filter(bill => bill.status !== 'pending').length === 0 && (
+                                <tr>
+                                    <td colSpan={8} className="text-center py-3">
+                                        Không có lịch sử thanh toán
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </Table>
+                </div>
+            );
+        }
     };
 
     return (
-        <div className="min-vh-100 bg-light">
-            <ShipperHeader />
-            <div className="container py-4">
-                <button 
-                    className="btn btn-link text-decoration-none mb-4"
-                    onClick={() => navigate('/shipper')}
+        <div className="p-4">
+            {/* Header */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="mb-0">Quản lý hoa hồng</h4>
+                <Button 
+                    variant="outline-secondary" 
+                    onClick={() => navigate(-1)}
+                    className="d-flex align-items-center gap-2"
                 >
-                    <FaArrowLeft className="me-2" />
-                    Quay lại
-                </button>
+                    <FaArrowLeft /> Quay lại
+                </Button>
+            </div>
 
-                {error && (
-                    <div className="alert alert-danger mb-4">
-                        {error}
-                    </div>
-                )}
+            {/* Stats Cards */}
+            <Row className="mb-4 g-3">
+                <Col sm={6} md={4}>
+                    <Card className="h-100 border-0 shadow-sm hover-shadow">
+                        <Card.Body className="d-flex align-items-center p-4">
+                            <div className="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                                <FaMoneyBillWave className="text-primary fs-3" />
+                            </div>
+                            <div>
+                                <h6 className="text-muted mb-1">Tổng hoa hồng</h6>
+                                <h4 className="mb-0 fw-bold text-primary">{formatCurrency(stats.totalAmount)}</h4>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col sm={6} md={4}>
+                    <Card className="h-100 border-0 shadow-sm hover-shadow">
+                        <Card.Body className="d-flex align-items-center p-4">
+                            <div className="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                                <FaClock className="text-warning fs-3" />
+                            </div>
+                            <div>
+                                <h6 className="text-muted mb-1">Chờ thanh toán</h6>
+                                <h4 className="mb-0 fw-bold text-warning">{formatCurrency(stats.pendingAmount)}</h4>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col sm={6} md={4}>
+                    <Card className="h-100 border-0 shadow-sm hover-shadow">
+                        <Card.Body className="d-flex align-items-center p-4">
+                            <div className="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                                <FaCheckCircle className="text-success fs-3" />
+                            </div>
+                            <div>
+                                <h6 className="text-muted mb-1">Đã thanh toán</h6>
+                                <h4 className="mb-0 fw-bold text-success">{formatCurrency(stats.paidAmount)}</h4>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
 
-                {/* Essential Stats Cards */}
-                <div className="row g-3 mb-4">
-                    <div className="col-md-3">
-                        <div className="card bg-primary text-white h-100">
-                            <div className="card-body text-center">
-                                <h6 className="mb-2">Tổng hoa hồng</h6>
-                                <h4 className="mb-0">{formatCurrency(overview.totalCommission)}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-md-3">
-                        <div className="card bg-warning h-100">
-                            <div className="card-body text-center">
-                                <h6 className="mb-2">Chờ thanh toán</h6>
-                                <h4 className="mb-0">{formatCurrency(overview.pendingAmount)}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-md-3">
-                        <div className="card bg-success text-white h-100">
-                            <div className="card-body text-center">
-                                <h6 className="mb-2">Đã xác nhận</h6>
-                                <h4 className="mb-0">{formatCurrency(overview.confirmedAmount)}</h4>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-md-3">
-                        <div className="card bg-danger text-white h-100">
-                            <div className="card-body text-center">
-                                <h6 className="mb-2">Đã từ chối</h6>
-                                <h4 className="mb-0">{formatCurrency(overview.rejectedAmount)}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {/* Navigation Tabs */}
+            <Card className="border-0 shadow-sm mb-4">
+                <Card.Body className="p-0">
+                    <Nav variant="tabs" className="nav-tabs-custom" activeKey={activeTab} onSelect={setActiveTab}>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="pending" 
+                                className="px-4 py-3 text-center"
+                            >
+                                <FaClock className="me-2" />
+                                Chờ thanh toán
+                            </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                            <Nav.Link 
+                                eventKey="history" 
+                                className="px-4 py-3 text-center"
+                            >
+                                <FaFileInvoiceDollar className="me-2" />
+                                Lịch sử thanh toán
+                            </Nav.Link>
+                        </Nav.Item>
+                    </Nav>
+                </Card.Body>
+            </Card>
 
-                {/* Transaction Tabs */}
-                <div className="card">
-                    <div className="card-header bg-white">
-                        <ul className="nav nav-tabs card-header-tabs">
-                            <li className="nav-item">
-                                <button
-                                    className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('pending')}
-                                >
-                                    Chờ thanh toán
-                                </button>
-                            </li>
-                            <li className="nav-item">
-                                <button
-                                    className={`nav-link ${activeTab === 'history' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('history')}
-                                >
-                                    Lịch sử thanh toán
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div className="card-body p-0">
-                        {activeTab === 'pending' && selectedTransactions.length > 0 && (
-                            <div className="p-3 border-bottom">
-                                <Button 
-                                    variant="primary"
-                                    onClick={handleBulkPayment}
-                                    disabled={isLoading}
-                                >
-                                    <FaQrcode className="me-2" />
-                                    Thanh toán {selectedTransactions.length} khoản đã chọn
-                                </Button>
-                            </div>
-                        )}
-                        <div className="table-responsive">
-                            <table className="table table-hover mb-0">
-                                <thead className="bg-light">
-                                    <tr>
-                                        {activeTab === 'pending' && (
-                                            <th className="text-center" style={{width: '40px'}}>
-                                                <input 
+            {/* Error Alert */}
+            {error && (
+                <Alert variant="danger" className="mb-4">
+                    {error}
+                </Alert>
+            )}
+
+            {/* Content Card */}
+            <Card className="border-0 shadow-sm">
+                <Card.Body className="p-0">
+                    {activeTab === 'pending' ? (
+                        <>
+                            {selectedTransactions.length > 0 && (
+                                <div className="p-4 border-bottom">
+                                    <Button 
+                                        variant="primary"
+                                        onClick={() => handleBulkPayment()}
+                                        disabled={isLoading}
+                                        className="d-flex align-items-center gap-2 px-4 py-2"
+                                    >
+                                        <FaQrcode />
+                                        Thanh toán {selectedTransactions.length} khoản đã chọn
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="table-responsive">
+                                <Table hover className="align-middle mb-0">
+                                    <thead>
+                                        <tr className="bg-light">
+                                            <th className="py-3">
+                                                <Form.Check
                                                     type="checkbox"
-                                                    checked={
-                                                        pendingCommissions.length > 0 &&
-                                                        selectedTransactions.length === pendingCommissions.length
-                                                    }
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
                                                             setSelectedTransactions(pendingCommissions.map(t => t._id));
@@ -333,114 +479,311 @@ const CommissionManagement = () => {
                                                             setSelectedTransactions([]);
                                                         }
                                                     }}
+                                                    checked={
+                                                        pendingCommissions.length > 0 &&
+                                                        selectedTransactions.length === pendingCommissions.length
+                                                    }
                                                 />
                                             </th>
+                                            <th className="py-3">Mã giao dịch</th>
+                                            <th className="py-3">Số tiền</th>
+                                            <th className="py-3">Trạng thái</th>
+                                            <th className="py-3">Ngày tạo</th>
+                                            <th className="py-3">Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingCommissions.map(transaction => {
+                                            const overdue = isOverdue(transaction.createdAt);
+                                            return (
+                                                <tr key={transaction._id} className={`border-bottom${overdue ? ' bg-danger bg-opacity-25' : ''}`}> 
+                                                    <td>
+                                                        <Form.Check
+                                                            type="checkbox"
+                                                            onChange={() => handleSelectTransaction(transaction._id)}
+                                                            checked={selectedTransactions.includes(transaction._id)}
+                                                        />
+                                                    </td>
+                                                    <td className="text-primary fw-medium">
+                                                        {transaction._id}
+                                                        {overdue && <FaExclamationTriangle className="ms-2 text-danger" title="Quá hạn 3 ngày" />}
+                                                    </td>
+                                                    <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
+                                                    <td>{getStatusBadge(transaction.status)}</td>
+                                                    <td>
+                                                        <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                        <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                                    </td>
+                                                    <td>
+                                                        <Button 
+                                                            variant="outline-primary"
+                                                            size="sm"
+                                                            onClick={() => handleBulkPayment([transaction._id])}
+                                                            disabled={isLoading}
+                                                            className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                                                        >
+                                                            <FaQrcode />
+                                                            Thanh toán
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {pendingCommissions.length === 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="text-center py-5">
+                                                    <div className="text-muted">
+                                                        <FaMoneyBillWave className="fs-1 mb-3" />
+                                                        <div>Không có giao dịch nào chờ thanh toán</div>
+                                                    </div>
+                                                </td>
+                                            </tr>
                                         )}
-                                        <th>Mã giao dịch</th>
-                                        <th>Số tiền</th>
-                                        <th>Ngày tạo</th>
-                                        <th>Trạng thái</th>
-                                        {activeTab === 'history' && (
-                                            <>
-                                                <th>Ngày xác nhận</th>
-                                                <th>Ghi chú</th>
-                                            </>
-                                        )}
-                                        {activeTab === 'pending' && <th>Thao tác</th>}
+                                    </tbody>
+                                </Table>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="table-responsive">
+                            <Table hover className="align-middle mb-0">
+                                <thead>
+                                    <tr className="bg-light">
+                                        <th className="py-3">Mã Bill</th>
+                                        <th className="py-3">Số giao dịch</th>
+                                        <th className="py-3">Tổng tiền</th>
+                                        <th className="py-3">Trạng thái</th>
+                                        <th className="py-3">Ngày tạo</th>
+                                        <th className="py-3">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(activeTab === 'pending' ? pendingCommissions : commissionHistory).map(transaction => (
-                                        <tr key={transaction._id}>
-                                            {activeTab === 'pending' && (
-                                                <td className="text-center">
-                                                    <input 
-                                                        type="checkbox"
-                                                        checked={selectedTransactions.includes(transaction._id)}
-                                                        onChange={() => handleSelectTransaction(transaction._id)}
-                                                    />
-                                                </td>
-                                            )}
-                                            <td className="text-primary small">{transaction._id}</td>
-                                            <td>{formatCurrency(transaction.amount)}</td>
-                                            <td>{formatDate(transaction.createdAt)}</td>
-                                            <td>{getStatusBadge(transaction.status)}</td>
-                                            {activeTab === 'history' ? (
-                                                <>
-                                                    <td>{transaction.confirmed_at ? formatDate(transaction.confirmed_at) : '-'}</td>
-                                                    <td className="text-muted small">{transaction.remarks || '-'}</td>
-                                                </>
-                                            ) : (
-                                                <td>
-                                                    <Button 
-                                                        variant="primary"
-                                                        size="sm"
-                                                        onClick={() => handleBulkPayment([transaction._id])}
-                                                        disabled={isLoading}
-                                                    >
-                                                        Thanh toán
-                                                    </Button>
-                                                </td>
-                                            )}
+                                    {bulkBills.filter(bill => bill.status === 'completed' || bill.status === 'confirmed' || bill.status === 'paid' || bill.status === 'rejected').map(bill => (
+                                        <tr key={bill._id} className="border-bottom">
+                                            <td className="text-primary fw-medium">{bill._id}</td>
+                                            <td className="fw-medium">{bill.transactions?.length || 0}</td>
+                                            <td className="fw-bold">{formatCurrency(bill.total_amount)}</td>
+                                            <td>{getStatusBadge(bill.status)}</td>
+                                            <td>
+                                                <div className="fw-medium">{new Date(bill.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                <small className="text-muted">{new Date(bill.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                            </td>
+                                            <td>
+                                                <Button
+                                                    variant="outline-info"
+                                                    size="sm"
+                                                    onClick={() => handleViewDetails(bill._id)}
+                                                    className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                                                >
+                                                    <FaEye />
+                                                    Chi tiết
+                                                </Button>
+                                            </td>
                                         </tr>
                                     ))}
-                                    {(activeTab === 'pending' ? pendingCommissions : commissionHistory).length === 0 && (
+                                    {bulkBills.filter(bill => bill.status === 'completed' || bill.status === 'confirmed' || bill.status === 'paid' || bill.status === 'rejected').length === 0 && (
                                         <tr>
-                                            <td colSpan={activeTab === 'history' ? 6 : 5} className="text-center py-3">
-                                                Không có giao dịch nào
+                                            <td colSpan={6} className="text-center py-5">
+                                                <div className="text-muted">
+                                                    <FaMoneyBillWave className="fs-1 mb-3" />
+                                                    <div>Không có lịch sử thanh toán</div>
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
                                 </tbody>
-                            </table>
+                            </Table>
                         </div>
-                    </div>
-                </div>
+                    )}
+                </Card.Body>
+            </Card>
 
-                {/* QR Payment Modal */}
-                <Modal show={showQRModal} onHide={handleCloseQRModal} centered>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Quét mã QR để thanh toán</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body className="text-center">
-                        {qrData && (
-                            <>
-                                <img src={qrData.qrCode} alt="QR Code" className="img-fluid mb-3" />
-                                <p className="mb-2">Số tiền: {formatCurrency(qrData.amount)}</p>
-                                <p className="text-muted small">
-                                    Mã QR sẽ hết hạn sau: {new Date(qrData.expiryTime).toLocaleTimeString('vi-VN')}
-                                </p>
-                                {paymentStatus === 'completed' && (
-                                    <div className="alert alert-success">
-                                        Thanh toán thành công!
+            {/* QR Modal */}
+            <Modal 
+                show={showQRModal} 
+                onHide={handleCloseQRModal}
+                centered
+            >
+                <Modal.Header closeButton className="border-0 pb-0">
+                    <Modal.Title className="fs-5">
+                        <FaQrcode className="me-2" />
+                        Quét mã QR để thanh toán
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="px-4">
+                    {qrData && (
+                        <div className="text-center">
+                            <div className="alert alert-light border-0 rounded-3 mb-4">
+                                <div className="d-flex align-items-center mb-3">
+                                    <div className="me-3">
+                                        <FaMoneyBillWave className="fs-3 text-primary" />
+                                    </div>
+                                    <div className="text-start">
+                                        <h6 className="mb-1">Thông tin thanh toán</h6>
+                                        <div className="text-muted small">Mã thanh toán: {qrData.paymentCode}</div>
+                                    </div>
+                                </div>
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <div className="text-muted">Số tiền cần thanh toán:</div>
+                                    <div className="fs-5 fw-bold text-primary">{formatCurrency(qrData.amount)}</div>
+                                </div>
+                            </div>
+
+                            <div className="mb-4 p-3 border rounded-3">
+                                <img 
+                                    src={qrData.qrCode} 
+                                    alt="QR Code" 
+                                    style={{ maxWidth: '100%', height: 'auto' }}
+                                />
+                            </div>
+
+                            {/* For development/testing only */}
+                            <Button
+                                variant="success"
+                                onClick={handleSimulatePayment}
+                                disabled={isLoading}
+                                className="w-100 mb-3 d-flex align-items-center justify-content-center gap-2"
+                            >
+                                <FaCheck />
+                                Giả lập thanh toán thành công
+                            </Button>
+                        </div>
+                    )}
+                    {error && (
+                        <Alert variant="danger" className="mb-0">
+                            {error}
+                        </Alert>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0">
+                    <Button 
+                        variant="light" 
+                        onClick={handleCloseQRModal}
+                        className="rounded-pill px-4"
+                    >
+                        Đóng
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Details Modal */}
+            <Modal 
+                show={showDetailsModal} 
+                onHide={() => setShowDetailsModal(false)}
+                size="lg"
+                centered
+            >
+                <Modal.Header closeButton className="border-0 pb-0">
+                    <Modal.Title className="fs-5">
+                        <FaEye className="me-2" />
+                        Chi tiết Bill
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="px-4">
+                    {isLoading ? (
+                        <div className="text-center py-5">
+                            <div className="spinner-border text-primary" role="status">
+                                <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <div className="mt-3 text-muted">Đang tải dữ liệu...</div>
+                        </div>
+                    ) : selectedBill ? (
+                        <>
+                            <div className="alert alert-light border-0 rounded-3 mb-4">
+                                <div className="d-flex align-items-center mb-3">
+                                    <div className="me-3">
+                                        <FaMoneyBillWave className="fs-3 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h6 className="mb-1">Thông tin chung</h6>
+                                        <div className="text-muted small">Mã bill: {selectedBill._id}</div>
+                                    </div>
+                                </div>
+                                <Row className="g-3">
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Tổng tiền</div>
+                                        <div className="fw-bold text-primary">{formatCurrency(selectedBill.total_amount)}</div>
+                                    </Col>
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Trạng thái</div>
+                                        <div>{getStatusBadge(selectedBill.status)}</div>
+                                    </Col>
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Ngày tạo</div>
+                                        <div className="fw-medium">{formatDate(selectedBill.createdAt)}</div>
+                                    </Col>
+                                    {selectedBill.paid_at && (
+                                        <Col md={6}>
+                                            <div className="text-muted small mb-1">Ngày thanh toán</div>
+                                            <div className="fw-medium">{formatDate(selectedBill.paid_at)}</div>
+                                        </Col>
+                                    )}
+                                </Row>
+                                {selectedBill.remarks && (
+                                    <div className="mt-3 pt-3 border-top">
+                                        <div className="text-muted small mb-1">Ghi chú từ Admin</div>
+                                        <div className="alert alert-light border-0 rounded-3 mb-0">
+                                            <div className="d-flex">
+                                                <div className="me-3">
+                                                    <FaInfoCircle className="text-primary fs-5" />
+                                                </div>
+                                                <div>{selectedBill.remarks}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
-                            </>
-                        )}
-                        {isLoading && (
-                            <div className="text-center">
-                                <FaSpinner className="fa-spin" />
-                                <p>Đang xử lý...</p>
                             </div>
-                        )}
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button 
-                            variant="secondary" 
-                            onClick={handleCloseQRModal}
-                        >
-                            Đóng
-                        </Button>
-                        <Button 
-                            variant="success"
-                            onClick={handleSimulatePayment}
-                            disabled={isLoading || paymentStatus === 'completed'}
-                        >
-                            Giả lập thanh toán
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-            </div>
+
+                            <div className="mb-3">
+                                <h6 className="mb-4">Danh sách giao dịch</h6>
+                                <div className="table-responsive">
+                                    <Table hover className="align-middle">
+                                        <thead>
+                                            <tr className="bg-light">
+                                                <th className="py-3">Mã giao dịch</th>
+                                                <th className="text-end py-3">Số tiền</th>
+                                                <th className="text-center py-3">Trạng thái</th>
+                                                <th className="py-3">Ngày tạo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedBill.transactions?.map(transaction => (
+                                                <tr key={transaction._id} className="border-bottom">
+                                                    <td className="text-primary fw-medium">{transaction._id}</td>
+                                                    <td className="text-end fw-bold">{formatCurrency(transaction.amount)}</td>
+                                                    <td className="text-center">{getStatusBadge(transaction.status)}</td>
+                                                    <td className="text-nowrap">
+                                                        <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                        <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {(!selectedBill.transactions || selectedBill.transactions.length === 0) && (
+                                                <tr>
+                                                    <td colSpan={4} className="text-center py-5">
+                                                        <div className="text-muted">
+                                                            <FaMoneyBillWave className="fs-1 mb-3" />
+                                                            <div>Không có giao dịch nào</div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </Table>
+                                </div>
+                            </div>
+                        </>
+                    ) : null}
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0">
+                    <Button 
+                        variant="light" 
+                        onClick={() => setShowDetailsModal(false)}
+                        className="rounded-pill px-4"
+                    >
+                        Đóng
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };

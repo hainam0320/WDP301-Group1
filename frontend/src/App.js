@@ -32,6 +32,7 @@ import RevenueReport from './components/admin/RevenueReport';
 import ReportManagement from './components/admin/ReportManagement';
 import SystemSettings from './components/admin/SystemSettings';
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
+import ForgotPassword from './pages/ForgotPassword';
 
 function App() {
   const socket = useRef(null);
@@ -93,6 +94,7 @@ function App() {
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           
           {/* User Routes */}
           <Route 

@@ -181,66 +181,68 @@ const DeliveryMap = ({ onLocationUpdate, pickupLocation, deliveryLocation }) => 
           <div className="alert alert-info">Click vào bản đồ để chọn {isSelectingPoint === 'pickup' ? 'điểm lấy hàng' : 'điểm giao hàng'}</div>
         )}
 
-        <div className="position-relative mb-2">
-          <div className="input-group">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Điểm lấy hàng..."
-              value={pickupLocation}
-              onChange={(e) => {
-                onLocationUpdate('pickup', e.target.value, null);
-                handleSearch(e.target.value, 'pickup');
-              }}
-            />
-            <button
-              className={`btn ${isSelectingPoint === 'pickup' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setIsSelectingPoint(isSelectingPoint === 'pickup' ? null : 'pickup')}
-            >
-              <FaMapMarkerAlt />
-            </button>
-          </div>
-          {isLoading && <div className="spinner-border spinner-border-sm text-primary position-absolute top-50 end-0 me-3" role="status" />}
-          {searchResults.length > 0 && (
-            <div className="position-absolute w-100 mt-1 shadow-sm bg-white rounded border z-3">
-              {searchResults.map((result, index) => (
-                <button key={index} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(result, 'pickup')}>
-                  {result.display_name}
-                </button>
-              ))}
+        <div className="d-flex gap-3 mb-2 position-relative" style={{zIndex: 10}}>
+          <div className="flex-fill position-relative">
+            <div className="input-group">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Điểm lấy hàng..."
+                value={pickupLocation}
+                onChange={(e) => {
+                  onLocationUpdate('pickup', e.target.value, null);
+                  handleSearch(e.target.value, 'pickup');
+                }}
+              />
+              <button
+                className={`btn ${isSelectingPoint === 'pickup' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setIsSelectingPoint(isSelectingPoint === 'pickup' ? null : 'pickup')}
+              >
+                <FaMapMarkerAlt />
+              </button>
             </div>
-          )}
-        </div>
+            {isLoading && <div className="spinner-border spinner-border-sm text-primary position-absolute top-50 end-0 me-3" role="status" />}
+            {searchResults.length > 0 && (
+              <div className="position-absolute w-100 mt-1 shadow-sm bg-white rounded border z-3" style={{top: '100%', left: 0}}>
+                {searchResults.map((result, index) => (
+                  <button key={index} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(result, 'pickup')}>
+                    {result.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="position-relative">
-          <div className="input-group">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Điểm giao hàng..."
-              value={deliveryLocation}
-              onChange={(e) => {
-                onLocationUpdate('delivery', e.target.value, null);
-                handleSearch(e.target.value, 'delivery');
-              }}
-            />
-            <button
-              className={`btn ${isSelectingPoint === 'delivery' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setIsSelectingPoint(isSelectingPoint === 'delivery' ? null : 'delivery')}
-            >
-              <FaMapMarkerAlt />
-            </button>
-          </div>
-          {isLoading && <div className="spinner-border spinner-border-sm text-primary position-absolute top-50 end-0 me-3" role="status" />}
-          {searchResults.length > 0 && (
-            <div className="position-absolute w-100 mt-1 shadow-sm bg-white rounded border z-3">
-              {searchResults.map((result, index) => (
-                <button key={index} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(result, 'delivery')}>
-                  {result.display_name}
-                </button>
-              ))}
+          <div className="flex-fill position-relative">
+            <div className="input-group">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Điểm giao hàng..."
+                value={deliveryLocation}
+                onChange={(e) => {
+                  onLocationUpdate('delivery', e.target.value, null);
+                  handleSearch(e.target.value, 'delivery');
+                }}
+              />
+              <button
+                className={`btn ${isSelectingPoint === 'delivery' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setIsSelectingPoint(isSelectingPoint === 'delivery' ? null : 'delivery')}
+              >
+                <FaMapMarkerAlt />
+              </button>
             </div>
-          )}
+            {isLoading && <div className="spinner-border spinner-border-sm text-primary position-absolute top-50 end-0 me-3" role="status" />}
+            {searchResults.length > 0 && (
+              <div className="position-absolute w-100 mt-1 shadow-sm bg-white rounded border z-3" style={{top: '100%', left: 0}}>
+                {searchResults.map((result, index) => (
+                  <button key={index} className="btn btn-light w-100 text-start border-0 py-2" onClick={() => handleLocationSelect(result, 'delivery')}>
+                    {result.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
