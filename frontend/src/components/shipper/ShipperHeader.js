@@ -4,6 +4,7 @@ import { FaUser, FaStar, FaSignOutAlt } from 'react-icons/fa';
 import axios from 'axios';
 import logo from '../../assets/img/favicon.png';
 import NotificationBell from '../NotificationBell';
+import { transactionAPI } from '../../services/api';
 
 const ShipperHeader = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const ShipperHeader = () => {
   });
 
   const [driverAvgRate, setDriverAvgRate] = useState({ avg: 0, count: 0 });
+  const [showCommissionWarning, setShowCommissionWarning] = useState(false);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -39,6 +41,26 @@ const ShipperHeader = () => {
       }
     };
     fetchDriverAvgRate();
+  }, []);
+
+  useEffect(() => {
+    const fetchOldPendingCommissions = async () => {
+      try {
+        const response = await transactionAPI.getPendingCommissions();
+        const transactions = response.data.transactions || [];
+        const now = new Date();
+        const hasOld = transactions.some(tran => {
+          if (!tran.createdAt) return false;
+          const created = new Date(tran.createdAt);
+          const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+          return diffDays >= 3;
+        });
+        setShowCommissionWarning(hasOld);
+      } catch (err) {
+        setShowCommissionWarning(false);
+      }
+    };
+    fetchOldPendingCommissions();
   }, []);
 
   const handleLogout = () => {
@@ -71,7 +93,11 @@ const ShipperHeader = () => {
           <img src={logo} alt="Logo" width="40" height="40" className="me-3" />
           <span className="navbar-brand h3 mb-0">Shipper Dashboard</span>
         </div>
-        
+        {showCommissionWarning && (
+          <div className="alert alert-warning mb-0 ms-4 py-2 px-3" style={{fontWeight:600, fontSize:'1rem'}}>
+            Bạn có đơn hoa hồng đã quá hạn 3 ngày, vui lòng thanh toán!
+          </div>
+        )}
         <nav className="header-nav ms-auto">
           <ul className="d-flex align-items-center">
             
