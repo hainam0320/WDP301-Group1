@@ -3,6 +3,7 @@ const Order = require('../model/orderModel');
 const Rate = require('../model/rateModel');
 const Driver = require('../model/driverModel');
 const Report = require('../model/reportModel');
+const Notification = require('../model/notificationModel');
 const mongoose = require('mongoose');
 
 // Get dashboard statistics
@@ -156,6 +157,7 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    const { io, connectedUsers } = req;
 
     // Try to update in User collection
     let user = await User.findById(req.params.id);
@@ -180,12 +182,28 @@ exports.updateUserStatus = async (req, res) => {
     // If not found in User collection, try Driver collection
     let driver = await Driver.findById(req.params.id);
     if (driver) {
+      // Lưu lại trạng thái cũ để so sánh
+      const oldStatus = driver.status;
+
       driver = await Driver.findByIdAndUpdate(
         req.params.id,
         { status: status },
         { new: true }
       ).select('-password');
       
+      // Gửi thông báo nếu tài khoản được duyệt
+      if (status === true && oldStatus === false) {
+        const notification = new Notification({
+          recipient: driver._id,
+          recipientModel: 'Driver',
+          title: 'Tài khoản đã được duyệt!',
+          message: 'Chúc mừng! Tài khoản của bạn đã được phê duyệt và có thể bắt đầu nhận đơn.',
+          link: '/shipper/available-orders',
+          type: 'GENERAL'
+        });
+        await notification.save();
+      }
+
       return res.json({
         _id: driver._id,
         fullName: driver.fullName,
@@ -204,7 +222,7 @@ exports.updateUserStatus = async (req, res) => {
     return res.status(404).json({ message: 'User/Driver not found' });
   } catch (error) {
     console.error('Error updating user status:', error);
-    res.status(500).json({ message: 'Error updating user status', error: error.message });
+    res.status(500).json({ message: 'Error updating user status' });
   }
 };
 

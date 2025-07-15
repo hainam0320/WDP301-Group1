@@ -490,4 +490,36 @@ router.get('/earnings', protect, async (req, res) => {
   }
 });
 
+// GET count of available orders
+router.get('/orders/available/count', protect, async (req, res) => {
+  try {
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const count = await Order.countDocuments({ 
+      status: 'pending',
+      driverId: { $exists: false } 
+    });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching available orders count' });
+  }
+});
+
+// GET count of ongoing orders for the current driver
+router.get('/orders/ongoing/count', protect, async (req, res) => {
+  try {
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const count = await Order.countDocuments({
+      driverId: req.user._id,
+      status: { $in: ['accepted', 'in-progress', 'delivering'] } // Thêm các trạng thái đang thực hiện nếu có
+    });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching ongoing orders count' });
+  }
+});
+
 module.exports = router; 

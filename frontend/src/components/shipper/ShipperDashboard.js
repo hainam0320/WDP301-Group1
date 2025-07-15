@@ -4,7 +4,7 @@ import { FaUser, FaShippingFast, FaDollarSign, FaHistory, FaStar, FaRoute, FaChe
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import ShipperHeader from './ShipperHeader';
-import { transactionAPI } from '../../services/api';
+import { transactionAPI, shipperAPI } from '../../services/api';
 
 const ShipperDashboard = () => {
   const navigate = useNavigate();
@@ -18,15 +18,41 @@ const ShipperDashboard = () => {
     totalDeliveries: 0
   });
   const [pendingCommissionCount, setPendingCommissionCount] = useState(0);
+  const [availableOrdersCount, setAvailableOrdersCount] = useState(0);
+  const [ongoingOrdersCount, setOngoingOrdersCount] = useState(0);
 
   useEffect(() => {
-    fetchEarnings();
-    fetchPendingCommissions();
+    fetchDashboardData();
 
-    // Cập nhật số lượng hoa hồng mỗi 5 phút
-    const interval = setInterval(fetchPendingCommissions, 5 * 60 * 1000);
+    // Cập nhật số liệu mỗi 30 giây
+    const interval = setInterval(fetchDashboardData, 30 * 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+        await Promise.all([
+            fetchEarnings(),
+            fetchPendingCommissions(),
+            fetchOrderCounts()
+        ]);
+    } catch (error) {
+        console.error("Failed to fetch all dashboard data", error);
+    }
+  };
+
+  const fetchOrderCounts = async () => {
+    try {
+        const [availableRes, ongoingRes] = await Promise.all([
+            shipperAPI.getAvailableOrdersCount(),
+            shipperAPI.getOngoingOrdersCount()
+        ]);
+        setAvailableOrdersCount(availableRes.data.count || 0);
+        setOngoingOrdersCount(ongoingRes.data.count || 0);
+    } catch (error) {
+        console.error('Error fetching order counts:', error);
+    }
+  };
 
   const fetchEarnings = async () => {
     try {
@@ -117,18 +143,24 @@ const ShipperDashboard = () => {
               <h5 className="fw-bold mb-4">Menu</h5>
               <div className="list-group list-group-flush">
                 <button 
-                  className="list-group-item list-group-item-action border-0"
+                  className="list-group-item list-group-item-action border-0 d-flex justify-content-between align-items-center"
                   onClick={() => navigate('/shipper/available-orders')}
                 >
-                  <FaShippingFast className="me-2" />
-                  Đơn hàng khả dụng
+                  <span>
+                    <FaShippingFast className="me-2" />
+                    Đơn hàng khả dụng
+                  </span>
+                  {availableOrdersCount > 0 && <span className="badge bg-success rounded-pill">{availableOrdersCount}</span>}
                 </button>
                 <button 
-                  className="list-group-item list-group-item-action border-0"
+                  className="list-group-item list-group-item-action border-0 d-flex justify-content-between align-items-center"
                   onClick={() => navigate('/shipper/my-orders')}
                 >
-                  <FaRoute className="me-2" />
-                  Đơn hàng đang thực hiện
+                  <span>
+                    <FaRoute className="me-2" />
+                    Đơn hàng đang thực hiện
+                  </span>
+                  {ongoingOrdersCount > 0 && <span className="badge bg-primary rounded-pill">{ongoingOrdersCount}</span>}
                 </button>
                 <button 
                   className="list-group-item list-group-item-action border-0"
@@ -181,6 +213,7 @@ const ShipperDashboard = () => {
                     >
                       <FaShippingFast className="me-2" />
                       Đơn hàng khả dụng
+                      {availableOrdersCount > 0 && <span className="badge bg-danger rounded-pill ms-2">{availableOrdersCount}</span>}
                     </button>
                   </div>
                   <div className="col-md-4">
@@ -200,7 +233,7 @@ const ShipperDashboard = () => {
                       <FaPercentage className="me-2" />
                       Thanh toán hoa hồng
                       {pendingCommissionCount > 0 && (
-                        <span className="badge bg-danger ms-2">{pendingCommissionCount}</span>
+                        <span className="badge bg-danger rounded-pill ms-2">{pendingCommissionCount}</span>
                       )}
                     </button>
                   </div>
