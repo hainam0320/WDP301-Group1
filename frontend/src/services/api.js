@@ -183,20 +183,35 @@ export const transactionAPI = {
   // Lấy tổng quan về hoa hồng
   getCommissionOverview: () => api.get('/transactions/driver/overview'),
 
-  // Tạo mã QR cho giao dịch
-  createQRPayment: (transactionId) => api.post(`/transactions/qr/create/${transactionId}`),
+  // Tạo hóa đơn tổng cho nhiều giao dịch
+  createBulkBill: (transactionIds) => api.post('/transactions/bulk-bill/create', { transactionIds }),
 
-  // Tạo mã QR cho nhiều giao dịch
-  createBulkQRPayment: (transactionIds) => api.post('/transactions/qr/bulk/create', { transactionIds }),
+  // Lấy danh sách bulk bills của tài xế
+  getDriverBulkBills: () => api.get('/transactions/driver/bulk-bills'),
 
-  // Kiểm tra trạng thái thanh toán QR hàng loạt
-  checkBulkQRPaymentStatus: (bulkPaymentId) => api.get(`/transactions/qr/bulk/status/${bulkPaymentId}`),
+  // Lấy danh sách bulk bills cho admin
+  getAdminBulkBills: (filters = {}) => {
+    const queryParams = new URLSearchParams();
+    if (filters.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters.endDate) queryParams.append('endDate', filters.endDate);
+    if (filters.driverName) queryParams.append('driverName', filters.driverName);
+    if (filters.status) queryParams.append('status', filters.status);
+    
+    const queryString = queryParams.toString();
+    return api.get(`/transactions/admin/bulk-bills${queryString ? `?${queryString}` : ''}`);
+  },
 
-  // Giả lập quét mã QR và thanh toán
-  simulateQRPayment: (paymentCode) => api.post('/transactions/qr/simulate-payment', { paymentCode }),
+  // Admin - Xác nhận thanh toán bulk bill
+  adminConfirmBulkPayment: (bulkBillId, data) => api.post(`/transactions/admin/bulk-bills/${bulkBillId}/confirm`, data),
 
-  // Kiểm tra trạng thái thanh toán QR
-  checkQRPaymentStatus: (transactionId) => api.get(`/transactions/qr/status/${transactionId}`)
+  // Cập nhật trạng thái thanh toán QR
+  updateBulkQRPaymentStatus: (paymentCode, status) => {
+    console.log('Sending payment status update:', { paymentCode, status });
+    return api.post(`/transactions/qr/payment/${encodeURIComponent(paymentCode)}/status`, { status });
+  },
+
+  // Lấy chi tiết bulk bill cho admin
+  getAdminBulkBillDetails: (billId) => api.get(`/transactions/admin/bulk-bills/${billId}`)
 };
 
 export const notificationAPI = {
@@ -207,7 +222,7 @@ export const notificationAPI = {
   markAsRead: (notificationId) => api.patch(`/notifications/${notificationId}/read`),
 
   // Đánh dấu tất cả là đã đọc
-  markAllAsRead: () => api.patch('/notifications/read-all'),
+  markAllAsRead: () => api.patch('/notifications/read-all')
 };
 
 // Admin Commission Management APIs
