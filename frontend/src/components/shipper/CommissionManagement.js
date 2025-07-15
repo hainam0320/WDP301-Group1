@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Form, Modal, Alert, Badge, Card, Row, Col, Nav } from 'react-bootstrap';
-import { FaQrcode, FaCheck, FaTimes, FaFileInvoiceDollar, FaEye, FaArrowLeft, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle } from 'react-icons/fa';
+import { FaQrcode, FaCheck, FaTimes, FaFileInvoiceDollar, FaEye, FaArrowLeft, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { transactionAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -213,6 +213,15 @@ const CommissionManagement = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Helper: check if commission is overdue (>= 3 days)
+    const isOverdue = (createdAt) => {
+        if (!createdAt) return false;
+        const now = new Date();
+        const created = new Date(createdAt);
+        const diffDays = (now - created) / (1000 * 60 * 60 * 24);
+        return diffDays >= 3;
     };
 
     const renderContent = () => {
@@ -484,36 +493,42 @@ const CommissionManagement = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {pendingCommissions.map(transaction => (
-                                            <tr key={transaction._id} className="border-bottom">
-                                                <td>
-                                                    <Form.Check
-                                                        type="checkbox"
-                                                        onChange={() => handleSelectTransaction(transaction._id)}
-                                                        checked={selectedTransactions.includes(transaction._id)}
-                                                    />
-                                                </td>
-                                                <td className="text-primary fw-medium">{transaction._id}</td>
-                                                <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
-                                                <td>{getStatusBadge(transaction.status)}</td>
-                                                <td>
-                                                    <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                    <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
-                                                </td>
-                                                <td>
-                                                    <Button 
-                                                        variant="outline-primary"
-                                                        size="sm"
-                                                        onClick={() => handleBulkPayment([transaction._id])}
-                                                        disabled={isLoading}
-                                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
-                                                    >
-                                                        <FaQrcode />
-                                                        Thanh toán
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {pendingCommissions.map(transaction => {
+                                            const overdue = isOverdue(transaction.createdAt);
+                                            return (
+                                                <tr key={transaction._id} className={`border-bottom${overdue ? ' bg-danger bg-opacity-25' : ''}`}> 
+                                                    <td>
+                                                        <Form.Check
+                                                            type="checkbox"
+                                                            onChange={() => handleSelectTransaction(transaction._id)}
+                                                            checked={selectedTransactions.includes(transaction._id)}
+                                                        />
+                                                    </td>
+                                                    <td className="text-primary fw-medium">
+                                                        {transaction._id}
+                                                        {overdue && <FaExclamationTriangle className="ms-2 text-danger" title="Quá hạn 3 ngày" />}
+                                                    </td>
+                                                    <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
+                                                    <td>{getStatusBadge(transaction.status)}</td>
+                                                    <td>
+                                                        <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                        <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                                    </td>
+                                                    <td>
+                                                        <Button 
+                                                            variant="outline-primary"
+                                                            size="sm"
+                                                            onClick={() => handleBulkPayment([transaction._id])}
+                                                            disabled={isLoading}
+                                                            className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                                                        >
+                                                            <FaQrcode />
+                                                            Thanh toán
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                         {pendingCommissions.length === 0 && (
                                             <tr>
                                                 <td colSpan={6} className="text-center py-5">
