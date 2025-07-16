@@ -56,9 +56,7 @@ exports.createReport = async (req, res) => {
             return res.status(404).json({ message: 'Đơn hàng không tồn tại' });
         }
 
-        if (order.status !== 'completed') {
-            return res.status(400).json({ message: 'Chỉ có thể báo cáo đơn hàng đã hoàn thành' });
-        }
+        
 
         // Check if the reporter is the customer who created the order
         if (order.userId.toString() !== reporterID.toString()) {
