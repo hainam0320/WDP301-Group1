@@ -148,12 +148,12 @@ const OrderTracking = () => {
                           order.status === 'pending' ? 'bg-warning' : 
                           order.status === 'accepted' ? 'bg-info' :
                           order.status === 'in-progress' ? 'bg-primary' : 
-                          order.status === 'completed' ? 'bg-success' : 'bg-secondary'
+                          order.status === 'completed' ? 'bg-success' : 'bg-danger'
                         } mb-2`}>
                           {order.status === 'pending' ? 'Chờ xử lý' : 
                            order.status === 'accepted' ? 'Đã nhận đơn' :
                            order.status === 'in-progress' ? 'Đang giao' : 
-                           order.status === 'completed' ? 'Đã giao hàng' : 'Không xác định'}
+                           order.status === 'completed' ? 'Đã giao hàng' : 'Thất Bại'}
                         </span>
                         <div className="fw-bold text-primary">{order.price.toLocaleString()} VNĐ</div>
                       </div>

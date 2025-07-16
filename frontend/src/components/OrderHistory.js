@@ -71,8 +71,8 @@ const OrderHistory = () => {
 
   useEffect(() => {
     if (orders.length > 0) {
-      const completedOrders = orders.filter(o => o.status === 'completed');
-      fetchRatesForCompletedOrders(completedOrders);
+      const successfulOrders = orders.filter(o => o.status === 'completed');
+      fetchRatesForCompletedOrders(successfulOrders);
     }
   }, [orders]);
 
@@ -351,7 +351,7 @@ const OrderHistory = () => {
     border: 'none'
   };
 
-  const completedOrders = orders.filter(order => order.status === 'completed');
+  const completedOrders = orders.filter(order => order.status === 'completed' || order.status === 'failed');
   const totalPages = Math.ceil(completedOrders.length / ordersPerPage);
   const paginatedOrders = completedOrders.slice(
     (currentPage - 1) * ordersPerPage,
@@ -395,6 +395,7 @@ const OrderHistory = () => {
                       <th>Loại</th>
                       <th>Thời gian hoàn thành</th>
                       <th>Giá</th>
+                      <th>Trạng thái</th>
                       <th>Đánh giá</th>
                       <th>Báo cáo</th>
                     </tr>
@@ -409,8 +410,18 @@ const OrderHistory = () => {
                         <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                         <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
                         <td>
+                          <span className={`badge ${order.status === 'failed' ? 'bg-danger' : 'bg-success'}`}>
+                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
+                          </span>
+                          {order.status === 'failed' && order.statusDescription && (
+                            <div className="small text-danger mt-1">
+                              Lý do: {order.statusDescription}
+                            </div>
+                          )}
+                        </td>
+                        <td>
                           {order.status === 'failed' ? (
-                            <span className="badge bg-danger">Thất bại</span>
+                            <span className="text-danger small">Không thể đánh giá</span>
                           ) : orderRates[order._id] ? (
                             <div>
                               <span className="text-warning">
