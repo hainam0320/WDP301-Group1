@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaMapMarkerAlt, FaUser, FaPhone, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
+import { Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 

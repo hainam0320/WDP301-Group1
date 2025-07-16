@@ -26,9 +26,33 @@ const CommissionManagement = () => {
     const [historyPage, setHistoryPage] = useState(1);
     const itemsPerPage = 5;
 
+    // Add pagination state
+    const [paginatedPending, setPaginatedPending] = useState([]);
+    const [paginatedHistory, setPaginatedHistory] = useState([]);
+    const [totalPendingPages, setTotalPendingPages] = useState(0);
+    const [totalHistoryPages, setTotalHistoryPages] = useState(0);
+
     useEffect(() => {
         fetchData();
     }, [activeTab]);
+
+    // Add pagination effect
+    useEffect(() => {
+        // Calculate paginated data for pending commissions
+        const startPending = (pendingPage - 1) * itemsPerPage;
+        const endPending = startPending + itemsPerPage;
+        setPaginatedPending(pendingCommissions.slice(startPending, endPending));
+        setTotalPendingPages(Math.ceil(pendingCommissions.length / itemsPerPage));
+    }, [pendingCommissions, pendingPage, itemsPerPage]);
+
+    // Add pagination effect for history
+    useEffect(() => {
+        // Calculate paginated data for history
+        const startHistory = (historyPage - 1) * itemsPerPage;
+        const endHistory = startHistory + itemsPerPage;
+        setPaginatedHistory(bulkBills.slice(startHistory, endHistory));
+        setTotalHistoryPages(Math.ceil(bulkBills.length / itemsPerPage));
+    }, [bulkBills, historyPage, itemsPerPage]);
 
     const fetchData = async () => {
         try {

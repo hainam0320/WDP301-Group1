@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaRoute, FaMapMarkerAlt, FaUser, FaEye, FaStar, FaArrowLeft } from 'react-icons/fa';
+import { FaRoute, FaMapMarkerAlt, FaUser, FaStar, FaArrowLeft } from 'react-icons/fa';
 import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
 import ShipperHeader from './ShipperHeader';
 import { toast } from 'react-hot-toast';
-import { shipperAPI } from '../../services/api';
 
 const MyOrders = () => {
   const navigate = useNavigate();

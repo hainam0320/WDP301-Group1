@@ -34,10 +34,9 @@ const OrderHistory = () => {
     setIsLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.get(`${BASE_URL}/api/orders`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       setOrders(response.data);
@@ -54,7 +53,6 @@ const OrderHistory = () => {
   }, []);
 
   const fetchRatesForCompletedOrders = async (completedOrders) => {
-    const token = localStorage.getItem('token');
     const newRates = {};
     await Promise.all(completedOrders.map(async (order) => {
       try {
@@ -343,12 +341,6 @@ const OrderHistory = () => {
         ))}
       </div>
     );
-  };
-
-  const cardStyle = {
-    borderRadius: '15px',
-    boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-    border: 'none'
   };
 
   const completedOrders = orders.filter(order => order.status === 'completed' || order.status === 'failed');

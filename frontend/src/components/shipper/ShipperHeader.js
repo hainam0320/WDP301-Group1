@@ -108,7 +108,7 @@ const ShipperHeader = () => {
             <NotificationBell />
 
             <li className="nav-item dropdown pe-3">
-              <a className="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+              <button className="nav-link nav-profile d-flex align-items-center pe-0 btn btn-link" data-bs-toggle="dropdown">
                 {shipperProfile.avatar && getImageUrl(shipperProfile.avatar) ? (
                   <img 
                     src={getImageUrl(shipperProfile.avatar)} 
@@ -120,7 +120,7 @@ const ShipperHeader = () => {
                   <FaUser />
                 )}
                 <span className="d-none d-md-block dropdown-toggle ps-2">{shipperProfile.name}</span>
-              </a>
+              </button>
 
               <ul className="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
                 <li className="dropdown-header">
@@ -128,17 +128,17 @@ const ShipperHeader = () => {
                 </li>
                 <li><hr className="dropdown-divider" /></li>
                 <li>
-                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={() => navigate('/shipper/profile')}>
+                  <button className="dropdown-item d-flex align-items-center" onClick={() => navigate('/shipper/profile')}>
                     <FaUser className="me-2" />
                     <span>Thông tin cá nhân</span>
-                  </a>
+                  </button>
                 </li>
                 <li><hr className="dropdown-divider" /></li>
                 <li>
-                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={handleLogout}>
+                  <button className="dropdown-item d-flex align-items-center" onClick={handleLogout}>
                     <FaSignOutAlt className="me-2" />
                     <span>Đăng xuất</span>
-                  </a>
+                  </button>
                 </li>
               </ul>
             </li>
