@@ -61,6 +61,12 @@ export const authAPI = {
 };
 
 export const shipperAPI = {
+  // ---- Get available orders count ----
+  getAvailableOrdersCount: () => api.get('/shipper/orders/available/count'),
+
+  // ---- Get ongoing orders count ----
+  getOngoingOrdersCount: () => api.get('/shipper/orders/ongoing/count'),
+
   // ---- Update Profile ----
   updateProfile: (data) => api.put('/shipper/profile', data),
 
