@@ -130,10 +130,29 @@ const CommissionManagement = () => {
         });
     };
 
-    const handleCloseQRModal = () => {
-        setShowQRModal(false);
-        setQRData(null);
-        fetchData();
+    const handleCloseQRModal = async () => {
+        try {
+            if (qrData) {
+                // Tìm bulk bill tương ứng với QR payment
+                const response = await transactionAPI.getDriverBulkBills();
+                const bills = response.data.data || [];
+                const pendingBill = bills.find(bill => 
+                    bill.status === 'pending' && 
+                    bill.qr_payment_id?.paymentCode === qrData.paymentCode
+                );
+
+                if (pendingBill) {
+                    await transactionAPI.cancelBulkBill(pendingBill._id);
+                }
+            }
+        } catch (error) {
+            console.error('Error canceling bulk bill:', error);
+            toast.error('Có lỗi xảy ra khi hủy hóa đơn');
+        } finally {
+            setShowQRModal(false);
+            setQRData(null);
+            fetchData();
+        }
     };
 
     const handleSimulatePayment = async () => {

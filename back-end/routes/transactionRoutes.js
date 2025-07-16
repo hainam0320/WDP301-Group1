@@ -12,6 +12,7 @@ router.get("/driver/overview", authorize('driver'), transactionController.getDri
 
 // ===== BULK BILL MANAGEMENT =====
 router.post("/bulk-bill/create", authorize('driver'), transactionController.createBulkBill);
+router.post('/bulk-bills/:bulkBillId/cancel', authorize('driver'), transactionController.cancelBulkBill);
 router.get("/driver/bulk-bills", authorize('driver'), transactionController.getDriverBulkBills);
 router.get("/admin/bulk-bills", authorize('admin'), transactionController.getAdminBulkBills);
 

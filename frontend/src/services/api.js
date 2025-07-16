@@ -188,6 +188,7 @@ export const transactionAPI = {
 
   // Tạo hóa đơn tổng cho nhiều giao dịch
   createBulkBill: (transactionIds) => api.post('/transactions/bulk-bill/create', { transactionIds }),
+  cancelBulkBill: (bulkBillId) => api.post(`/transactions/bulk-bills/${bulkBillId}/cancel`),
 
   // Lấy danh sách bulk bills của tài xế
   getDriverBulkBills: () => api.get('/transactions/driver/bulk-bills'),
