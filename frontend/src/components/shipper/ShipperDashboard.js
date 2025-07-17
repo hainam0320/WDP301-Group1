@@ -27,7 +27,7 @@ const ShipperDashboard = () => {
     // Cập nhật số liệu mỗi 30 giây
     const interval = setInterval(fetchDashboardData, 30 * 1000);
     return () => clearInterval(interval);
-  }, [fetchDashboardData]);
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
