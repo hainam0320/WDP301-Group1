@@ -18,8 +18,8 @@ const UserProfile = () => {
     avatar: ''
   });
 
-  const [emailVerified, setEmailVerified] = useState(false);
-  const [showVerifyForm, setShowVerifyForm] = useState(false);
+  const [emailVerified, setEmailVerified] = useState('');
+  const [showVerifyForm, setShowVerifyForm] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
 
@@ -33,7 +33,8 @@ const UserProfile = () => {
         phone: user.phone,
         address: user.address || '',
         email: user.email || '',
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        emailVerified: user.emailVerified || false
       });
       setEmailVerified(!!user.emailVerified);
     }
@@ -147,7 +148,6 @@ const UserProfile = () => {
 
   // Xác nhận mã xác thực
   const handleConfirmVerifyCode = async (e) => {
-    e.preventDefault();
     setVerifyMsg('');
     try {
       const token = localStorage.getItem('token');
@@ -156,16 +156,26 @@ const UserProfile = () => {
         { code: verifyCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Gọi lại API lấy user mới nhất
       const res = await axios.get('http://localhost:9999/api/users/profile', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Nếu API trả về user ở res.data.data:
-      // const user = res.data.data;
-      // Nếu trả về user ở res.data:
-      const user = res.data;
-      localStorage.setItem('user', JSON.stringify(user));
-      setEmailVerified(user.emailVerified); // <-- cập nhật đúng trạng thái từ backend
+      const user = res.data.data || res.data;
+
+      // Cập nhật localStorage với trạng thái emailVerified mới nhất
+      const oldUser = JSON.parse(localStorage.getItem('user')) || {};
+      const updatedUser = { ...oldUser, ...user, emailVerified: user.emailVerified };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      // Cập nhật state userProfile và emailVerified
+      setUserProfile({
+        name: user.fullName || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        email: user.email || '',
+        avatar: user.avatar || '',
+        emailVerified: user.emailVerified || false
+      });
+      setEmailVerified(user.emailVerified);
       setShowVerifyForm(false);
       setVerifyMsg('Xác thực email thành công!');
     } catch (err) {
@@ -310,7 +320,7 @@ const UserProfile = () => {
                     )}
                   </div>
                   {showVerifyForm && !emailVerified && (
-                    <form className="mt-2 d-flex align-items-center" onSubmit={handleConfirmVerifyCode}>
+                    <div className="mt-2 d-flex align-items-center">
                       <input
                         type="text"
                         className="form-control form-control-sm me-2"
@@ -320,8 +330,14 @@ const UserProfile = () => {
                         required
                         style={{maxWidth: '120px'}}
                       />
-                      <button type="submit" className="btn btn-sm btn-success">Xác nhận</button>
-                    </form>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-success"
+                        onClick={handleConfirmVerifyCode}
+                      >
+                        Xác nhận
+                      </button>
+                    </div>
                   )}
                   {verifyMsg && <div className="small mt-1 text-info">{verifyMsg}</div>}
                 </div>
