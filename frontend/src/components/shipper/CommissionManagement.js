@@ -643,8 +643,8 @@ const CommissionManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Pagination controls cho pending */}
-            {totalPendingPages > 1 && (
+            {/* Pagination controls - show based on active tab */}
+            {activeTab === 'pending' && totalPendingPages > 1 && (
               <nav className="d-flex justify-content-center my-3">
                 <ul className="pagination">
                   <li className={`page-item${pendingPage === 1 ? ' disabled' : ''}`}>
@@ -662,8 +662,7 @@ const CommissionManagement = () => {
               </nav>
             )}
 
-            {/* Pagination controls cho history */}
-            {totalHistoryPages > 1 && (
+            {activeTab === 'history' && totalHistoryPages > 1 && (
               <nav className="d-flex justify-content-center my-3">
                 <ul className="pagination">
                   <li className={`page-item${historyPage === 1 ? ' disabled' : ''}`}>
