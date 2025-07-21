@@ -198,32 +198,80 @@ const UserProfile = () => {
     return null;
   };
 
-  const cardStyle = {
-    borderRadius: '15px',
-    boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-    border: 'none'
-  };
-
-  const buttonStyle = {
-    borderRadius: '10px',
-    padding: '12px 24px',
-    fontWeight: 'bold',
-    transition: 'all 0.3s ease'
-  };
-
   return (
-    <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
+    <div className="min-vh-100 userprofile-bg">
       <Header />
+      <style>{`
+        .userprofile-bg {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+        }
+        .userprofile-card {
+          border-radius: 18px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+          border: none;
+          background: rgba(255,255,255,0.97);
+        }
+        .userprofile-card .card-header {
+          border-radius: 18px 18px 0 0;
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+        }
+        .userprofile-card .card-body {
+          padding: 2.5rem 1.5rem;
+        }
+        .userprofile-btn-lg {
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          padding: 0.9rem 1.5rem;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.08);
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .userprofile-btn-lg:active, .userprofile-btn-lg:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #6a82fb33;
+        }
+        .userprofile-btn-lg.btn-primary {
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          border: none;
+        }
+        .userprofile-btn-lg.btn-primary:hover {
+          background: linear-gradient(90deg, #fc5c7d 0%, #6a82fb 100%);
+          color: #fff;
+          transform: scale(1.04);
+        }
+        .userprofile-btn-lg.btn-outline-danger {
+          border: 2px solid #dc3545;
+          color: #dc3545;
+          background: #fff;
+        }
+        .userprofile-btn-lg.btn-outline-danger:hover {
+          background: #dc3545;
+          color: #fff;
+          border: none;
+          transform: scale(1.04);
+        }
+        .userprofile-card .rounded-circle {
+          box-shadow: 0 2px 8px rgba(31,38,135,0.10);
+        }
+        @media (max-width: 768px) {
+          .userprofile-card .card-body {
+            padding: 1.2rem 0.5rem;
+          }
+        }
+      `}</style>
       <div className="container my-5">
         <button 
-          className="btn btn-outline-primary mb-4"
+          className="btn btn-outline-primary mb-4 userprofile-btn-lg"
           onClick={() => navigate('/home')}
         >
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
-        <div className="card" style={cardStyle}>
-          <div className="card-header bg-primary text-white">
+        <div className="card userprofile-card">
+          <div className="card-header">
             <h4 className="mb-0"><FaUser className="me-2" />Thông tin cá nhân</h4>
           </div>
           <div className="card-body">
@@ -366,8 +414,7 @@ const UserProfile = () => {
               </div>
               <button 
                 type="submit" 
-                className="btn btn-primary" 
-                style={buttonStyle}
+                className="btn btn-primary userprofile-btn-lg" 
                 disabled={isLoading}
               >
                 {isLoading ? (
