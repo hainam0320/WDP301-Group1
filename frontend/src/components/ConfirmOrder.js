@@ -9,6 +9,7 @@ const ConfirmOrder = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   if (!orderData) {
     return <p>Không có dữ liệu đơn hàng.</p>;
@@ -16,6 +17,8 @@ const ConfirmOrder = () => {
 
   const handleConfirm = async () => {
     setSubmitting(true);
+    setError('');
+    setSuccess('');
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       const token = localStorage.getItem('token');
@@ -45,8 +48,14 @@ const ConfirmOrder = () => {
           'Content-Type': 'application/json'
         }
       });
+
+      setSuccess('Đặt đơn hàng thành công!');
       
-      navigate('/home', { state: { order: res.data } });
+      // Delay navigation to show success message
+      setTimeout(() => {
+        navigate('/home', { state: { order: res.data } });
+      }, 2000);
+      
     } catch (err) {
       console.error('Error saving order:', err);
       if (err.response?.status === 401) {
@@ -126,6 +135,12 @@ const ConfirmOrder = () => {
                 {error && (
                   <div className="alert alert-danger" role="alert">
                     {error}
+                  </div>
+                )}
+
+                {success && (
+                  <div className="alert alert-success" role="alert">
+                    {success}
                   </div>
                 )}
 

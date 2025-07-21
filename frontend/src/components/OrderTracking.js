@@ -80,7 +80,7 @@ const OrderTracking = () => {
   };
 
   const trackingOrders = orders
-    .filter(order => order.status !== 'completed')
+    .filter(order => order.status !== 'completed' && order.status !== 'failed')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const totalPages = Math.ceil(trackingOrders.length / ordersPerPage);
   const paginatedOrders = trackingOrders.slice(
