@@ -10,6 +10,8 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState({ userId: null, currentStatus: null });
 
   useEffect(() => {
     fetchUsers();
@@ -68,6 +70,20 @@ const UserManagement = () => {
   const handleCloseModal = () => {
     setShowUserModal(false);
     setSelectedUser(null);
+  };
+
+  const handleConfirmToggle = (userId, currentStatus) => {
+    setConfirmAction({ userId, currentStatus });
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirm = async () => {
+    await toggleUserStatus(confirmAction.userId, confirmAction.currentStatus);
+    setShowConfirmModal(false);
+  };
+
+  const handleCancel = () => {
+    setShowConfirmModal(false);
   };
 
   const getImageUrl = (imagePath) => {
@@ -143,7 +159,7 @@ const UserManagement = () => {
           <Button
             variant={selectedUser.status ? 'danger' : 'success'}
             onClick={() => {
-              toggleUserStatus(selectedUser._id, selectedUser.status);
+              handleConfirmToggle(selectedUser._id, selectedUser.status);
               handleCloseModal();
             }}
           >
@@ -202,7 +218,7 @@ const UserManagement = () => {
                         </button>
                         <button 
                           className={`btn ${user.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                          onClick={() => toggleUserStatus(user._id, user.status)}
+                          onClick={() => handleConfirmToggle(user._id, user.status)}
                           title={user.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                         >
                           {user.status ? <FaLock /> : <FaLockOpen />}
@@ -217,6 +233,27 @@ const UserManagement = () => {
         )}
       </div>
       <UserDetailsModal />
+      {/* Modal xác nhận khóa/mở khóa tài khoản */}
+      <Modal show={showConfirmModal} onHide={handleCancel} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {confirmAction.currentStatus ? (
+            <span>Bạn có chắc chắn muốn <b>khóa</b> tài khoản này không?</span>
+          ) : (
+            <span>Bạn có chắc chắn muốn <b>mở khóa</b> tài khoản này không?</span>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancel}>
+            Hủy
+          </Button>
+          <Button variant={confirmAction.currentStatus ? 'danger' : 'success'} onClick={handleConfirm}>
+            {confirmAction.currentStatus ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

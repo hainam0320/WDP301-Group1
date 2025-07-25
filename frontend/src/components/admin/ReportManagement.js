@@ -259,9 +259,19 @@ const ReportManagement = () => {
                     className="form-control"
                     rows="3"
                     value={adminNote}
-                    onChange={(e) => setAdminNote(e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 256) setAdminNote(e.target.value);
+                    }}
                     placeholder="Nhập ghi chú xử lý..."
+                    maxLength={256}
                   />
+                  <div className="text-end mt-1">
+                    <small
+                      className={adminNote.length === 256 ? 'text-danger' : 'text-muted'}
+                    >
+                      {adminNote.length}/256 ký tự
+                    </small>
+                  </div>
                 </div>
               )}
 
@@ -283,6 +293,7 @@ const ReportManagement = () => {
               <Button 
                 variant="info" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'reviewed')}
+                disabled={adminNote.length > 256}
               >
                 <FaEye className="me-1" />
                 Đang xem xét
@@ -290,6 +301,7 @@ const ReportManagement = () => {
               <Button 
                 variant="success" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
+                disabled={adminNote.length > 256}
               >
                 <FaCheck className="me-1" />
                 Giải quyết
@@ -297,6 +309,7 @@ const ReportManagement = () => {
               <Button 
                 variant="danger" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
+                disabled={adminNote.length > 256}
               >
                 <FaTimes className="me-1" />
                 Từ chối
@@ -308,6 +321,7 @@ const ReportManagement = () => {
               <Button 
                 variant="success" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
+                disabled={adminNote.length > 256}
               >
                 <FaCheck className="me-1" />
                 Giải quyết
@@ -315,6 +329,7 @@ const ReportManagement = () => {
               <Button 
                 variant="danger" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
+                disabled={adminNote.length > 256}
               >
                 <FaTimes className="me-1" />
                 Từ chối

@@ -30,7 +30,7 @@ import ShipperManagement from './components/admin/ShipperManagement';
 import OrderManagement from './components/admin/OrderManagement';
 import RevenueReport from './components/admin/RevenueReport';
 import ReportManagement from './components/admin/ReportManagement';
-import SystemSettings from './components/admin/SystemSettings';
+
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 import ForgotPassword from './pages/ForgotPassword';
 
@@ -230,7 +230,7 @@ function App() {
             <Route path="orders" element={<OrderManagement />} />
             <Route path="revenue" element={<RevenueReport />} />
             <Route path="reports" element={<ReportManagement />} />
-            <Route path="settings" element={<SystemSettings />} />
+            
             <Route path="commission-management" element={<AdminCommissionManagement />} />
           </Route>
         </Routes>
