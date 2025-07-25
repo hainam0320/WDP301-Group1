@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaShippingFast, FaMapMarkerAlt, FaRuler, FaMoneyBillWave, FaClock } from 'react-icons/fa';
+import { FaShippingFast, FaMapMarkerAlt, FaRuler, FaMoneyBillWave, FaClock, FaArrowLeft } from 'react-icons/fa';
+import Header from './Header'; // Added missing import for Header
 
 const ConfirmOrder = () => {
   const { state } = useLocation();
@@ -72,17 +73,82 @@ const ConfirmOrder = () => {
   };
 
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-md-8">
-          <div className="card shadow-lg border-0 rounded-3">
-            <div className="card-header bg-primary text-white py-3">
-              <h3 className="mb-0 text-center">
-                <FaShippingFast className="me-2" />
-                Xác nhận đơn hàng
-              </h3>
-            </div>
-            <div className="card-body p-4">
+    <div className="min-vh-100 confirmorder-bg">
+      <Header />
+      <style>{`
+        .confirmorder-bg {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+        }
+        .confirmorder-card {
+          border-radius: 18px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+          border: none;
+          background: rgba(255,255,255,0.97);
+        }
+        .confirmorder-card .card-header {
+          border-radius: 18px 18px 0 0;
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+        }
+        .confirmorder-card .card-body {
+          padding: 2.5rem 1.5rem;
+        }
+        .confirmorder-btn-lg {
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          padding: 0.9rem 1.5rem;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.08);
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .confirmorder-btn-lg:active, .confirmorder-btn-lg:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #6a82fb33;
+        }
+        .confirmorder-btn-lg.btn-primary {
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          border: none;
+        }
+        .confirmorder-btn-lg.btn-primary:hover {
+          background: linear-gradient(90deg, #fc5c7d 0%, #6a82fb 100%);
+          color: #fff;
+          transform: scale(1.04);
+        }
+        .confirmorder-btn-lg.btn-outline-danger {
+          border: 2px solid #dc3545;
+          color: #dc3545;
+          background: #fff;
+        }
+        .confirmorder-btn-lg.btn-outline-danger:hover {
+          background: #dc3545;
+          color: #fff;
+          border: none;
+          transform: scale(1.04);
+        }
+        .confirmorder-card .rounded-circle {
+          box-shadow: 0 2px 8px rgba(31,38,135,0.10);
+        }
+        @media (max-width: 768px) {
+          .confirmorder-card .card-body {
+            padding: 1.2rem 0.5rem;
+          }
+        }
+      `}</style>
+      <div className="container my-5">
+        <button 
+          className="btn btn-outline-primary mb-4 confirmorder-btn-lg"
+          onClick={() => navigate(-1)}
+        >
+          <FaArrowLeft className="me-2" />
+          Quay lại
+        </button>
+        <div className="card confirmorder-card">
+          <div className="card-header">
+            <h4 className="mb-0"><FaShippingFast className="me-2" />Xác nhận đơn hàng</h4>
+          </div>
+          <div className="card-body">
               <div className="order-summary">
                 <div className="service-type mb-4 p-3 bg-light rounded">
                   <h5 className="text-primary mb-3">
@@ -146,14 +212,14 @@ const ConfirmOrder = () => {
 
                 <div className="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                   <button 
-                    className="btn btn-secondary px-4"
+                    className="btn btn-secondary px-4 confirmorder-btn-lg"
                     onClick={() => navigate(-1)}
                     disabled={submitting}
                   >
                     Quay lại
                   </button>
                   <button 
-                    className="btn btn-primary px-4"
+                    className="btn btn-primary px-4 confirmorder-btn-lg"
                     onClick={handleConfirm}
                     disabled={submitting}
                   >
@@ -171,7 +237,6 @@ const ConfirmOrder = () => {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };

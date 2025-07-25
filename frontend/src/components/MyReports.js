@@ -64,25 +64,76 @@ const MyReports = () => {
     }
   };
 
-  const cardStyle = {
-    borderRadius: '15px',
-    boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-    border: 'none'
-  };
-
   return (
-    <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
+    <div className="min-vh-100 myreports-bg">
       <Header />
+      <style>{`
+        .myreports-bg {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+        }
+        .myreports-card {
+          border-radius: 18px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+          border: none;
+          background: rgba(255,255,255,0.97);
+        }
+        .myreports-card .card-header {
+          border-radius: 18px 18px 0 0;
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+        }
+        .myreports-card .card-body {
+          padding: 2.5rem 1.5rem;
+        }
+        .myreports-btn-lg {
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          padding: 0.9rem 1.5rem;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.08);
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .myreports-btn-lg:active, .myreports-btn-lg:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #6a82fb33;
+        }
+        .myreports-btn-lg.btn-outline-primary {
+          border: 2px solid #6a82fb;
+          color: #6a82fb;
+          background: #fff;
+        }
+        .myreports-btn-lg.btn-outline-primary:hover {
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+          border: none;
+          transform: scale(1.04);
+        }
+        .myreports-card .card {
+          border-radius: 14px;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.07);
+        }
+        .myreports-card .card:hover {
+          box-shadow: 0 4px 16px rgba(31,38,135,0.13);
+          transform: translateY(-2px) scale(1.01);
+        }
+        @media (max-width: 768px) {
+          .myreports-card .card-body {
+            padding: 1.2rem 0.5rem;
+          }
+        }
+      `}</style>
       <div className="container my-5">
         <button 
-          className="btn btn-outline-primary mb-4"
+          className="btn btn-outline-primary mb-4 myreports-btn-lg"
           onClick={() => navigate('/home')}
         >
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
-        <div className="card" style={cardStyle}>
-          <div className="card-header bg-primary text-white">
+        <div className="card myreports-card">
+          <div className="card-header">
             <h4 className="mb-0"><FaExclamationTriangle className="me-2" />Báo cáo của tôi</h4>
           </div>
           <div className="card-body">
