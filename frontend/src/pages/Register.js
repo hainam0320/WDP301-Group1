@@ -78,11 +78,11 @@ const Register = () => {
     }
 
     // Validate phone
-    const phoneRegex = /^[0-9]{10,11}$/;
+    const phoneRegex = /^0\d{9}$/;
     if (!formData.phone.trim()) {
       newErrors.phone = 'Vui lòng nhập số điện thoại';
     } else if (!phoneRegex.test(formData.phone)) {
-      newErrors.phone = 'Số điện thoại phải có 10-11 chữ số';
+      newErrors.phone = 'Số điện thoại phải bắt đầu bằng số 0 và có đúng 10 chữ số';
     }
 
     // Validate address
@@ -91,10 +91,11 @@ const Register = () => {
     }
 
     // Validate password
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{6,}$/;
     if (!formData.password) {
       newErrors.password = 'Vui lòng nhập mật khẩu';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    } else if (!passwordRegex.test(formData.password)) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự, chứa chữ hoa và số';
     }
 
     // Validate confirm password

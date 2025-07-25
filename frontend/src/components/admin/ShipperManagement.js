@@ -150,7 +150,14 @@ const ShipperManagement = () => {
 
   const getImageUrl = (imagePath) => {
     if (!imagePath || typeof imagePath !== 'string') return 'https://via.placeholder.com/150';
-    return `http://localhost:9999/${imagePath}`;
+    if (imagePath.startsWith('uploads/')) {
+      return `http://localhost:9999/${imagePath}`;
+    }
+    const relativePath = imagePath.split('\\uploads\\')[1];
+    if (relativePath) {
+      return `http://localhost:9999/uploads/${relativePath}`;
+    }
+    return 'https://via.placeholder.com/150';
   };
 
   const handleImageClick = (imagePath) => {
