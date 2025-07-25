@@ -31,6 +31,7 @@ const OrderHistory = () => {
   const ordersPerPage = 5;
   // Add a new state for description length error
   const [reportDescriptionError, setReportDescriptionError] = useState('');
+  const [rateCommentError, setRateCommentError] = useState('');
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -90,6 +91,13 @@ const OrderHistory = () => {
 
   const handleSubmitRate = async () => {
     if (!rateTargetOrder) return;
+    // Validate rateComment length
+    if (rateComment.length > 256) {
+      setRateCommentError('Bình luận không được vượt quá 256 ký tự');
+      return;
+    } else {
+      setRateCommentError('');
+    }
     setRateLoading(true);
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -557,9 +565,26 @@ const OrderHistory = () => {
                     as="textarea"
                     rows={3}
                     value={rateComment}
-                    onChange={e => setRateComment(e.target.value)}
+                    onChange={e => {
+                      const value = e.target.value;
+                      if (value.length <= 256) {
+                        setRateComment(value);
+                        setRateCommentError('');
+                      } else {
+                        setRateCommentError('Bình luận không được vượt quá 256 ký tự');
+                      }
+                    }}
                     placeholder="Nhập nhận xét của bạn..."
+                    isInvalid={!!rateCommentError}
                   />
+                  <div className="d-flex justify-content-between align-items-center mt-1">
+                    <small className={rateComment.length > 256 ? 'text-danger' : 'text-muted'}>
+                      {rateComment.length}/256 ký tự
+                    </small>
+                    {rateCommentError && (
+                      <small className="text-danger">{rateCommentError}</small>
+                    )}
+                  </div>
                 </Form.Group>
               </Form>
             </Modal.Body>

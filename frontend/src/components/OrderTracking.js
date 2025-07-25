@@ -253,16 +253,7 @@ const OrderTracking = () => {
           <Modal.Body>
             {shipperDetail && (
               <div className="text-center">
-                <img 
-                  src={getImageUrl(shipperDetail.avatar)}
-                  alt="Avatar" 
-                  className="rounded-circle img-thumbnail"
-                  style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://via.placeholder.com/100';
-                  }}
-                />
+               
                 <h5>{shipperDetail.fullName}</h5>
                 <div className="d-flex justify-content-center align-items-center mb-2">
                   <span className="fw-bold">{shipperAvgRate.avg.toFixed(1)}</span>

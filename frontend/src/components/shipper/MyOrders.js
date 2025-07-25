@@ -20,6 +20,7 @@ const MyOrders = () => {
   const [orderRate, setOrderRate] = useState(null);
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [failureReason, setFailureReason] = useState('');
+  const [failureReasonError, setFailureReasonError] = useState('');
   const [orderToFail, setOrderToFail] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -151,13 +152,20 @@ const MyOrders = () => {
   const handleCloseFailureModal = () => {
     setShowFailureModal(false);
     setFailureReason('');
+    setFailureReasonError('');
     setOrderToFail(null);
   };
 
   const handleFailureSubmit = async () => {
     if (!failureReason.trim()) {
-      toast.error('Vui lòng nhập lý do thất bại');
+      setFailureReasonError('Vui lòng nhập lý do thất bại');
       return;
+    }
+    if (failureReason.length > 256) {
+      setFailureReasonError('Lý do không được vượt quá 256 ký tự');
+      return;
+    } else {
+      setFailureReasonError('');
     }
 
     try {
@@ -284,7 +292,7 @@ const MyOrders = () => {
                               className="btn btn-danger btn-sm mb-2 w-100"
                               onClick={() => handleShowFailureModal(order)}
                             >
-                              Giao hàng thất bại
+                              {order.type === 'delivery' ? 'Giao hàng thất bại' : 'Đưa đón thất bại'}
                             </button>
                           </>
                         )}
@@ -429,19 +437,40 @@ const MyOrders = () => {
       {/* Modal nhập lý do thất bại */}
       <Modal show={showFailureModal} onHide={handleCloseFailureModal} centered>
         <Modal.Header closeButton className="bg-danger text-white">
-          <Modal.Title>Lý do giao hàng thất bại</Modal.Title>
+          <Modal.Title>
+            {orderToFail?.type === 'delivery' ? 'Lý do giao hàng thất bại' : 'Lý do đưa đón thất bại'}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
             <Form.Group>
-              <Form.Label>Vui lòng nhập lý do thất bại:</Form.Label>
+              <Form.Label>
+                {orderToFail?.type === 'delivery' ? 'Vui lòng nhập lý do giao hàng thất bại:' : 'Vui lòng nhập lý do đưa đón thất bại:'}
+              </Form.Label>
               <Form.Control
                 as="textarea"
                 rows={3}
                 value={failureReason}
-                onChange={(e) => setFailureReason(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 256) {
+                    setFailureReason(value);
+                    setFailureReasonError('');
+                  } else {
+                    setFailureReasonError('Lý do không được vượt quá 256 ký tự');
+                  }
+                }}
                 placeholder="Nhập lý do thất bại..."
+                isInvalid={!!failureReasonError}
               />
+              <div className="d-flex justify-content-between align-items-center mt-1">
+                <small className={failureReason.length > 256 ? 'text-danger' : 'text-muted'}>
+                  {failureReason.length}/256 ký tự
+                </small>
+                {failureReasonError && (
+                  <small className="text-danger">{failureReasonError}</small>
+                )}
+              </div>
             </Form.Group>
           </Form>
         </Modal.Body>

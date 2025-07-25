@@ -68,6 +68,16 @@ const NewOrder = () => {
       setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
       return;
     }
+
+    // Validate weight: 0 < weight < 30
+    if (serviceType === 'delivery') {
+      const weight = parseFloat(orderData.weight);
+      if (isNaN(weight) || weight <= 0 || weight >= 30) {
+        setMessage({ type: 'error', content: 'Cân nặng nhỏ hơn 30 kg' });
+        return;
+      }
+    }
+
     navigate('/confirmOrder', { state: { orderData, serviceType } });
   };
 
@@ -142,12 +152,6 @@ const NewOrder = () => {
             <h4 className="mb-0"><FaShippingFast className="me-2" />Đặt đơn mới</h4>
           </div>
           <div className="card-body">
-            {message.content && (
-              <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
-                {message.content}
-              </div>
-            )}
-
             {/* Service Type Selection */}
             <div className="row mb-4">
               <div className="col-md-6">
@@ -224,6 +228,7 @@ const NewOrder = () => {
                   </label>
                   <input 
                     type="number" 
+                    min="0"
                     className="form-control" 
                     placeholder="0"
                     value={orderData.weight}
@@ -265,6 +270,13 @@ const NewOrder = () => {
                     <strong>Giá tạm tính:</strong> {orderData.estimatedPrice.toLocaleString()} VNĐ
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Message display moved here */}
+            {message.content && (
+              <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
+                {message.content}
               </div>
             )}
 
