@@ -50,7 +50,7 @@ const OrderManagement = () => {
                   <th>Giá</th>
                   <th>Trạng thái</th>
                   <th>Ngày</th>
-                  <th>Thao tác</th>
+                 
                 </tr>
               </thead>
               <tbody>
@@ -73,16 +73,7 @@ const OrderManagement = () => {
                         </span>
                       </td>
                       <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
-                      <td>
-                        <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary" title="Xem chi tiết">
-                            <FaEye />
-                          </button>
-                          <button className="btn btn-outline-warning" title="Chỉnh sửa">
-                            <FaEdit />
-                          </button>
-                        </div>
-                      </td>
+                     
                     </tr>
                   ))}
               </tbody>

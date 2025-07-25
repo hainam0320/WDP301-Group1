@@ -11,7 +11,7 @@ import ShipperManagement from './admin/ShipperManagement';
 import OrderManagement from './admin/OrderManagement';
 import RevenueReport from './admin/RevenueReport';
 import ReportManagement from './admin/ReportManagement';
-import SystemSettings from './admin/SystemSettings';
+
 import AdminCommissionManagement from './admin/AdminCommissionManagement';
 
 const AdminDashboard = () => {
@@ -55,7 +55,7 @@ const AdminDashboard = () => {
                 Administrator
               </button>
               <ul className="dropdown-menu">
-                <li><Link to="/admin/settings" className="dropdown-item"><FaCog className="me-2" />Cài đặt hệ thống</Link></li>
+               
                 <li><hr className="dropdown-divider" /></li>
                 <li><button className="dropdown-item" onClick={handleLogout}><FaSignOutAlt className="me-2" />Đăng xuất</button></li>
               </ul>
@@ -120,13 +120,7 @@ const AdminDashboard = () => {
                   <FaExclamationTriangle className="me-2" />
                   Quản lý báo cáo
                 </Link>
-                <Link 
-                  to="/admin/settings"
-                  className="list-group-item list-group-item-action border-0"
-                >
-                  <FaCog className="me-2" />
-                  Cài đặt hệ thống
-                </Link>
+              
               </div>
             </div>
           </div>
@@ -140,7 +134,7 @@ const AdminDashboard = () => {
               <Route path="/orders" element={<OrderManagement />} />
               <Route path="/revenue" element={<RevenueReport />} />
               <Route path="/reports" element={<ReportManagement />} />
-              <Route path="/settings" element={<SystemSettings />} />
+              
               <Route path="/commission-management" element={<AdminCommissionManagement />} />
             </Routes>
           </div>
