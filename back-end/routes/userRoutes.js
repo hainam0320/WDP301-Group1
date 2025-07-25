@@ -177,5 +177,7 @@ router.post('/verify-email/send', protect, userController.sendEmailVerification)
 router.post('/verify-email/confirm', protect, userController.verifyEmailCode);
 router.post('/forgot-password/send', userController.sendForgotPasswordCode);
 router.post('/forgot-password/reset', userController.resetPassword);
+// Change password
+router.post('/change-password', protect, userController.changePassword);
 
 module.exports = router; 

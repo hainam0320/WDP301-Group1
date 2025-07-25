@@ -87,11 +87,16 @@ const UserManagement = () => {
   };
 
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/150';
-    if (imagePath.startsWith('http')) return imagePath;
-    return `http://localhost:9999/${imagePath.replace(/\\/g, '/')}`;
+    if (!imagePath || typeof imagePath !== 'string') return 'https://via.placeholder.com/150';
+    if (imagePath.startsWith('uploads/')) {
+      return `http://localhost:9999/${imagePath}`;
+    }
+    const relativePath = imagePath.split('\\uploads\\')[1];
+    if (relativePath) {
+      return `http://localhost:9999/uploads/${relativePath}`;
+    }
+    return 'https://via.placeholder.com/150';
   };
-
   const UserDetailsModal = () => {
     if (!selectedUser) return null;
 

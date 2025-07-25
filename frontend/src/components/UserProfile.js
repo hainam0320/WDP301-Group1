@@ -4,6 +4,7 @@ import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import axios from 'axios';
+import { Modal, Button, Form } from 'react-bootstrap';
 
 const UserProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +23,13 @@ const UserProfile = () => {
   const [showVerifyForm, setShowVerifyForm] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
+  const [errors, setErrors] = useState({});
+
+  const [showChangePwModal, setShowChangePwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' });
+  const [pwErrors, setPwErrors] = useState({});
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState('');
 
   const navigate = useNavigate();
 
@@ -89,10 +97,38 @@ const UserProfile = () => {
     setUserProfile(prev => ({ ...prev, avatar: '' }));
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+    // Validate name
+    if (!userProfile.name.trim()) {
+      newErrors.name = 'Vui lòng nhập họ và tên';
+    } else if (userProfile.name.trim().length < 2) {
+      newErrors.name = 'Họ và tên phải có ít nhất 2 ký tự';
+    }
+    // Validate phone
+    const phoneRegex = /^0\d{9}$/;
+    if (!userProfile.phone.trim()) {
+      newErrors.phone = 'Vui lòng nhập số điện thoại';
+    } else if (!phoneRegex.test(userProfile.phone)) {
+      newErrors.phone = 'Số điện thoại phải bắt đầu bằng số 0 và có đúng 10 chữ số';
+    }
+    // Validate address
+    if (!userProfile.address.trim()) {
+      newErrors.address = 'Vui lòng nhập địa chỉ';
+    }
+    // Validate avatar
+    if (!userProfile.avatar) {
+      newErrors.avatar = 'Vui lòng chọn ảnh đại diện';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
     setMessage({ type: '', content: '' });
+    if (!validateForm()) return;
+    setIsLoading(true);
 
     try {
       const response = await userAPI.updateProfile({
@@ -180,6 +216,45 @@ const UserProfile = () => {
       setVerifyMsg('Xác thực email thành công!');
     } catch (err) {
       setVerifyMsg(err.response?.data?.message || 'Lỗi xác thực mã');
+    }
+  };
+
+  const validatePwForm = () => {
+    const errs = {};
+    if (!pwForm.current) errs.current = 'Vui lòng nhập mật khẩu hiện tại';
+    const pwRegex = /^(?=.*[A-Z])(?=.*\d).{6,}$/;
+    if (!pwForm.new) errs.new = 'Vui lòng nhập mật khẩu mới';
+    else if (!pwRegex.test(pwForm.new)) errs.new = 'Mật khẩu mới phải có ít nhất 6 ký tự, chứa chữ hoa và số';
+    if (!pwForm.confirm) errs.confirm = 'Vui lòng xác nhận mật khẩu mới';
+    else if (pwForm.new !== pwForm.confirm) errs.confirm = 'Mật khẩu xác nhận không khớp';
+    setPwErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwMsg('');
+    if (!validatePwForm()) return;
+    setPwLoading(true);
+    try {
+      const res = await userAPI.changePassword({
+        currentPassword: pwForm.current,
+        newPassword: pwForm.new
+      });
+      if (res.data.success) {
+        setPwMsg('Đổi mật khẩu thành công!');
+        setTimeout(() => {
+          setShowChangePwModal(false);
+          setPwForm({ current: '', new: '', confirm: '' });
+          setPwErrors({});
+          setPwMsg('');
+        }, 1500);
+      } else {
+        setPwMsg(res.data.message || 'Đổi mật khẩu thất bại');
+      }
+    } catch (err) {
+      setPwMsg(err.response?.data?.message || 'Đổi mật khẩu thất bại');
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -339,11 +414,12 @@ const UserProfile = () => {
                   <label className="form-label fw-semibold">Họ và tên</label>
                   <input 
                     type="text" 
-                    className="form-control" 
+                    className={`form-control${errors.name ? ' is-invalid' : ''}`} 
                     value={userProfile.name}
                     onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
                     required
                   />
+                  {errors.name && <div className="text-danger small mt-1">{errors.name}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-semibold">Email</label>
@@ -395,41 +471,101 @@ const UserProfile = () => {
                   <label className="form-label fw-semibold">Số điện thoại</label>
                   <input 
                     type="tel" 
-                    className="form-control" 
+                    className={`form-control${errors.phone ? ' is-invalid' : ''}`} 
                     value={userProfile.phone}
                     onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})}
                     required
                   />
+                  {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-semibold">Địa chỉ</label>
                   <input 
                     type="text" 
-                    className="form-control" 
+                    className={`form-control${errors.address ? ' is-invalid' : ''}`} 
                     value={userProfile.address}
                     onChange={(e) => setUserProfile({...userProfile, address: e.target.value})}
                     required
                   />
+                  {errors.address && <div className="text-danger small mt-1">{errors.address}</div>}
                 </div>
               </div>
-              <button 
-                type="submit" 
-                className="btn btn-primary userprofile-btn-lg" 
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Đang cập nhật...
-                  </>
-                ) : (
-                  'Cập nhật thông tin'
-                )}
-              </button>
+              {/* Avatar error display */}
+              {errors.avatar && <div className="text-danger small mt-1">{errors.avatar}</div>}
+              {/* Buttons row */}
+              <div className="d-flex gap-2 mt-3">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary userprofile-btn-lg" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    'Cập nhật thông tin'
+                  )}
+                </button>
+                <Button 
+                  variant="outline-secondary" 
+                  className="userprofile-btn-lg" 
+                  onClick={() => setShowChangePwModal(true)}
+                  disabled={isLoading}
+                >
+                  Đổi mật khẩu
+                </Button>
+              </div>
             </form>
           </div>
         </div>
       </div>
+      {/* Change Password Modal */}
+      <Modal show={showChangePwModal} onHide={() => setShowChangePwModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Đổi mật khẩu</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {pwMsg && <div className={`alert ${pwMsg.includes('thành công') ? 'alert-success' : 'alert-danger'} mb-3`}>{pwMsg}</div>}
+          <Form onSubmit={handleChangePassword}>
+            <Form.Group className="mb-3">
+              <Form.Label>Mật khẩu hiện tại</Form.Label>
+              <Form.Control
+                type="password"
+                value={pwForm.current}
+                onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+                isInvalid={!!pwErrors.current}
+              />
+              <Form.Control.Feedback type="invalid">{pwErrors.current}</Form.Control.Feedback>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Mật khẩu mới</Form.Label>
+              <Form.Control
+                type="password"
+                value={pwForm.new}
+                onChange={e => setPwForm(f => ({ ...f, new: e.target.value }))}
+                isInvalid={!!pwErrors.new}
+              />
+              <Form.Control.Feedback type="invalid">{pwErrors.new}</Form.Control.Feedback>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Xác nhận mật khẩu mới</Form.Label>
+              <Form.Control
+                type="password"
+                value={pwForm.confirm}
+                onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                isInvalid={!!pwErrors.confirm}
+              />
+              <Form.Control.Feedback type="invalid">{pwErrors.confirm}</Form.Control.Feedback>
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="secondary" onClick={() => setShowChangePwModal(false)} disabled={pwLoading}>Hủy</Button>
+              <Button type="submit" variant="primary" disabled={pwLoading}>{pwLoading ? 'Đang đổi...' : 'Đổi mật khẩu'}</Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };

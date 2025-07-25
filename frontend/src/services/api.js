@@ -134,6 +134,10 @@ export const userAPI = {
     const response = await api.get('/reports/my-reports');
     return response;
   },
+
+  // ---- Change Password ----
+  changePassword: ({ currentPassword, newPassword }) =>
+    api.post('/users/change-password', { currentPassword, newPassword }),
 };
 
 export const adminAPI = {

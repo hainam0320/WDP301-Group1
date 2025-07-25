@@ -29,6 +29,8 @@ const OrderHistory = () => {
   const fileInputRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
+  // Add a new state for description length error
+  const [reportDescriptionError, setReportDescriptionError] = useState('');
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -181,6 +183,10 @@ const OrderHistory = () => {
   const handleSubmitReport = async () => {
     if (!reportTargetOrder || !reportType || !reportDescription) {
       setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin báo cáo' });
+      return;
+    }
+    if (reportDescription.length > 256) {
+      setMessage({ type: 'error', content: 'Nội dung báo cáo không được vượt quá 256 ký tự' });
       return;
     }
 
@@ -666,13 +672,29 @@ const OrderHistory = () => {
                     as="textarea"
                     rows={3}
                     value={reportDescription}
-                    onChange={(e) => setReportDescription(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value.length <= 256) {
+                        setReportDescription(value);
+                        setReportDescriptionError('');
+                      } else {
+                        setReportDescriptionError('Nội dung báo cáo không được vượt quá 256 ký tự');
+                      }
+                    }}
                     placeholder={existingReport ? 
                       "Nhập nội dung cập nhật cho báo cáo..." :
                       "Vui lòng mô tả chi tiết vấn đề bạn gặp phải..."}
-                    isInvalid={!reportDescription}
+                    isInvalid={!reportDescription || !!reportDescriptionError}
                     disabled={existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')}
                   />
+                  <div className="d-flex justify-content-between align-items-center mt-1">
+                    <small className={reportDescription.length > 256 ? 'text-danger' : 'text-muted'}>
+                      {reportDescription.length}/256 ký tự
+                    </small>
+                    {reportDescriptionError && (
+                      <small className="text-danger">{reportDescriptionError}</small>
+                    )}
+                  </div>
                 </Form.Group>
 
                 <Form.Group className="mb-3">
