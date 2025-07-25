@@ -11,10 +11,10 @@ exports.registerUser = async (req, res) => {
 
         // Kiểm tra email đã tồn tại chưa (cả trong User và Driver)
         if (await User.findOne({ email })) {
-            return res.status(400).json({ message: 'Email đã được sử dụng (User)' });
+            return res.status(400).json({ message: 'Email đã được sử dụng ' });
         }
         if (await Driver.findOne({ email })) {
-            return res.status(400).json({ message: 'Email đã được sử dụng (Driver)' });
+            return res.status(400).json({ message: 'Email đã được sử dụng ' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
