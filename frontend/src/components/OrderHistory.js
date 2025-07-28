@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaHistory, FaStar, FaExclamationTriangle, FaArrowLeft, FaInfoCircle, FaTrash, FaImage } from 'react-icons/fa';
+import { FaHistory, FaStar, FaExclamationTriangle, FaArrowLeft, FaInfoCircle, FaTrash, FaImage, FaCheckCircle, FaMoneyBillWave } from 'react-icons/fa';
 import axios from 'axios';
-import { Modal, Button, Form, Badge } from 'react-bootstrap';
+import { Modal, Button, Form, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap'; // Thêm Tooltip
 import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import { toast } from 'react-hot-toast'; // Import toast
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -29,7 +30,6 @@ const OrderHistory = () => {
   const fileInputRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
-  // Add a new state for description length error
   const [reportDescriptionError, setReportDescriptionError] = useState('');
   const [rateCommentError, setRateCommentError] = useState('');
 
@@ -37,11 +37,7 @@ const OrderHistory = () => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await axios.get(`${BASE_URL}/api/orders`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await userAPI.getUserOrders(); // Sử dụng userAPI
       setOrders(response.data);
     } catch (err) {
       console.error('Error fetching orders:', err);
@@ -72,8 +68,13 @@ const OrderHistory = () => {
 
   useEffect(() => {
     if (orders.length > 0) {
-      const successfulOrders = orders.filter(o => o.status === 'completed');
-      fetchRatesForCompletedOrders(successfulOrders);
+      // Chỉ lấy các đơn đã hoàn thành bởi shipper HOẶC đã xác nhận bởi user để fetch rate
+      const completedOrders = orders.filter(o => 
+        o.status === 'shipper_completed' || 
+        o.status === 'user_confirmed_completion' || 
+        o.status === 'completed' // Backward compatibility if 'completed' still exists
+      );
+      fetchRatesForCompletedOrders(completedOrders);
     }
   }, [orders]);
 
@@ -91,7 +92,6 @@ const OrderHistory = () => {
 
   const handleSubmitRate = async () => {
     if (!rateTargetOrder) return;
-    // Validate rateComment length
     if (rateComment.length > 256) {
       setRateCommentError('Bình luận không được vượt quá 256 ký tự');
       return;
@@ -111,8 +111,10 @@ const OrderHistory = () => {
       const res = await userAPI.createOrderRate(payload);
       setOrderRates(prev => ({ ...prev, [rateTargetOrder._id]: res.data }));
       setShowRateModal(false);
+      toast.success('Gửi đánh giá thành công!');
     } catch (err) {
-      alert('Lỗi khi gửi đánh giá!');
+      console.error('Lỗi khi gửi đánh giá:', err);
+      toast.error('Lỗi khi gửi đánh giá!');
     } finally {
       setRateLoading(false);
     }
@@ -124,30 +126,24 @@ const OrderHistory = () => {
       return;
     }
 
-    // Reset state
     setReportType('');
     setReportDescription('');
     setReportImages([]);
     setExistingReport(null);
     setMessage({ type: '', content: '' });
 
-    // Check for existing report
     try {
       const response = await userAPI.getUserReports();
-      console.log('User reports:', response.data);
       
       if (response.data && response.data.reports) {
         const existingReport = response.data.reports.find(report => 
           report.order_id && report.order_id._id === order._id
         );
         
-        console.log('Found existing report:', existingReport);
-
         if (existingReport) {
           setExistingReport(existingReport);
           setReportType(existingReport.type || '');
           
-          // Handle images
           if (existingReport.image) {
             const images = Array.isArray(existingReport.image)
               ? existingReport.image
@@ -157,7 +153,6 @@ const OrderHistory = () => {
             setReportImages(images);
           }
 
-          // Check if report can be updated
           if (existingReport.status === 'resolved' || existingReport.status === 'rejected') {
             setMessage({
               type: 'warning',
@@ -198,7 +193,6 @@ const OrderHistory = () => {
       return;
     }
 
-    // Check if report can be updated
     if (existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')) {
       setMessage({
         type: 'error',
@@ -214,23 +208,15 @@ const OrderHistory = () => {
         type: reportType,
         description: reportDescription,
         image: reportImages,
-        removedImages: [] // Add this if you're tracking removed images
+        removedImages: []
       };
-
-      console.log('Submitting report data:', reportData);
 
       let response;
       if (existingReport) {
-        // Update existing report
-        console.log('Updating report:', existingReport._id);
         response = await userAPI.updateReport(existingReport._id, reportData);
       } else {
-        // Create new report
-        console.log('Creating new report');
         response = await userAPI.createReport(reportData);
       }
-
-      console.log('Server response:', response);
 
       if (response.data) {
         setMessage({ 
@@ -238,22 +224,18 @@ const OrderHistory = () => {
           content: response.data.message || 'Báo cáo đã được cập nhật thành công'
         });
         
-        // Refresh the reports list
         const updatedReports = await userAPI.getUserReports();
         const updatedReport = updatedReports.data.reports.find(r => 
           r.order_id._id === reportTargetOrder._id
         );
         setExistingReport(updatedReport);
 
-        // Close modal after delay
         setTimeout(() => {
           handleCloseReportModal();
         }, 1500);
       }
     } catch (error) {
       console.error('Error submitting report:', error);
-      console.error('Error response:', error.response);
-      
       let errorMessage = 'Lỗi khi gửi báo cáo';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -282,7 +264,6 @@ const OrderHistory = () => {
       });
 
       const response = await userAPI.uploadReportImages(formData);
-      console.log('Upload response:', response);
 
       if (response.data?.filePaths) {
         setReportImages(prev => [...prev, ...response.data.filePaths]);
@@ -298,7 +279,6 @@ const OrderHistory = () => {
       });
     } finally {
       setReportLoading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -311,23 +291,19 @@ const OrderHistory = () => {
 
   const getImageUrl = (path) => {
     if (!path) return null;
-    
     if (path.startsWith('uploads/')) {
       return `${BASE_URL}/${path}`;
     }
-    
     const relativePath = path.split('\\uploads\\')[1];
     if (relativePath) {
       return `${BASE_URL}/uploads/${relativePath}`;
     }
-    
     return null;
   };
 
   const renderImages = (imagePaths) => {
     if (!imagePaths) return null;
     
-    // Convert to array if it's a string, or use existing array
     const images = Array.isArray(imagePaths) 
       ? imagePaths 
       : typeof imagePaths === 'string' 
@@ -357,12 +333,42 @@ const OrderHistory = () => {
     );
   };
 
-  const completedOrders = orders.filter(order => order.status === 'completed' || order.status === 'failed');
-  const totalPages = Math.ceil(completedOrders.length / ordersPerPage);
-  const paginatedOrders = completedOrders.slice(
+  const getOrderStatusBadge = (status) => {
+    switch (status) {
+        case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
+        case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
+        case 'payment_failed': return <Badge bg="danger">TT Thất bại</Badge>;
+        case 'accepted': return <Badge bg="primary">Đã nhận</Badge>;
+        case 'in_progress': return <Badge bg="warning">Đang giao</Badge>;
+        case 'shipper_completed': return <Badge bg="info">Shipper Hoàn thành</Badge>;
+        case 'user_confirmed_completion': return <Badge bg="success">Đã Hoàn tất</Badge>;
+        case 'disputed': return <Badge bg="danger">Tranh chấp</Badge>;
+        case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
+        case 'failed': return <Badge bg="danger">Thất bại</Badge>;
+        default: return <Badge bg="secondary">{status}</Badge>;
+    }
+  };
+
+  const handleConfirmCompletion = async (orderId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xác nhận hoàn tất đơn hàng này không? Việc này sẽ giải ngân tiền cho tài xế.')) {
+        try {
+            await userAPI.confirmOrderCompletion(orderId);
+            toast.success('Đơn hàng đã được xác nhận hoàn tất. Tiền đã giải ngân cho tài xế!');
+            fetchOrders(); // Refresh orders to update status
+        } catch (error) {
+            console.error('Error confirming completion:', error);
+            const errorMessage = error.response?.data?.message || 'Lỗi khi xác nhận hoàn tất đơn hàng.';
+            toast.error(errorMessage);
+        }
+    }
+  };
+
+  const paginatedOrders = orders.slice(
     (currentPage - 1) * ordersPerPage,
     currentPage * ordersPerPage
   );
+  const totalPages = Math.ceil(orders.length / ordersPerPage);
+
 
   return (
     <div className="min-vh-100 orderhistory-bg">
@@ -445,8 +451,8 @@ const OrderHistory = () => {
               </div>
             ) : error ? (
               <div className="alert alert-danger">{error}</div>
-            ) : completedOrders.length === 0 ? (
-              <div className="alert alert-info">Không có lịch sử đơn hàng</div>
+            ) : orders.length === 0 ? ( // Display if no orders at all
+              <div className="alert alert-info">Bạn chưa có đơn hàng nào</div>
             ) : (
               <div className="table-responsive">
                 <table className="table">
@@ -456,9 +462,9 @@ const OrderHistory = () => {
                       <th>Từ</th>
                       <th>Đến</th>
                       <th>Loại</th>
-                      <th>Thời gian hoàn thành</th>
                       <th>Giá</th>
                       <th>Trạng thái</th>
+                      <th>Thao tác</th>
                       <th>Đánh giá</th>
                       <th>Báo cáo</th>
                     </tr>
@@ -470,43 +476,76 @@ const OrderHistory = () => {
                         <td>{order.pickupaddress}</td>
                         <td>{order.dropupaddress}</td>
                         <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                        <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                         <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
                         <td>
-                          <span className={`badge ${order.status === 'failed' ? 'bg-danger' : 'bg-success'}`}>
-                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
-                          </span>
-                          {order.status === 'failed' && order.statusDescription && (
-                            <div className="small text-danger mt-1">
-                              Lý do: {order.statusDescription}
-                            </div>
+                          {getOrderStatusBadge(order.status)}
+                          {(order.status === 'failed' || order.status === 'disputed' || order.paymentStatus === 'disputed_payment') && order.statusDescription && (
+                            <OverlayTrigger
+                                placement="top"
+                                overlay={<Tooltip id={`tooltip-desc-${order._id}`}>{order.statusDescription}</Tooltip>}
+                            >
+                                <FaInfoCircle className="ms-1 text-muted" style={{cursor: 'help'}} />
+                            </OverlayTrigger>
                           )}
                         </td>
                         <td>
-                          {order.status === 'failed' ? (
-                            <span className="text-danger small">Không thể đánh giá</span>
-                          ) : orderRates[order._id] ? (
-                            <div>
-                              <span className="text-warning">
-                                {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
-                              </span>
-                              <div className="small text-muted">{orderRates[order._id].comment}</div>
-                            </div>
+                            {order.status === 'shipper_completed' && (
+                                <Button 
+                                    size="sm" 
+                                    variant="success" 
+                                    onClick={() => handleConfirmCompletion(order._id)}
+                                    className="me-2"
+                                >
+                                    <FaCheckCircle className="me-1" />
+                                    Xác nhận hoàn tất
+                                </Button>
+                            )}
+                            {(order.status === 'pending_payment' || order.status === 'payment_failed') && (
+                                <Button size="sm" variant="info" onClick={() => navigate(`/new-order?orderId=${order._id}`)}> {/* Có thể chuyển hướng lại trang đặt đơn để thanh toán lại */}
+                                    <FaMoneyBillWave className="me-1" /> Thanh toán lại
+                                </Button>
+                            )}
+                        </td>
+                        <td>
+                          {(order.status === 'user_confirmed_completion' || order.status === 'completed') ? ( // Chỉ cho đánh giá khi user đã xác nhận
+                            orderRates[order._id] ? (
+                              <div>
+                                <span className="text-warning">
+                                  {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
+                                </span>
+                                <div className="small text-muted">{orderRates[order._id].comment}</div>
+                              </div>
+                            ) : (
+                              <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
+                                Đánh giá
+                              </Button>
+                            )
                           ) : (
-                            <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
-                              Đánh giá
-                            </Button>
+                            <span className="text-muted small">Chưa hoàn tất</span>
                           )}
                         </td>
                         <td>
-                          <Button 
-                            size="sm" 
-                            variant="outline-danger"
-                            onClick={() => handleOpenReportModal(order)}
-                          >
-                            <FaExclamationTriangle className="me-1" />
-                            Báo cáo
-                          </Button>
+                            {(order.status !== 'pending_payment' && order.status !== 'payment_failed' && order.status !== 'refunded') && ( // Không cho báo cáo khi chưa thanh toán/đã hoàn tiền
+                                <Button 
+                                    size="sm" 
+                                    variant="outline-danger"
+                                    onClick={() => handleOpenReportModal(order)}
+                                    disabled={order.status === 'disputed'} // Nếu đang tranh chấp thì không báo cáo nữa
+                                >
+                                    <FaExclamationTriangle className="me-1" />
+                                    Báo cáo
+                                </Button>
+                            )}
+                            {order.status === 'disputed' && (
+                                <OverlayTrigger
+                                    placement="top"
+                                    overlay={<Tooltip id={`tooltip-dispute-${order._id}`}>Đơn hàng đang có tranh chấp.</Tooltip>}
+                                >
+                                    <Button size="sm" variant="outline-secondary" disabled>
+                                        Đang tranh chấp
+                                    </Button>
+                                </OverlayTrigger>
+                            )}
                         </td>
                       </tr>
                     ))}
@@ -806,4 +845,4 @@ const OrderHistory = () => {
   );
 };
 
-export default OrderHistory; 
+export default OrderHistory;

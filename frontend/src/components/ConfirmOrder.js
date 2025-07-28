@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { FaShippingFast, FaMapMarkerAlt, FaRuler, FaMoneyBillWave, FaClock, FaArrowLeft } from 'react-icons/fa';
-import Header from './Header'; // Added missing import for Header
+import Header from './Header';
+import { userAPI, transactionAPI } from '../services/api'; // Import transactionAPI
 
 const ConfirmOrder = () => {
   const { state } = useLocation();
@@ -22,51 +22,77 @@ const ConfirmOrder = () => {
     setSuccess('');
     try {
       const user = JSON.parse(localStorage.getItem('user'));
-      const token = localStorage.getItem('token');
       
-      if (!token) {
-        throw new Error('Vui lòng đăng nhập để đặt đơn hàng');
+      if (!user || !localStorage.getItem('token')) {
+        throw new Error('Vui lòng đăng nhập để đặt đơn hàng.');
       }
 
       const payload = {
         userId: user._id,
         type: serviceType === 'delivery' ? 'delivery' : 'order',
-        phone: user.phone,
+        phone: user.phone, // Lấy từ user profile
         pickupaddress: orderData.pickupLocation,
         dropupaddress: orderData.deliveryLocation,
         timeStart: new Date().toISOString(),
-        timeEnd: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        timeEnd: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // Thời gian ước tính
         price: orderData.estimatedPrice,
-        status: 'pending',
-        distance_km: orderData.distance
+        distance_km: orderData.distance,
+        // Thêm thông tin hàng hóa nếu là đơn giao hàng
+        ...(serviceType === 'delivery' && {
+            itemType: orderData.itemType,
+            weight_kg: orderData.weight,
+            dimensions: orderData.dimensions
+        })
       };
 
-      console.log('Sending payload:', payload);
+      console.log('Creating order with payload:', payload);
       
-      const res = await axios.post('http://localhost:9999/api/orders', payload, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Bước 1: Tạo đơn hàng với trạng thái 'pending_payment'
+      const orderResponse = await userAPI.createOrder(payload);
+      const createdOrder = orderResponse.data;
 
-      setSuccess('Đặt đơn hàng thành công!');
+      if (!createdOrder || !createdOrder._id) {
+          throw new Error('Không thể tạo đơn hàng. Vui lòng thử lại.');
+      }
       
-      // Delay navigation to show success message
-      setTimeout(() => {
-        navigate('/home', { state: { order: res.data } });
-      }, 2000);
+      setSuccess('Đơn hàng đã được tạo. Chuyển đến trang thanh toán...');
+
+      // Bước 2: Gọi API VNPAY để tạo thanh toán
+      const paymentPayload = {
+          orderId: createdOrder._id,
+          amount: createdOrder.price,
+          orderInfo: `Thanh toan don hang ${createdOrder._id}`,
+          bankCode: 'NCB' // Có thể cho phép người dùng chọn bankCode hoặc để trống
+      };
+
+      console.log('Initiating VNPAY payment with payload:', paymentPayload);
+      const vnpayResponse = await transactionAPI.createVnPayPayment(paymentPayload);
+      
+      if (vnpayResponse.data && vnpayResponse.data.vnpUrl) {
+          // Chuyển hướng người dùng đến cổng thanh toán VNPAY
+          window.location.href = vnpayResponse.data.vnpUrl;
+      } else {
+          throw new Error('Không nhận được URL thanh toán từ VNPAY.');
+      }
       
     } catch (err) {
-      console.error('Error saving order:', err);
-      if (err.response?.status === 401) {
-        setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
-      } else {
-        setError(err.message || 'Lỗi khi lưu đơn hàng. Vui lòng thử lại.');
+      console.error('Lỗi khi xử lý đặt đơn hàng hoặc thanh toán:', err);
+      let errorMessage = 'Lỗi khi đặt đơn hàng hoặc thanh toán. Vui lòng thử lại.';
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
+      setError(errorMessage);
+
+      // Nếu có lỗi, có thể muốn hủy đơn hàng đã tạo ở backend
+      // (cần thêm API để hủy đơn hàng nếu thanh toán thất bại)
+
+      // Delay để người dùng đọc thông báo lỗi
+      setTimeout(() => {
+        setError(''); // Xóa lỗi sau một khoảng thời gian
+      }, 5000);
+      
     } finally {
       setSubmitting(false);
     }
@@ -177,6 +203,17 @@ const ConfirmOrder = () => {
                   </div>
                 </div>
 
+                {serviceType === 'delivery' && (
+                    <div className="item-details mb-4">
+                        <div className="p-3 bg-light rounded">
+                            <h5 className="text-primary mb-3">Thông tin hàng hóa</h5>
+                            <p className="mb-1"><strong>Loại hàng:</strong> {orderData.itemType}</p>
+                            <p className="mb-1"><strong>Cân nặng:</strong> {orderData.weight} kg</p>
+                            <p className="mb-0"><strong>Kích thước:</strong> {orderData.dimensions}</p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="details row g-3 mb-4">
                   <div className="col-md-6">
                     <div className="p-3 bg-light rounded h-100">
@@ -226,10 +263,10 @@ const ConfirmOrder = () => {
                     {submitting ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Đang xử lý...
+                        Đang chuyển hướng thanh toán...
                       </>
                     ) : (
-                      'Xác nhận và lưu'
+                      'Xác nhận và Thanh toán'
                     )}
                   </button>
                 </div>

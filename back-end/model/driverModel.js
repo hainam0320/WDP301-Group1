@@ -10,6 +10,7 @@ const driverSchema = new mongoose.Schema({
     cmndFront:{type: String, required: true}, // Ảnh CMND mặt trước
     cmndBack:{type: String, required: true}, // Ảnh CMND mặt sau
     status:{type: Boolean, default: false},
+    balance: { type: Number, default: 0 }, // Thêm trường số dư ví cho tài xế
 }, { timestamps: true });
 
 module.exports = mongoose.model('Driver', driverSchema);

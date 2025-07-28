@@ -4,6 +4,7 @@ import { FaShippingFast, FaMapMarkerAlt, FaCheck, FaClock, FaUser, FaRoute, FaAr
 import axios from 'axios';
 import ShipperHeader from './ShipperHeader';
 import { Modal, Button } from 'react-bootstrap';
+import { toast } from 'react-hot-toast'; // Import toast for notifications
 
 const AvailableOrders = () => {
   const navigate = useNavigate();
@@ -11,8 +12,8 @@ const AvailableOrders = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState({ type: '', content: '' });
-  const [showCommissionModal, setShowCommissionModal] = useState(false);
-  const [commissionMessage, setCommissionMessage] = useState('');
+  // const [showCommissionModal, setShowCommissionModal] = useState(false); // Bỏ modal này nếu luồng mới không còn cảnh báo hoa hồng
+  // const [commissionMessage, setCommissionMessage] = useState(''); // Bỏ state này
   const BASE_URL = 'http://localhost:9999';
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
@@ -30,12 +31,13 @@ const AvailableOrders = () => {
       setAvailableOrders(response.data);
     } catch (err) {
       console.error('Error fetching available orders:', err);
-      // Nếu bị chặn do hoa hồng quá hạn
-      if (err.response && err.response.status === 403 && err.response.data?.message?.includes('hoa hồng')) {
-        setCommissionMessage(err.response.data.message);
-        setShowCommissionModal(true);
-        return;
-      }
+      // Logic kiểm tra hoa hồng quá hạn đã được chuyển về backend trong `shipperRoutes.js`
+      // Nếu backend vẫn trả về 403 với thông báo liên quan đến hoa hồng, thì xử lý ở đây:
+      // if (err.response && err.response.status === 403 && err.response.data?.message?.includes('hoa hồng')) {
+      //   setCommissionMessage(err.response.data.message);
+      //   setShowCommissionModal(true);
+      //   return;
+      // }
       setError('Không thể tải danh sách đơn hàng khả dụng');
     } finally {
       setIsLoading(false);
@@ -48,16 +50,23 @@ const AvailableOrders = () => {
     const handleNewOrder = (event) => {
         console.log('Received new order event, refreshing list...');
         fetchAvailableOrders();
-        // Optional: Add a more prominent sound or visual cue
-        new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e));
+        new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e)); // Đảm bảo tệp âm thanh tồn tại
     };
-
+    
+    // Lắng nghe sự kiện từ socket.io (server.js)
+    // Giả sử `socket` được truyền xuống component hoặc có context
+    // Ví dụ nếu bạn có socket.io client instance (ví dụ: `socket = io(BASE_URL)`)
+    // socket.on('new_order_available', handleNewOrder);
+    // Để đơn giản, nếu bạn đang sử dụng window event, hãy kiểm tra lại cách event này được emit
+    // Dòng dưới đây có vẻ là một custom event bạn đang dùng, hãy giữ lại nếu có:
     window.addEventListener('new_order_for_driver', handleNewOrder);
 
+
     return () => {
+        // socket.off('new_order_available', handleNewOrder); // Hủy đăng ký socket event
         window.removeEventListener('new_order_for_driver', handleNewOrder);
     };
-  }, []); // The dependency array is empty, so fetchAvailableOrders is not recreated
+  }, []);
 
   const acceptOrder = async (orderId) => {
     try {
@@ -70,19 +79,17 @@ const AvailableOrders = () => {
         }
       });
 
+      toast.success('Nhận đơn thành công!'); // Sử dụng toast
       setMessages({ type: 'success', content: 'Nhận đơn thành công!' });
-      // Refresh the list after accepting
       fetchAvailableOrders();
     } catch (error) {
       console.error('Error accepting order:', error);
-      if (error.response?.data?.message === 'Đơn hàng này đã được shipper khác nhận') {
-        setMessages({ type: 'error', content: 'Đơn hàng này đã được shipper khác nhận' });
-        fetchAvailableOrders();
-      } else {
-        setMessages({ 
-          type: 'error', 
-          content: error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn'
-        });
+      const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn';
+      setMessages({ type: 'error', content: errorMessage });
+      toast.error(errorMessage); // Sử dụng toast
+      if (error.response?.data?.message === 'Đơn hàng này đã được shipper khác nhận' || 
+          error.response?.data?.message.includes('không ở trạng thái khả dụng')) {
+        fetchAvailableOrders(); // Refresh nếu đơn đã bị nhận hoặc không hợp lệ
       }
     } finally {
       setIsLoading(false);
@@ -111,8 +118,8 @@ const AvailableOrders = () => {
   return (
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <ShipperHeader />
-      {/* Modal cảnh báo hoa hồng quá hạn */}
-      <Modal show={showCommissionModal} onHide={() => { setShowCommissionModal(false); navigate('/shipper/commissions'); }} centered>
+      {/* Modal cảnh báo hoa hồng quá hạn - Bỏ đi nếu không còn cần */}
+      {/* <Modal show={showCommissionModal} onHide={() => { setShowCommissionModal(false); navigate('/shipper/commissions'); }} centered>
         <Modal.Header closeButton className="bg-warning text-dark">
           <Modal.Title>Thanh toán hoa hồng quá hạn</Modal.Title>
         </Modal.Header>
@@ -127,7 +134,7 @@ const AvailableOrders = () => {
             Đi đến trang thanh toán hoa hồng
           </Button>
         </Modal.Footer>
-      </Modal>
+      </Modal> */}
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"
@@ -182,9 +189,9 @@ const AvailableOrders = () => {
                           <FaRoute className="text-info me-2" />
                           <strong>Khoảng cách:</strong> {order.distance_km ? `${order.distance_km.toFixed(1)} km` : 'N/A'}
                         </p>
-                        {order.type === 'delivery' && order.weight && (
+                        {order.type === 'delivery' && order.weight_kg && ( // Sử dụng weight_kg
                           <p className="mb-1">
-                            <strong>Khối lượng:</strong> {order.weight} kg
+                            <strong>Khối lượng:</strong> {order.weight_kg} kg
                           </p>
                         )}
                         <p className="mb-1">
@@ -239,4 +246,4 @@ const AvailableOrders = () => {
   );
 };
 
-export default AvailableOrders; 
+export default AvailableOrders;

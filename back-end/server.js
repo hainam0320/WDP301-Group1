@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
@@ -13,8 +15,8 @@ const rateRoutes = require('./routes/rateRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const transactionRoutes = require("./routes/transactionRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const paymentRoutes = require("./routes/paymentRoutes"); // Thêm dòng này
 
-require('dotenv').config();
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -82,6 +84,7 @@ app.use('/api/rate', rateRoutes);
 app.use('/api/reports', reportRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payment', paymentRoutes); // Thêm dòng này
 
 
 // Khởi động server

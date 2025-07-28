@@ -28,7 +28,7 @@ const NewOrder = () => {
       setOrderData(prev => ({
         ...prev,
         distance: coordinates.distance,
-        estimatedPrice: calculatePrice(coordinates.distance)
+        estimatedPrice: calculatePrice(coordinates.distance, parseFloat(prev.weight || 0)) // Recalculate price
       }));
     } else if (type === 'pickup') {
       setOrderData(prev => ({
@@ -36,7 +36,7 @@ const NewOrder = () => {
         pickupLocation: location !== undefined ? location : prev.pickupLocation,
         pickupCoordinates: coordinates !== undefined ? coordinates : prev.pickupCoordinates
       }));
-    } else if (type === 'delivery' || type === 'dropoff') {
+    } else if (type === 'delivery' || type === 'dropoff') { // "dropoff" here for consistency with RideMap
       setOrderData(prev => ({
         ...prev,
         deliveryLocation: location !== undefined ? location : prev.deliveryLocation,
@@ -45,12 +45,12 @@ const NewOrder = () => {
     }
   };
 
-  const calculatePrice = (distance) => {
+  const calculatePrice = (distance, weight) => {
     if (!distance) return 0;
     
     let basePrice = serviceType === 'delivery' ? 25000 : 20000;
     let distancePrice = distance * 10000; // 10,000 VND per km
-    let weightFactor = orderData.weight ? parseInt(orderData.weight) * 2000 : 0;
+    let weightFactor = (serviceType === 'delivery' && weight) ? weight * 2000 : 0;
     let estimated = basePrice + distancePrice + weightFactor;
     
     return Math.round(estimated);
@@ -64,21 +64,31 @@ const NewOrder = () => {
       return;
     }
 
-    if (serviceType === 'delivery' && (!orderData.itemType || !orderData.weight || !orderData.dimensions)) {
-      setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
-      return;
-    }
-
-    // Validate weight: 0 < weight < 30
     if (serviceType === 'delivery') {
-      const weight = parseFloat(orderData.weight);
-      if (isNaN(weight) || weight <= 0 || weight >= 30) {
-        setMessage({ type: 'error', content: 'Cân nặng nhỏ hơn 30 kg' });
-        return;
-      }
+        if (!orderData.itemType || !orderData.weight || !orderData.dimensions) {
+            setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
+            return;
+        }
+        const weight = parseFloat(orderData.weight);
+        if (isNaN(weight) || weight <= 0 || weight > 30) { // Cập nhật điều kiện cân nặng
+            setMessage({ type: 'error', content: 'Cân nặng phải lớn hơn 0 và nhỏ hơn hoặc bằng 30 kg' });
+            return;
+        }
     }
 
-    navigate('/confirmOrder', { state: { orderData, serviceType } });
+    // Pass all necessary data to ConfirmOrder, including item details for backend
+    navigate('/confirmOrder', { 
+        state: { 
+            orderData: {
+                ...orderData,
+                itemType: serviceType === 'delivery' ? orderData.itemType : undefined,
+                weight: serviceType === 'delivery' ? parseFloat(orderData.weight) : undefined,
+                dimensions: serviceType === 'delivery' ? orderData.dimensions : undefined,
+                estimatedPrice: calculatePrice(orderData.distance, parseFloat(orderData.weight || 0)) // Ensure final price calculation
+            }, 
+            serviceType 
+        } 
+    });
   };
 
   return (
@@ -233,10 +243,12 @@ const NewOrder = () => {
                     placeholder="0"
                     value={orderData.weight}
                     onChange={(e) => {
-                      setOrderData({...orderData, weight: e.target.value});
-                      if (orderData.pickupCoordinates && orderData.deliveryCoordinates) {
-                        handleLocationUpdate('route', null, { distance: orderData.distance });
-                      }
+                      const newWeight = parseFloat(e.target.value);
+                      setOrderData(prev => ({
+                          ...prev, 
+                          weight: e.target.value,
+                          estimatedPrice: calculatePrice(prev.distance, newWeight) // Update price immediately
+                      }));
                     }}
                   />
                 </div>
@@ -284,7 +296,7 @@ const NewOrder = () => {
             <button
               type="button"
               className="btn btn-primary btn-lg w-100 neworder-btn-lg"
-              disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates}
+              disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates || orderData.estimatedPrice <= 0}
               onClick={handleSubmit}
             >
               Đặt đơn ngay
@@ -296,4 +308,4 @@ const NewOrder = () => {
   );
 };
 
-export default NewOrder; 
+export default NewOrder;

@@ -8,34 +8,40 @@ const {
   updateOrder,
   deleteOrder,
   acceptOrder,
-  completeOrder // 👈 thêm dòng này
+  completeOrder,
+  userConfirmCompletion // Thêm dòng này
 } = require('../controller/orderController');
 const Order = require('../model/orderModel');
 
 // Protect all routes
 router.use(protect);
 
-// Get user's orders
-router.get('/', async (req, res) => {
+// Get user's orders (filter by userId)
+router.get('/user', async (req, res) => { // Đổi route thành /user để tránh trùng với /api/orders cho admin
   try {
     const orders = await Order.find({ userId: req.user._id })
       .populate('driverId', 'fullName phone')
       .sort('-createdAt');
     res.json(orders);
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.error('Error fetching user orders:', error);
     res.status(500).json({ message: 'Server error while fetching orders' });
   }
 });
 
-// Route definitions
-router.post('/', createOrder);
-router.get('/:id', getOrderById);
-router.put('/:id', updateOrder);
-router.delete('/:id', deleteOrder);
+// Route definitions (đơn hàng chung, có thể dành cho admin nếu không có filter userId)
+router.post('/', authorize('user'), createOrder); // Chỉ user tạo đơn
+router.get('/:id', getOrderById); // Có thể cần authorize
+router.put('/:id', authorize('user', 'driver', 'admin'), updateOrder); // Có thể cần authorize chi tiết hơn
+router.delete('/:id', authorize('admin'), deleteOrder); // Chỉ admin xóa
+
+// Shipper chấp nhận đơn hàng
 router.post('/:id/accept', authorize('shipper', 'driver'), acceptOrder);
 
-// ✅ Thêm route hoàn tất đơn
+// Shipper hoàn tất đơn hàng
 router.post('/:id/complete', authorize('shipper', 'driver'), completeOrder);
+
+// User xác nhận hoàn thành đơn hàng (NEW ROUTE)
+router.post('/:id/user-confirm-completion', authorize('user'), userConfirmCompletion);
 
 module.exports = router;
