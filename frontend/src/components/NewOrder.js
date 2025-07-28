@@ -68,37 +68,90 @@ const NewOrder = () => {
       setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin hàng hóa' });
       return;
     }
+
+    // Validate weight: 0 < weight < 30
+    if (serviceType === 'delivery') {
+      const weight = parseFloat(orderData.weight);
+      if (isNaN(weight) || weight <= 0 || weight >= 30) {
+        setMessage({ type: 'error', content: 'Cân nặng nhỏ hơn 30 kg' });
+        return;
+      }
+    }
+
     navigate('/confirmOrder', { state: { orderData, serviceType } });
   };
 
-  const cardStyle = {
-    borderRadius: '15px',
-    boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
-    border: 'none'
-  };
-
   return (
-    <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
+    <div className="min-vh-100 neworder-bg">
       <Header />
+      <style>{`
+        .neworder-bg {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+        }
+        .neworder-card {
+          border-radius: 18px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+          border: none;
+          background: rgba(255,255,255,0.97);
+        }
+        .neworder-card .card-header {
+          border-radius: 18px 18px 0 0;
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+        }
+        .neworder-card .card-body {
+          padding: 2.5rem 1.5rem;
+        }
+        .neworder-btn-lg {
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          padding: 0.9rem 1.5rem;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.08);
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .neworder-btn-lg:active, .neworder-btn-lg:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #6a82fb33;
+        }
+        .neworder-btn-lg.btn-primary {
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          border: none;
+        }
+        .neworder-btn-lg.btn-primary:hover {
+          background: linear-gradient(90deg, #fc5c7d 0%, #6a82fb 100%);
+          color: #fff;
+          transform: scale(1.04);
+        }
+        .neworder-card .card {
+          border-radius: 14px;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.07);
+        }
+        .neworder-card .card:hover {
+          box-shadow: 0 4px 16px rgba(31,38,135,0.13);
+          transform: translateY(-2px) scale(1.01);
+        }
+        @media (max-width: 768px) {
+          .neworder-card .card-body {
+            padding: 1.2rem 0.5rem;
+          }
+        }
+      `}</style>
       <div className="container my-5">
         <button 
-          className="btn btn-outline-primary mb-4"
+          className="btn btn-outline-primary mb-4 neworder-btn-lg"
           onClick={() => navigate('/home')}
         >
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
-        <div className="card" style={cardStyle}>
-          <div className="card-header bg-primary text-white">
+        <div className="card neworder-card">
+          <div className="card-header">
             <h4 className="mb-0"><FaShippingFast className="me-2" />Đặt đơn mới</h4>
           </div>
           <div className="card-body">
-            {message.content && (
-              <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
-                {message.content}
-              </div>
-            )}
-
             {/* Service Type Selection */}
             <div className="row mb-4">
               <div className="col-md-6">
@@ -175,6 +228,7 @@ const NewOrder = () => {
                   </label>
                   <input 
                     type="number" 
+                    min="0"
                     className="form-control" 
                     placeholder="0"
                     value={orderData.weight}
@@ -219,10 +273,17 @@ const NewOrder = () => {
               </div>
             )}
 
+            {/* Message display moved here */}
+            {message.content && (
+              <div className={`alert ${message.type === 'success' ? 'alert-success' : 'alert-danger'} mb-4`}>
+                {message.content}
+              </div>
+            )}
+
             {/* Submit button */}
             <button
               type="button"
-              className="btn btn-primary btn-lg w-100"
+              className="btn btn-primary btn-lg w-100 neworder-btn-lg"
               disabled={!orderData.pickupCoordinates || !orderData.deliveryCoordinates}
               onClick={handleSubmit}
             >

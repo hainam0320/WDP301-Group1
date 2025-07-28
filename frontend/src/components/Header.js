@@ -42,56 +42,64 @@ const Header = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg" style={headerStyle}>
-      <div className="container">
-        <div className="d-flex align-items-center">
-          <img src={logo} alt="Logo" width="40" height="40" className="me-3" />
-          <span className="navbar-brand h3 mb-0">Tốc Hành Hòa Lạc</span>
+    <>
+      <style>{`
+        .header-username {
+          font-weight: 700;
+          background: linear-gradient(90deg, #6a82fb, #fc5c7d);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+      `}</style>
+      <nav className="navbar navbar-expand-lg" style={headerStyle}>
+        <div className="container">
+          <div className="d-flex align-items-center">
+            <img src={logo} alt="Logo" width="40" height="40" className="me-3" />
+            <span className="navbar-brand h3 mb-0">Tốc Hành Hòa Lạc</span>
+          </div>
+          <nav className="header-nav ms-auto">
+            <ul className="d-flex align-items-center">
+              <NotificationBell />
+              <li className="nav-item dropdown pe-3">
+                <a className="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+                  {userProfile.avatar ? (
+                    <img 
+                      src={getImageUrl(userProfile.avatar)} 
+                      alt="Avatar" 
+                      className="rounded-circle" 
+                      style={{width: '30px', height: '30px', objectFit: 'cover'}}
+                    />
+                  ) : (
+                    <FaUser />
+                  )}
+                  <span className="d-none d-md-block dropdown-toggle ps-2 header-username">{userProfile.name}</span>
+                </a>
+                <ul className="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+                  <li className="dropdown-header">
+                    <h6 className="header-username">{userProfile.name}</h6>
+                  </li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
+                    <a className="dropdown-item d-flex align-items-center" href="#" onClick={() => navigate('/profile')}>
+                      <FaUser className="me-2" />
+                      <span>Thông tin cá nhân</span>
+                    </a>
+                  </li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
+                    <a className="dropdown-item d-flex align-items-center" href="#" onClick={handleLogout}>
+                      <FaSignOutAlt className="me-2" />
+                      <span>Đăng xuất</span>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </nav>
         </div>
-        
-        <nav className="header-nav ms-auto">
-          <ul className="d-flex align-items-center">
-            <NotificationBell />
-
-            <li className="nav-item dropdown pe-3">
-              <a className="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
-                {userProfile.avatar ? (
-                  <img 
-                    src={getImageUrl(userProfile.avatar)} 
-                    alt="Avatar" 
-                    className="rounded-circle" 
-                    style={{width: '30px', height: '30px', objectFit: 'cover'}}
-                  />
-                ) : (
-                  <FaUser />
-                )}
-                <span className="d-none d-md-block dropdown-toggle ps-2">{userProfile.name}</span>
-              </a>
-
-              <ul className="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
-                <li className="dropdown-header">
-                  <h6>{userProfile.name}</h6>
-                </li>
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={() => navigate('/profile')}>
-                    <FaUser className="me-2" />
-                    <span>Thông tin cá nhân</span>
-                  </a>
-                </li>
-                <li><hr className="dropdown-divider" /></li>
-                <li>
-                  <a className="dropdown-item d-flex align-items-center" href="#" onClick={handleLogout}>
-                    <FaSignOutAlt className="me-2" />
-                    <span>Đăng xuất</span>
-                  </a>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 };
 

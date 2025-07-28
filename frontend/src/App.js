@@ -30,7 +30,7 @@ import ShipperManagement from './components/admin/ShipperManagement';
 import OrderManagement from './components/admin/OrderManagement';
 import RevenueReport from './components/admin/RevenueReport';
 import ReportManagement from './components/admin/ReportManagement';
-import SystemSettings from './components/admin/SystemSettings';
+
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 import ForgotPassword from './pages/ForgotPassword';
 
@@ -53,28 +53,39 @@ function App() {
         socket.current.emit('registerUser', { userId: user._id, role: user.role });
       });
 
-      // Lắng nghe sự kiện 'notification' từ server (cho user)
-      socket.current.on('notification', (data) => {
-        console.log('Notification received:', data);
-        
-        // Hiển thị thông báo bằng react-hot-toast
-        toast.success(data.message || 'Bạn có thông báo mới!', {
-          icon: '🔔',
+      // Phân tách các listener dựa trên vai trò của người dùng
+      if (user.role === 'user') {
+        // Lắng nghe sự kiện 'notification' từ server (chỉ dành cho user)
+        socket.current.on('notification', (data) => {
+          console.log('Notification for user:', data);
+          
+          toast.success(data.message || 'Bạn có thông báo mới!', {
+            icon: '🔔',
+          });
+
+          // Gửi sự kiện để các component khác (như chuông thông báo) có thể cập nhật
+          window.dispatchEvent(new Event('new-notification'));
         });
-
-        // Gửi sự kiện để các component khác (như chuông thông báo) có thể cập nhật
-        window.dispatchEvent(new Event('new-notification'));
-      });
-
-      // Lắng nghe sự kiện 'new_order_available' từ server (cho driver)
-      if (user.role === 'driver') {
+      } else if (user.role === 'driver') {
+        // Lắng nghe sự kiện 'new_order_available' từ server (chỉ dành cho driver)
         socket.current.on('new_order_available', (data) => {
-          console.log('New order available:', data);
+          console.log('New order available for driver:', data);
           toast.success(data.message || 'Có đơn hàng mới!', {
             icon: '🛵',
           });
           // Gửi sự kiện để trang AvailableOrders có thể cập nhật
           window.dispatchEvent(new CustomEvent('new_order_for_driver', { detail: data.order }));
+        });
+
+        // Tài xế cũng có thể nhận được các thông báo chung khác (ví dụ: tài khoản được duyệt)
+        // nhưng chúng ta sẽ bỏ qua thông báo `ORDER_ACCEPTED` để tránh nhầm lẫn.
+        socket.current.on('notification', (data) => {
+          if (data.type === 'ORDER_ACCEPTED') {
+            return; // Bỏ qua thông báo này vì nó dành cho người dùng
+          }
+          console.log('Generic notification for driver:', data);
+          toast.success(data.message || 'Bạn có thông báo mới!', { icon: '🔔' });
+          window.dispatchEvent(new Event('new-notification'));
         });
       }
 
@@ -219,7 +230,7 @@ function App() {
             <Route path="orders" element={<OrderManagement />} />
             <Route path="revenue" element={<RevenueReport />} />
             <Route path="reports" element={<ReportManagement />} />
-            <Route path="settings" element={<SystemSettings />} />
+            
             <Route path="commission-management" element={<AdminCommissionManagement />} />
           </Route>
         </Routes>

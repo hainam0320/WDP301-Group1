@@ -10,10 +10,34 @@ function ForgotPassword() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{6,}$/;
+
+  const validateEmail = () => {
+    if (!email.trim()) return 'Vui lòng nhập email';
+    if (!emailRegex.test(email)) return 'Email không hợp lệ';
+    return '';
+  };
+  const validatePassword = () => {
+    if (!newPassword) return 'Vui lòng nhập mật khẩu mới';
+    if (!passwordRegex.test(newPassword)) return 'Mật khẩu phải có ít nhất 6 ký tự, chứa chữ hoa và số';
+    return '';
+  };
+  const validateConfirmPassword = () => {
+    if (!confirmPassword) return 'Vui lòng xác nhận mật khẩu mới';
+    if (newPassword !== confirmPassword) return 'Mật khẩu nhập lại không khớp!';
+    return '';
+  };
+
   const handleSendCode = async (e) => {
     e.preventDefault();
     setMsg('');
     setError('');
+    const emailErr = validateEmail();
+    if (emailErr) {
+      setError(emailErr);
+      return;
+    }
     try {
       await axios.post('http://localhost:9999/api/users/forgot-password/send', { email });
       setStep(2);
@@ -27,8 +51,14 @@ function ForgotPassword() {
     e.preventDefault();
     setMsg('');
     setError('');
-    if (newPassword !== confirmPassword) {
-      setError('Mật khẩu nhập lại không khớp!');
+    const pwErr = validatePassword();
+    const confirmErr = validateConfirmPassword();
+    if (pwErr) {
+      setError(pwErr);
+      return;
+    }
+    if (confirmErr) {
+      setError(confirmErr);
       return;
     }
     try {
@@ -64,6 +94,8 @@ function ForgotPassword() {
                 required
               />
             </div>
+            {/* Email field error display */}
+            {step === 1 && error && <div className="text-danger small mb-2">{error}</div>}
             <button className="btn btn-primary w-100" type="submit">Gửi mã xác thực</button>
           </form>
         ) : (
@@ -87,7 +119,7 @@ function ForgotPassword() {
                 onChange={e => setNewPassword(e.target.value)}
                 required
               />
-            </div>
+            </div>         
             <div className="mb-3">
               <label className="form-label">Nhập lại mật khẩu mới</label>
               <input

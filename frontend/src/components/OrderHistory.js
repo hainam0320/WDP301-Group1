@@ -29,6 +29,9 @@ const OrderHistory = () => {
   const fileInputRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
+  // Add a new state for description length error
+  const [reportDescriptionError, setReportDescriptionError] = useState('');
+  const [rateCommentError, setRateCommentError] = useState('');
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -88,6 +91,13 @@ const OrderHistory = () => {
 
   const handleSubmitRate = async () => {
     if (!rateTargetOrder) return;
+    // Validate rateComment length
+    if (rateComment.length > 256) {
+      setRateCommentError('Bình luận không được vượt quá 256 ký tự');
+      return;
+    } else {
+      setRateCommentError('');
+    }
     setRateLoading(true);
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -181,6 +191,10 @@ const OrderHistory = () => {
   const handleSubmitReport = async () => {
     if (!reportTargetOrder || !reportType || !reportDescription) {
       setMessage({ type: 'error', content: 'Vui lòng điền đầy đủ thông tin báo cáo' });
+      return;
+    }
+    if (reportDescription.length > 256) {
+      setMessage({ type: 'error', content: 'Nội dung báo cáo không được vượt quá 256 ký tự' });
       return;
     }
 
@@ -351,18 +365,75 @@ const OrderHistory = () => {
   );
 
   return (
-    <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
+    <div className="min-vh-100 orderhistory-bg">
       <Header />
+      <style>{`
+        .orderhistory-bg {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+        }
+        .orderhistory-card {
+          border-radius: 18px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+          border: none;
+          background: rgba(255,255,255,0.97);
+        }
+        .orderhistory-card .card-header {
+          border-radius: 18px 18px 0 0;
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+        }
+        .orderhistory-card .card-body {
+          padding: 2.5rem 1.5rem;
+        }
+        .orderhistory-btn-lg {
+          font-size: 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+          padding: 0.9rem 1.5rem;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.08);
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+        .orderhistory-btn-lg:active, .orderhistory-btn-lg:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px #6a82fb33;
+        }
+        .orderhistory-btn-lg.btn-outline-primary {
+          border: 2px solid #6a82fb;
+          color: #6a82fb;
+          background: #fff;
+        }
+        .orderhistory-btn-lg.btn-outline-primary:hover {
+          background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+          color: #fff;
+          border: none;
+          transform: scale(1.04);
+        }
+        .orderhistory-card .card {
+          border-radius: 14px;
+          box-shadow: 0 2px 8px rgba(31,38,135,0.07);
+        }
+        .orderhistory-card .card:hover {
+          box-shadow: 0 4px 16px rgba(31,38,135,0.13);
+          transform: translateY(-2px) scale(1.01);
+        }
+        @media (max-width: 768px) {
+          .orderhistory-card .card-body {
+            padding: 1.2rem 0.5rem;
+          }
+        }
+      `}</style>
       <div className="container my-5">
         <button 
-          className="btn btn-outline-primary mb-4"
+          className="btn btn-outline-primary mb-4 orderhistory-btn-lg"
           onClick={() => navigate('/home')}
         >
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
-        <div className="card">
-          <div className="card-header bg-primary text-white">
+        <div className="card orderhistory-card">
+          <div className="card-header">
             <h4 className="mb-0"><FaHistory className="me-2" />Lịch sử đơn hàng</h4>
           </div>
           <div className="card-body">
@@ -494,9 +565,26 @@ const OrderHistory = () => {
                     as="textarea"
                     rows={3}
                     value={rateComment}
-                    onChange={e => setRateComment(e.target.value)}
+                    onChange={e => {
+                      const value = e.target.value;
+                      if (value.length <= 256) {
+                        setRateComment(value);
+                        setRateCommentError('');
+                      } else {
+                        setRateCommentError('Bình luận không được vượt quá 256 ký tự');
+                      }
+                    }}
                     placeholder="Nhập nhận xét của bạn..."
+                    isInvalid={!!rateCommentError}
                   />
+                  <div className="d-flex justify-content-between align-items-center mt-1">
+                    <small className={rateComment.length > 256 ? 'text-danger' : 'text-muted'}>
+                      {rateComment.length}/256 ký tự
+                    </small>
+                    {rateCommentError && (
+                      <small className="text-danger">{rateCommentError}</small>
+                    )}
+                  </div>
                 </Form.Group>
               </Form>
             </Modal.Body>
@@ -609,13 +697,29 @@ const OrderHistory = () => {
                     as="textarea"
                     rows={3}
                     value={reportDescription}
-                    onChange={(e) => setReportDescription(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value.length <= 256) {
+                        setReportDescription(value);
+                        setReportDescriptionError('');
+                      } else {
+                        setReportDescriptionError('Nội dung báo cáo không được vượt quá 256 ký tự');
+                      }
+                    }}
                     placeholder={existingReport ? 
                       "Nhập nội dung cập nhật cho báo cáo..." :
                       "Vui lòng mô tả chi tiết vấn đề bạn gặp phải..."}
-                    isInvalid={!reportDescription}
+                    isInvalid={!reportDescription || !!reportDescriptionError}
                     disabled={existingReport && (existingReport.status === 'resolved' || existingReport.status === 'rejected')}
                   />
+                  <div className="d-flex justify-content-between align-items-center mt-1">
+                    <small className={reportDescription.length > 256 ? 'text-danger' : 'text-muted'}>
+                      {reportDescription.length}/256 ký tự
+                    </small>
+                    {reportDescriptionError && (
+                      <small className="text-danger">{reportDescriptionError}</small>
+                    )}
+                  </div>
                 </Form.Group>
 
                 <Form.Group className="mb-3">

@@ -24,6 +24,8 @@ const ShipperManagement = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState({ userId: null, currentStatus: null, type: null });
 
   useEffect(() => {
     fetchShippers();
@@ -148,7 +150,14 @@ const ShipperManagement = () => {
 
   const getImageUrl = (imagePath) => {
     if (!imagePath || typeof imagePath !== 'string') return 'https://via.placeholder.com/150';
-    return `http://localhost:9999/${imagePath}`;
+    if (imagePath.startsWith('uploads/')) {
+      return `http://localhost:9999/${imagePath}`;
+    }
+    const relativePath = imagePath.split('\\uploads\\')[1];
+    if (relativePath) {
+      return `http://localhost:9999/uploads/${relativePath}`;
+    }
+    return 'https://via.placeholder.com/150';
   };
 
   const handleImageClick = (imagePath) => {
@@ -302,7 +311,7 @@ const ShipperManagement = () => {
           <Button
             variant={selectedUser.status ? 'danger' : 'success'}
             onClick={() => {
-              toggleUserStatus(selectedUser._id, selectedUser.status, selectedUser.type);
+              handleConfirmToggle(selectedUser._id, selectedUser.status, selectedUser.type);
               handleCloseModal();
             }}
           >
@@ -536,6 +545,20 @@ const ShipperManagement = () => {
     );
   };
 
+  const handleConfirmToggle = (userId, currentStatus, type) => {
+    setConfirmAction({ userId, currentStatus, type });
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirm = async () => {
+    await toggleUserStatus(confirmAction.userId, confirmAction.currentStatus, confirmAction.type);
+    setShowConfirmModal(false);
+  };
+
+  const handleCancel = () => {
+    setShowConfirmModal(false);
+  };
+
   // Add custom CSS for the modal width
   const styles = `
     .modal-90w {
@@ -606,7 +629,7 @@ const ShipperManagement = () => {
                         </button>
                         <button 
                           className={`btn ${shipper.status ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                          onClick={() => toggleUserStatus(shipper._id, shipper.status, shipper.type)}
+                          onClick={() => handleConfirmToggle(shipper._id, shipper.status, shipper.type)}
                           title={shipper.status ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
                         >
                           {shipper.status ? <FaLock /> : <FaLockOpen />}
@@ -639,6 +662,28 @@ const ShipperManagement = () => {
             }}
           />
         </Modal.Body>
+      </Modal>
+
+      {/* Modal xác nhận khóa/mở khóa tài khoản */}
+      <Modal show={showConfirmModal} onHide={handleCancel} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {confirmAction.currentStatus ? (
+            <span>Bạn có chắc chắn muốn <b>khóa</b> tài khoản này không?</span>
+          ) : (
+            <span>Bạn có chắc chắn muốn <b>mở khóa</b> tài khoản này không?</span>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancel}>
+            Hủy
+          </Button>
+          <Button variant={confirmAction.currentStatus ? 'danger' : 'success'} onClick={handleConfirm}>
+            {confirmAction.currentStatus ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );

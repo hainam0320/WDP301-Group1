@@ -91,15 +91,7 @@ const AdminDashboardHome = () => {
             </div>
           </div>
         </div>
-        <div className="col-md-2 mb-3">
-          <div className="card bg-dark text-white" style={cardStyle}>
-            <div className="card-body text-center">
-              <FaUsers size={30} className="mb-2" />
-              <h6>Online</h6>
-              <h4>{systemStats.activeShippers}</h4>
-            </div>
-          </div>
-        </div>
+        
       </div>
 
       {/* Dashboard Overview */}
@@ -115,9 +107,9 @@ const AdminDashboardHome = () => {
                   <h5 className="card-title">Hoạt động hôm nay</h5>
                   <ul className="list-unstyled">
                     <li>• {systemStats.todayOrders} đơn hàng mới</li>
-                    <li>• {systemStats.activeShippers} shipper đang hoạt động</li>
-                    <li>• 15 người dùng mới đăng ký</li>
-                    <li>• 8 đơn hàng hoàn thành</li>
+                   
+                    <li>• {systemStats.newUsers} người dùng mới đăng ký</li>
+                    <li>• {systemStats.completedOrders} đơn hàng hoàn thành</li>
                   </ul>
                 </div>
               </div>
@@ -127,10 +119,10 @@ const AdminDashboardHome = () => {
                 <div className="card-body">
                   <h5 className="card-title">Thống kê nhanh</h5>
                   <ul className="list-unstyled">
-                    <li>• Tỷ lệ hoàn thành: 94.5%</li>
-                    <li>• Đánh giá trung bình: 4.7/5</li>
-                    <li>• Thời gian giao trung bình: 35 phút</li>
-                    <li>• Tăng trưởng tháng: +12%</li>
+                    <li>• Tỷ lệ hoàn thành: {systemStats.completionRate.toFixed(1)}%</li>
+                    <li>• Đánh giá trung bình: {systemStats.averageRating.toFixed(1)}/5</li>
+                    
+                    <li>• Tăng trưởng tháng: +{systemStats.monthlyGrowth}%</li>
                   </ul>
                 </div>
               </div>
