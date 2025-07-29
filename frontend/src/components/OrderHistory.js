@@ -524,6 +524,9 @@ const OrderHistory = () => {
                               Thanh toán
                             </Button>
                           )}
+                          {order.status === 'completed' && order.paymentStatus === 'paid' && (
+                            <span className="badge bg-success">Đã thanh toán</span>
+                          )}
                         </td>
                       </tr>
                     ))}

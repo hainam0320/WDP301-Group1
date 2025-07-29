@@ -6,6 +6,7 @@ const companyTransactionSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     status: { type: String, enum: ['pending', 'paid', 'confirmed'], default: 'pending' },
     payos_payment_id: { type: String },
+    orderCode: { type: Number }, // Thêm field orderCode
     payment_method: { type: String, enum: ['payos'], default: 'payos' },
     paid_at: Date,
     confirmed_at: Date,

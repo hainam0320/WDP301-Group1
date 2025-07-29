@@ -266,3 +266,25 @@ exports.completeOrder = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi hoàn tất đơn' });
   }
 };
+
+// Get order payment status
+exports.getOrderPaymentStatus = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = await Order.findById(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    
+    res.json({
+      orderId: order._id,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      price: order.price
+    });
+  } catch (error) {
+    console.error('Error fetching order payment status:', error);
+    res.status(500).json({ message: 'Server error while fetching order payment status' });
+  }
+};

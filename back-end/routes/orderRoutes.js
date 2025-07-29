@@ -8,7 +8,8 @@ const {
   updateOrder,
   deleteOrder,
   acceptOrder,
-  completeOrder // 👈 thêm dòng này
+  completeOrder,
+  getOrderPaymentStatus // 👈 thêm dòng này
 } = require('../controller/orderController');
 const Order = require('../model/orderModel');
 
@@ -37,5 +38,6 @@ router.post('/:id/accept', authorize('shipper', 'driver'), acceptOrder);
 
 // ✅ Thêm route hoàn tất đơn
 router.post('/:id/complete', authorize('shipper', 'driver'), completeOrder);
+router.get('/:id/payment-status', getOrderPaymentStatus);
 
 module.exports = router;

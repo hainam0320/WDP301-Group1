@@ -14,6 +14,7 @@ const orderSchema = new Schema({
   status:        { type: String, required: true },
   statusDescription: { type: String },
   distance_km:   { type: Number, required: true },
+  paymentStatus: { type: String, enum: ['pending', 'paid'], default: 'pending' }, // Thêm field paymentStatus
 
   // Liên kết tới giao dịch thanh toán
   transactionId: { type: Schema.Types.ObjectId, ref: 'CompanyTransaction' }

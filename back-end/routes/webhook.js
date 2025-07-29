@@ -15,7 +15,7 @@ router.post('/webhook', async (req, res) => {
     const isValid = payos.verifyPaymentWebhook(rawBody, checksumHeader);
     if (!isValid) return res.status(400).send('Invalid checksum');
 
-    const data = JSON.parse(rawBody);
+    const data = JSON.parse(rawBody.toString());
     const { orderCode, status } = data;
 
     if (status === 'PAID') {

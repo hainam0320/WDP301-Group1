@@ -16,13 +16,15 @@ exports.createPayOSPaymentLink = async (req, res) => {
 
     const amount = order.price;
     const userId = req.user._id;
+    const orderCode = Date.now();
 
     // Tạo transaction cho admin
     const transaction = await CompanyTransaction.create({
       userId,
       orderId,
       amount,
-      status: 'pending'
+      status: 'pending',
+      orderCode: orderCode // Lưu orderCode để webhook có thể tìm
     });
 
     const returnUrl = `${process.env.DOMAIN_FE}/payment-success`;
@@ -32,8 +34,8 @@ exports.createPayOSPaymentLink = async (req, res) => {
     const shortOrderId = order._id.toString().slice(-6); // Rút gọn cho phù hợp giới hạn mô tả
     const description = `Don hang #${shortOrderId}`; // Tối đa 25 ký tự
 
-    const paymentLinkRes = await payos.createPaymentLink({
-      orderCode: Date.now(),
+    const paymentPayload = {
+      orderCode: orderCode,
       amount,
       description,
       returnUrl,
@@ -49,7 +51,9 @@ exports.createPayOSPaymentLink = async (req, res) => {
           price: amount
         }
       ]
-    });
+    };
+    console.log('PayOS payment payload:', paymentPayload);
+    const paymentLinkRes = await payos.createPaymentLink(paymentPayload);
 
     transaction.payos_payment_id = paymentLinkRes.paymentId;
     await transaction.save();
@@ -65,24 +69,52 @@ exports.createPayOSPaymentLink = async (req, res) => {
 
 exports.payosWebhook = async (req, res) => {
   try {
-    const { paymentId, status } = req.body;
+    console.log('=== PAYOS WEBHOOK RECEIVED ===');
+    console.log('Webhook body:', req.body);
+    
+    const { code, success, data } = req.body;
 
-    const transaction = await CompanyTransaction.findOne({ payos_payment_id: paymentId });
-    if (!transaction) return res.status(404).send('Not found');
+    console.log('Code:', code);
+    console.log('Success:', success);
+    console.log('Data:', data);
 
-    if (status === 'PAID') {
+    // Kiểm tra thanh toán thành công
+    if (code === '00' && success === true) {
+      console.log('Payment is successful, updating transaction and order...');
+      
+      // Tìm transaction bằng orderCode (ổn định hơn paymentLinkId)
+      const transaction = await CompanyTransaction.findOne({ 
+        orderCode: data.orderCode 
+      });
+      
+      console.log('Found transaction:', transaction);
+
+      if (!transaction) {
+        console.log('Transaction not found for orderCode:', data.orderCode);
+        return res.status(404).send('Transaction not found');
+      }
+
+      // Cập nhật transaction
       transaction.status = 'paid';
       transaction.paid_at = new Date();
       await transaction.save();
+      console.log('Transaction updated:', transaction);
 
-      // Cập nhật đơn hàng nếu cần
+      // Cập nhật đơn hàng
       const order = await Order.findById(transaction.orderId);
       if (order) {
-        order.status = 'paid';
+        console.log('Order before update:', order);
+        order.paymentStatus = 'paid';
         await order.save();
+        console.log('Order after update:', order);
+      } else {
+        console.log('Order not found for transaction.orderId:', transaction.orderId);
       }
+    } else {
+      console.log('Payment is not successful:', { code, success });
     }
 
+    console.log('=== WEBHOOK PROCESSING COMPLETE ===');
     res.status(200).send('OK');
   } catch (err) {
     console.error('Webhook error:', err);
