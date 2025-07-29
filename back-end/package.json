@@ -19,6 +19,7 @@
     "nodemon": "^3.0.1"
   },
   "dependencies": {
+    "@payos/node": "^1.0.10",
     "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",

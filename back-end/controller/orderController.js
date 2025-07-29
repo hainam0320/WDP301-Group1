@@ -254,19 +254,12 @@ exports.completeOrder = async (req, res) => {
       date: assignment.date
     });
 
-    // 4. Tạo CompanyTransaction (hoa hồng 10%)
-    const commission = await CompanyTransaction.create({
-      driverId,
-      total_earning_id: earning._id,
-      amount: earning.amount * 0.1,
-      status: 'pending'
-    });
+    // Không tạo CompanyTransaction (hoa hồng) nữa
 
     res.json({
       message: 'Hoàn tất đơn và ghi nhận thu nhập thành công',
       order,
-      earning,
-      commission
+      earning
     });
   } catch (err) {
     console.error(err);

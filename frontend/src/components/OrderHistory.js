@@ -5,6 +5,7 @@ import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import { createPayOSLink } from '../utils/payment';
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -357,6 +358,15 @@ const OrderHistory = () => {
     );
   };
 
+  const handlePay = async (orderId) => {
+    try {
+      const paymentUrl = await createPayOSLink(orderId);
+      window.location.href = paymentUrl;
+    } catch (err) {
+      alert('Không thể tạo link thanh toán. Vui lòng thử lại!');
+    }
+  };
+
   const completedOrders = orders.filter(order => order.status === 'completed' || order.status === 'failed');
   const totalPages = Math.ceil(completedOrders.length / ordersPerPage);
   const paginatedOrders = completedOrders.slice(
@@ -507,6 +517,13 @@ const OrderHistory = () => {
                             <FaExclamationTriangle className="me-1" />
                             Báo cáo
                           </Button>
+                        </td>
+                        <td>
+                          {order.status === 'completed' && order.paymentStatus !== 'paid' && (
+                            <Button size="sm" variant="success" onClick={() => handlePay(order._id)}>
+                              Thanh toán
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))}
