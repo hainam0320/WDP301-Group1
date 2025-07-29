@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaDollarSign, FaHistory, FaStar, FaRoute, FaCheckCircle, FaPercentage } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaDollarSign, FaHistory, FaStar, FaRoute, FaCheckCircle, FaPercentage, FaWallet } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import ShipperHeader from './ShipperHeader';
@@ -194,6 +194,13 @@ const ShipperDashboard = () => {
                 >
                   <FaUser className="me-2" />
                   Thông tin cá nhân
+                </button>
+                <button 
+                  className="list-group-item list-group-item-action border-0"
+                  onClick={() => navigate('/shipper/wallet')}
+                >
+                  <FaWallet className="me-2" />
+                  Ví tiền
                 </button>
               </div>
             </div>

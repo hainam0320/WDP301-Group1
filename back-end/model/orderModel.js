@@ -17,8 +17,7 @@ const orderSchema = new Schema({
     required: true,
     enum: [
       'pending_payment',      // Đơn hàng chờ thanh toán từ user
-      'payment_successful',   // User đã thanh toán, tiền đang được giữ (chờ shipper nhận)
-      'payment_failed',       // Thanh toán thất bại
+      'payment_successful',   // User đã thanh toán, tiền đang được giữ (chờ shipper nhận)   // Thanh toán thất bại
       'accepted',             // Shipper đã nhận đơn
       'in_progress',          // Shipper đang thực hiện
       'shipper_completed',    // Shipper đã đánh dấu hoàn thành

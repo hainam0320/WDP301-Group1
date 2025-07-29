@@ -205,7 +205,7 @@ router.get('/orders', protect, async (req, res) => {
 
     const orders = await Order.find({ 
       driverId: req.user._id,
-      status: { $nin: ['pending_payment', 'payment_successful', 'payment_failed', 'refunded'] } // Loại trừ các trạng thái liên quan đến thanh toán ban đầu
+      status: { $nin: ['pending_payment', 'payment_successful', 'refunded'] } // Loại trừ các trạng thái liên quan đến thanh toán ban đầu
     }).populate('userId', 'fullName phone');
 
     res.json(orders);

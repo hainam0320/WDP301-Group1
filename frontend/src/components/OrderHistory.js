@@ -335,16 +335,13 @@ const OrderHistory = () => {
 
   const getOrderStatusBadge = (status) => {
     switch (status) {
-        case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
-        case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
-        case 'payment_failed': return <Badge bg="danger">TT Thất bại</Badge>;
-        case 'accepted': return <Badge bg="primary">Đã nhận</Badge>;
-        case 'in_progress': return <Badge bg="warning">Đang giao</Badge>;
         case 'shipper_completed': return <Badge bg="info">Shipper Hoàn thành</Badge>;
         case 'user_confirmed_completion': return <Badge bg="success">Đã Hoàn tất</Badge>;
         case 'disputed': return <Badge bg="danger">Tranh chấp</Badge>;
-        case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
         case 'failed': return <Badge bg="danger">Thất bại</Badge>;
+        case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
+        case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
+        case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
         default: return <Badge bg="secondary">{status}</Badge>;
     }
   };
@@ -500,7 +497,7 @@ const OrderHistory = () => {
                                     Xác nhận hoàn tất
                                 </Button>
                             )}
-                            {(order.status === 'pending_payment' || order.status === 'payment_failed') && (
+                            {(order.status === 'pending_payment') && (
                                 <Button size="sm" variant="info" onClick={() => navigate(`/new-order?orderId=${order._id}`)}> {/* Có thể chuyển hướng lại trang đặt đơn để thanh toán lại */}
                                     <FaMoneyBillWave className="me-1" /> Thanh toán lại
                                 </Button>
@@ -525,7 +522,7 @@ const OrderHistory = () => {
                           )}
                         </td>
                         <td>
-                            {(order.status !== 'pending_payment' && order.status !== 'payment_failed' && order.status !== 'refunded') && ( // Không cho báo cáo khi chưa thanh toán/đã hoàn tiền
+                            {(order.status !== 'pending_payment' && order.status !== 'refunded') && ( // Không cho báo cáo khi chưa thanh toán/đã hoàn tiền
                                 <Button 
                                     size="sm" 
                                     variant="outline-danger"

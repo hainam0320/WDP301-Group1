@@ -33,6 +33,10 @@ import ReportManagement from './components/admin/ReportManagement';
 
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 import ForgotPassword from './pages/ForgotPassword';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentFail from './pages/PaymentFail';
+import UserWallet from './pages/UserWallet';
+import ShipperWallet from './components/shipper/ShipperWallet';
 
 function App() {
   const socket = useRef(null);
@@ -164,15 +168,19 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/fail" element={<PaymentFail />} />
+          <Route path="/wallet" element={<ProtectedRoute><UserWallet /></ProtectedRoute>} />
           {/* Shipper Routes */}
           <Route 
             path="/shipper" 
             element={
-              <ProtectedRoute allowedRoles={['driver']}>
+              <ProtectedRoute>
                 <ShipperDashboard />
               </ProtectedRoute>
             } 
           />
+          <Route path="/shipper/wallet" element={<ProtectedRoute><ShipperWallet /></ProtectedRoute>} />
           <Route 
             path="/shipper/available-orders" 
             element={

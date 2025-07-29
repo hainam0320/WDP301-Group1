@@ -155,3 +155,9 @@ export const notificationAPI = {
   markAsRead: (notificationId) => api.patch(`/notifications/${notificationId}/read`),
   markAllAsRead: () => api.patch('/notifications/read-all')
 };
+
+// Wallet APIs
+export const walletAPI = {
+  getUserWallet: () => api.get('/transactions/user/wallet'),
+  getDriverWallet: () => api.get('/transactions/driver/wallet'),
+};

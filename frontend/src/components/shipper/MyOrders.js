@@ -213,7 +213,6 @@ const MyOrders = () => {
         case 'failed': return <Badge bg="danger">Thất bại</Badge>;
         case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
         case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
-        case 'payment_failed': return <Badge bg="danger">TT Thất bại</Badge>;
         case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
         default: return <Badge bg="secondary">{status}</Badge>;
     }

@@ -80,7 +80,11 @@ const OrderTracking = () => {
   };
 
   const trackingOrders = orders
-    .filter(order => order.status !== 'completed' && order.status !== 'failed')
+  .filter(order => 
+    order.status !== 'user_confirmed_completion' && 
+    order.status !== 'failed' && 
+    order.status !== 'refunded'
+  )
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const totalPages = Math.ceil(trackingOrders.length / ordersPerPage);
   const paginatedOrders = trackingOrders.slice(
@@ -181,7 +185,7 @@ const OrderTracking = () => {
                         <p className="mb-1"><strong>Từ:</strong> {order.pickupaddress}</p>
                         <p className="mb-1"><strong>Đến:</strong> {order.dropupaddress}</p>
                         <p className="mb-1"><strong>Loại:</strong> {order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</p>
-                        {order.status !== 'pending' && order.driverId && (
+                        {order.driverId && (
                           <div className="mb-2 p-2 bg-light rounded">
                             <p className="mb-1">
                               <FaUser className="text-primary me-2" />
@@ -202,15 +206,25 @@ const OrderTracking = () => {
                       </div>
                       <div className="text-end">
                         <span className={`badge ${
-                          order.status === 'pending' ? 'bg-warning' : 
-                          order.status === 'accepted' ? 'bg-info' :
-                          order.status === 'in-progress' ? 'bg-primary' : 
-                          order.status === 'completed' ? 'bg-success' : 'bg-danger'
+                          order.status === 'pending_payment' ? 'bg-warning' :
+                          order.status === 'payment_successful' ? 'bg-info' :
+                          order.status === 'accepted' ? 'bg-primary' :
+                          order.status === 'in_progress' ? 'bg-warning' : 
+                          order.status === 'shipper_completed' ? 'bg-info' :
+                          order.status === 'user_confirmed_completion' ? 'bg-success' :
+                          order.status === 'disputed' ? 'bg-warning' :
+                          order.status === 'refunded' ? 'bg-secondary' :
+                          order.status === 'failed' ? 'bg-danger' : 'bg-secondary'
                         } mb-2`}>
-                          {order.status === 'pending' ? 'Chờ xử lý' : 
+                          {order.status === 'pending_payment' ? 'Chờ thanh toán' : 
+                           order.status === 'payment_successful' ? 'Chờ xử lý' :
                            order.status === 'accepted' ? 'Đã nhận đơn' :
-                           order.status === 'in-progress' ? 'Đang giao' : 
-                           order.status === 'completed' ? 'Đã giao hàng' : 'Thất Bại'}
+                           order.status === 'in_progress' ? 'Đang giao' : 
+                           order.status === 'shipper_completed' ? 'Shipper hoàn thành' :
+                           order.status === 'user_confirmed_completion' ? 'Đã hoàn tất' :
+                           order.status === 'disputed' ? 'Tranh chấp' :
+                           order.status === 'refunded' ? 'Đã hoàn tiền' :
+                           order.status === 'failed' ? 'Thất bại' : order.status}
                         </span>
                         <div className="fw-bold text-primary">{order.price.toLocaleString()} VNĐ</div>
                       </div>

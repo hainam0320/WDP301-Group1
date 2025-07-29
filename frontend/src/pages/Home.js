@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaShippingFast, FaMapMarkerAlt, FaHistory, FaExclamationTriangle, FaUser } from 'react-icons/fa';
+import { FaShippingFast, FaMapMarkerAlt, FaHistory, FaExclamationTriangle, FaUser, FaWallet } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Header from '../components/Header';
 import headerBg from '../assets/img/header.jpg';
@@ -146,6 +146,13 @@ const Home = () => {
                 >
                   <FaUser />
                   Thông tin cá nhân
+                </button>
+                <button 
+                  className="list-group-item list-group-item-action"
+                  onClick={() => navigate('/wallet')}
+                >
+                  <FaWallet />
+                  Ví tiền
                 </button>
               </div>
             </div>

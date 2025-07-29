@@ -22,6 +22,10 @@ router.get("/admin/:transactionId", authorize('admin'), transactionController.ge
 // Admin xử lý tranh chấp / hoàn tiền / giải ngân lại (từ trạng thái 'disputed')
 router.post("/admin/:transactionId/resolve", authorize('admin'), transactionController.adminResolveTransaction);
 
+// Routes cho ví tiền
+router.get("/user/wallet", authorize('user'), transactionController.getUserWallet);
+router.get("/driver/wallet", authorize('driver'), transactionController.getDriverWallet);
+
 // Các routes liên quan đến BulkBill và QRPayment của luồng cũ có thể được xóa hoặc tái cấu trúc
 // Tùy thuộc vào việc bạn có muốn giữ chức năng rút tiền của tài xế thông qua QR nữa không.
 // Tạm thời, tôi sẽ loại bỏ các route này để đơn giản hóa luồng mới tập trung vào user trả trước.

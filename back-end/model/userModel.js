@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
     status:{type: Boolean, default: true},
     emailVerified: { type: Boolean, default: false },
     emailVerificationCode: { type: String },
+    balance: { type: Number, default: 0 }, // Thêm trường số dư ví cho user
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
