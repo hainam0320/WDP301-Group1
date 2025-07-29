@@ -1,265 +1,107 @@
 const CompanyTransaction = require("../model/companyTransisModel");
-const TotalEarning = require("../model/totalEarning");
-const QRPayment = require("../model/qrPaymentModel");
-const BulkBill = require("../model/bulkBillModel");
-const qrcode = require('qrcode');
-const crypto = require('crypto');
+const TotalEarning = require("../model/totalEarning"); // Có thể không cần thiết nữa nếu TotalEarning được tạo ở orderController
+const QRPayment = require("../model/qrPaymentModel"); // Có thể chỉ dùng cho các thanh toán khác, không phải hoa hồng
+const BulkBill = require("../model/bulkBillModel"); // Có thể chỉ dùng cho các thanh toán khác, không phải hoa hồng
+const qrcode = require('qrcode'); // Có thể không cần nếu không dùng QR cho hoa hồng
+const crypto = require('crypto'); // Có thể không cần nếu không dùng QR cho hoa hồng
 const Driver = require('../model/driverModel');
 const mongoose = require('mongoose');
 
-// ===== DRIVER COMMISSION MANAGEMENT =====
+// ===== DRIVER EARNINGS AND PAYOUTS (CẬP NHẬT TỪ COMMISSION MANAGEMENT) =====
 
-// Lấy danh sách các khoản hoa hồng cần thanh toán của tài xế
-exports.getDriverPendingCommissions = async (req, res) => {
+// Lấy danh sách các khoản hoa hồng (tiền hệ thống đã giữ từ user)
+exports.getDriverCommissions = async (req, res) => {
   try {
     const driverId = req.user._id;
 
-    const pendingTransactions = await CompanyTransaction.find({
+    const commissions = await CompanyTransaction.find({
       driverId: driverId,
-      status: "pending"
+      type: 'commission', // Chỉ lấy các giao dịch loại hoa hồng
+      status: 'commission_collected' // Hoa hồng đã được trích
     })
-    .populate({
-      path: 'total_earning_id',
-      populate: {
-        path: 'driverAssigmentId',
-        populate: {
-          path: 'orderId'
-        }
-      }
-    })
-    .sort('-createdAt');
+    .populate('orderId')
+    .sort('-processed_at');
 
-    const totalAmount = pendingTransactions.reduce((sum, trans) => sum + trans.amount, 0);
+    const totalAmount = commissions.reduce((sum, trans) => sum + trans.amount, 0);
 
     res.json({
-      transactions: pendingTransactions,
+      transactions: commissions,
       totalAmount: totalAmount,
-      count: pendingTransactions.length
+      count: commissions.length
     });
   } catch (error) {
-    console.error("Lỗi lấy danh sách hoa hồng:", error);
+    console.error("Lỗi lấy danh sách hoa hồng tài xế:", error);
     res.status(500).json({ message: "Lỗi server." });
   }
 };
 
-// Lấy lịch sử thanh toán hoa hồng của tài xế
-exports.getDriverCommissionHistory = async (req, res) => {
+// Lấy lịch sử giải ngân cho tài xế
+exports.getDriverPayoutHistory = async (req, res) => {
   try {
     const driverId = req.user._id;
 
-    const transactions = await CompanyTransaction.find({
+    const payouts = await CompanyTransaction.find({
       driverId: driverId,
-      status: { $in: ['paid', 'confirmed', 'rejected'] }
+      type: 'payout_to_driver', // Chỉ lấy các giao dịch giải ngân
+      status: 'disbursed_to_driver' // Đã giải ngân
     })
-    .populate({
-      path: 'total_earning_id',
-      populate: {
-        path: 'driverAssigmentId',
-        populate: {
-          path: 'orderId'
-        }
-      }
-    })
-    .sort('-paid_at');
+    .populate('orderId')
+    .sort('-processed_at');
 
-    const transactionsByStatus = {
-      paid: transactions.filter(t => t.status === 'paid'),
-      confirmed: transactions.filter(t => t.status === 'confirmed'),
-      rejected: transactions.filter(t => t.status === 'rejected')
-    };
-
-    const totalsByStatus = {
-      paid: transactionsByStatus.paid.reduce((sum, t) => sum + t.amount, 0),
-      confirmed: transactionsByStatus.confirmed.reduce((sum, t) => sum + t.amount, 0),
-      rejected: transactionsByStatus.rejected.reduce((sum, t) => sum + t.amount, 0)
-    };
+    const totalPayouts = payouts.reduce((sum, trans) => sum + trans.amount, 0);
 
     res.json({
-      transactions: transactions,
-      transactionsByStatus: transactionsByStatus,
-      totalsByStatus: totalsByStatus,
-      count: transactions.length
+      payouts: payouts,
+      totalPayouts: totalPayouts,
+      count: payouts.length
     });
   } catch (error) {
-    console.error("Lỗi lấy lịch sử thanh toán:", error);
+    console.error("Lỗi lấy lịch sử giải ngân:", error);
     res.status(500).json({ message: "Lỗi server." });
   }
 };
 
-// Lấy tổng quan về hoa hồng của tài xế
-exports.getDriverCommissionOverview = async (req, res) => {
+// Lấy tổng quan về thu nhập của tài xế
+exports.getDriverEarningsOverview = async (req, res) => {
   try {
     const driverId = req.user._id;
 
-    const [pendingTransactions, paidTransactions, confirmedTransactions, rejectedTransactions] = await Promise.all([
-      CompanyTransaction.find({ driverId, status: "pending" }),
-      CompanyTransaction.find({ driverId, status: "paid" }),
-      CompanyTransaction.find({ driverId, status: "confirmed" }),
-      CompanyTransaction.find({ driverId, status: "rejected" })
+    // Lấy tổng số dư hiện tại của tài xế
+    const driver = await Driver.findById(driverId).select('balance');
+    const currentBalance = driver ? driver.balance : 0;
+
+    // Lấy tổng tiền hoa hồng đã trích
+    const totalCommissions = await CompanyTransaction.aggregate([
+        { $match: { driverId: new mongoose.Types.ObjectId(driverId), type: 'commission', status: 'commission_collected' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
+    const totalCommissionCollected = totalCommissions[0]?.total || 0;
 
-    const totalPending = pendingTransactions.reduce((sum, trans) => sum + trans.amount, 0);
-    const totalPaid = paidTransactions.reduce((sum, trans) => sum + trans.amount, 0);
-    const totalConfirmed = confirmedTransactions.reduce((sum, trans) => sum + trans.amount, 0);
-    const totalRejected = rejectedTransactions.reduce((sum, trans) => sum + trans.amount, 0);
-
-    const totalCommission = totalPending + totalPaid + totalConfirmed + totalRejected;
-
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const thisMonthTransactions = confirmedTransactions.filter(trans => {
-      const confirmedDate = new Date(trans.confirmed_at);
-      return confirmedDate.getMonth() === currentMonth && confirmedDate.getFullYear() === currentYear;
-    });
-    const thisMonthConfirmed = thisMonthTransactions.reduce((sum, trans) => sum + trans.amount, 0);
+    // Lấy tổng tiền đã giải ngân cho tài xế
+    const totalPayouts = await CompanyTransaction.aggregate([
+        { $match: { driverId: new mongoose.Types.ObjectId(driverId), type: 'payout_to_driver', status: 'disbursed_to_driver' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const totalPayoutDisbursed = totalPayouts[0]?.total || 0;
 
     res.json({
       overview: {
-        totalCommission,
-        totalPending,
-        totalsByStatus: {
-          paid: totalPaid,
-          confirmed: totalConfirmed,
-          rejected: totalRejected
-        },
-        transactionsByStatus: {
-          paid: paidTransactions,
-          confirmed: confirmedTransactions,
-          rejected: rejectedTransactions
-        },
-        thisMonthConfirmed,
-        pendingCount: pendingTransactions.length,
-        paidCount: paidTransactions.length,
-        confirmedCount: confirmedTransactions.length,
-        rejectedCount: rejectedTransactions.length
+        currentBalance,
+        totalCommissionCollected,
+        totalPayoutDisbursed,
       }
     });
   } catch (error) {
-    console.error("Lỗi lấy tổng quan hoa hồng:", error);
+    console.error("Lỗi lấy tổng quan thu nhập tài xế:", error);
     res.status(500).json({ message: "Lỗi server." });
   }
 };
 
-// ===== BULK BILL MANAGEMENT =====
-
-// Tạo hóa đơn tổng cho nhiều giao dịch
-exports.createBulkBill = async (req, res) => {
+// ADMIN: Lấy danh sách các giao dịch liên quan đến tiền đang được giữ (hoa hồng, giải ngân)
+exports.getAdminTransactions = async (req, res) => {
   try {
-    const { transactionIds } = req.body;
-    const driverId = req.user._id;
-
-    // Kiểm tra xem các giao dịch có tồn tại và thuộc về tài xế không
-    const transactions = await CompanyTransaction.find({
-      _id: { $in: transactionIds },
-      driverId: driverId,
-      status: "pending"
-    });
-
-    if (transactions.length !== transactionIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Một số giao dịch không tồn tại hoặc không thuộc về tài xế"
-      });
-    }
-
-    // Tính tổng số tiền
-    const totalAmount = transactions.reduce((sum, trans) => sum + trans.amount, 0);
-
-    // Tạo hóa đơn tổng
-    const bulkBill = await BulkBill.create({
-      driverId,
-      transactions: transactionIds,
-      total_amount: totalAmount,
-      status: "pending"
-    });
-
-    // Tạo mã QR cho hóa đơn tổng
-    const paymentData = {
-      amount: totalAmount,
-      bulkBillId: bulkBill._id.toString(),
-      timestamp: Date.now()
-    };
-
-    console.log('Creating payment code with data:', paymentData); // Add debug log
-
-    const paymentCode = crypto.createHash('sha256')
-      .update(JSON.stringify(paymentData))
-      .digest('hex');
-
-    console.log('Generated payment code:', paymentCode); // Add debug log
-
-    const qrCodeData = JSON.stringify({
-      paymentCode,
-        amount: totalAmount,
-      timestamp: Date.now()
-    });
-
-    console.log('QR code data:', qrCodeData); // Add debug log
-
-    const qrCode = await qrcode.toDataURL(qrCodeData);
-
-    // Tạo QR Payment
-    const qrPayment = await QRPayment.create({
-      bulkBillId: bulkBill._id,
-      qrCode,
-      paymentCode,
-      amount: totalAmount,
-      status: "pending",
-      bulkPayment: true,
-      bulkTransactionIds: transactionIds,
-      expiryTime: new Date(Date.now() + 15 * 60 * 1000) // 15 phút
-    });
-
-    // Cập nhật hóa đơn tổng với mã QR
-    bulkBill.qr_payment_id = qrPayment._id;
-    await bulkBill.save();
-
-        res.status(201).json({
-            success: true,
-            data: {
-        bulkBill,
-        qrPayment
-            }
-        });
-    } catch (error) {
-    console.error("Lỗi tạo hóa đơn tổng:", error);
-        res.status(500).json({
-            success: false,
-      message: "Lỗi khi tạo hóa đơn tổng",
-            error: error.message
-        });
-  }
-};
-
-// Lấy danh sách hóa đơn tổng của tài xế
-exports.getDriverBulkBills = async (req, res) => {
-  try {
-    const driverId = req.user._id;
-    const bills = await BulkBill.find({ driverId })
-      .populate('transactions')
-      .populate('qr_payment_id')
-      .sort('-createdAt');
-
-    res.json({
-      success: true,
-      data: bills
-    });
-  } catch (error) {
-    console.error("Lỗi lấy danh sách hóa đơn tổng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi khi lấy danh sách hóa đơn tổng",
-      error: error.message
-    });
-  }
-};
-
-// Lấy danh sách hóa đơn tổng cho admin
-exports.getAdminBulkBills = async (req, res) => {
-  try {
-    const { startDate, endDate, driverName, status } = req.query;
+    const { startDate, endDate, driverId, userId, status, type } = req.query;
     
-    // Xây dựng query
     const query = {};
     
     if (startDate && endDate) {
@@ -269,351 +111,181 @@ exports.getAdminBulkBills = async (req, res) => {
       };
     }
     
-    // Chỉ lấy các bills không phải pending, trừ khi status được chỉ định rõ
-    if (status) {
-      query.status = status;
-    } else {
-      query.status = { $ne: 'pending' };
-    }
+    if (status) query.status = status;
+    if (type) query.type = type;
 
-    // Nếu có tên tài xế, tìm driver ID trước
-    if (driverName) {
-      const drivers = await Driver.find({
-        fullName: { $regex: driverName, $options: 'i' }
-      });
-      query.driverId = { $in: drivers.map(d => d._id) };
-    }
+    if (driverId) query.driverId = driverId;
+    if (userId) query.userId = userId;
 
-    // Lấy danh sách bills
-    const bills = await BulkBill.find(query)
+    const transactions = await CompanyTransaction.find(query)
       .populate('driverId', 'fullName email phone')
-      .populate('transactions')
+      .populate('userId', 'fullName email phone')
+      .populate('orderId')
       .sort('-createdAt');
 
     // Tính toán thống kê
     const stats = {
       totalAmount: 0,
-      pendingAmount: 0,
-      paidAmount: 0,
-      confirmedAmount: 0,
-      rejectedAmount: 0
+      heldAmount: 0, // Tiền đang được giữ
+      commissionCollectedAmount: 0,
+      payoutDisbursedAmount: 0,
+      refundedAmount: 0,
+      disputedAmount: 0
     };
 
-    bills.forEach(bill => {
-      stats.totalAmount += bill.total_amount;
-      switch (bill.status) {
-        case 'pending':
-          stats.pendingAmount += bill.total_amount;
+    transactions.forEach(trans => {
+      stats.totalAmount += trans.amount;
+      switch (trans.status) {
+        case 'held':
+          stats.heldAmount += trans.amount;
           break;
-        case 'paid':
-          stats.paidAmount += bill.total_amount;
+        case 'commission_collected':
+          stats.commissionCollectedAmount += trans.amount;
           break;
-        case 'confirmed':
-          stats.confirmedAmount += bill.total_amount;
+        case 'disbursed_to_driver':
+          stats.payoutDisbursedAmount += trans.amount;
           break;
-        case 'rejected':
-          stats.rejectedAmount += bill.total_amount;
+        case 'refunded_to_user':
+          stats.refundedAmount += trans.amount;
+          break;
+        case 'disputed':
+          stats.disputedAmount += trans.amount;
           break;
       }
     });
 
     res.json({
       success: true,
-      bills,
+      transactions,
       stats
     });
   } catch (error) {
-    console.error('Error getting admin bulk bills:', error);
+    console.error('Error getting admin transactions:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách bills'
+      message: 'Lỗi khi lấy danh sách giao dịch'
     });
   }
 };
 
-// Lấy chi tiết bulk bill cho admin
-exports.getAdminBulkBillDetails = async (req, res) => {
+// ADMIN: Lấy chi tiết một giao dịch
+exports.getAdminTransactionDetails = async (req, res) => {
   try {
-    const { billId } = req.params;
+    const { transactionId } = req.params;
 
-    const bill = await BulkBill.findById(billId)
+    const transaction = await CompanyTransaction.findById(transactionId)
       .populate('driverId', 'fullName email phone')
-      .populate({
-        path: 'transactions',
-        populate: {
-          path: 'total_earning_id',
-          populate: {
-            path: 'driverAssigmentId',
-            populate: {
-              path: 'orderId'
-            }
-          }
-        }
-      });
+      .populate('userId', 'fullName email phone')
+      .populate('orderId');
 
-    if (!bill) {
+    if (!transaction) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy bill'
+        message: 'Không tìm thấy giao dịch'
       });
     }
 
     res.json({
       success: true,
-      bill
+      transaction
     });
   } catch (error) {
-    console.error('Error getting bulk bill details:', error);
+    console.error('Error getting transaction details:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy chi tiết bill'
+      message: 'Lỗi khi lấy chi tiết giao dịch'
     });
   }
 };
 
-// ===== PAYMENT CONFIRMATION =====
-
-// Xác nhận thanh toán hóa đơn tổng (cho admin)
-exports.adminConfirmBulkPayment = async (req, res) => {
-  try {
-    const { bulkBillId } = req.params;
-    const { status, remarks } = req.body;
-    const adminId = req.user._id;
-
-    console.log('Processing admin confirmation:', {
-      bulkBillId,
-      status,
-      remarks,
-      adminId
-    });
-
-    // Validate input
-    if (!bulkBillId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Thiếu mã bill'
-      });
-    }
-
-    if (!['confirmed', 'rejected'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Trạng thái không hợp lệ'
-      });
-    }
-
-    // Find the bulk bill
-    const bulkBill = await BulkBill.findById(bulkBillId);
-    if (!bulkBill) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy hóa đơn tổng'
-      });
-    }
-
-    // Check if bill is in correct state
-    if (bulkBill.status !== 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: 'Hóa đơn tổng không ở trạng thái chờ xác nhận'
-      });
-    }
-
+// ADMIN: Xử lý tranh chấp / hoàn tiền (từ trạng thái 'disputed' của CompanyTransaction)
+exports.adminResolveTransaction = async (req, res) => {
     try {
-      // Update bulk bill status
-      bulkBill.status = status;
-      bulkBill.confirmed_at = new Date();
-      bulkBill.confirmed_by = adminId;
-      bulkBill.remarks = remarks || '';
-      await bulkBill.save();
+        const { transactionId } = req.params;
+        const { newStatus, remarks } = req.body; // newStatus có thể là 'refunded_to_user' hoặc 'disbursed_to_driver' (nếu tranh chấp đc giải quyết cho shipper)
+        const adminId = req.user._id;
 
-      // Update associated transactions
-      const updateResult = await CompanyTransaction.updateMany(
-        { 
-          _id: { $in: bulkBill.transactions },
-          status: 'paid' // Only update transactions in 'paid' status
-        },
-      { 
-        $set: { 
-            status: status,
-          confirmed_at: new Date(),
-          confirmed_by: adminId,
-            remarks: remarks || ''
-        }
-      }
-    );
-
-      console.log('Updated transactions:', updateResult);
-
-    res.status(200).json({
-      success: true,
-      message: status === 'confirmed' ? 'Đã xác nhận thanh toán' : 'Đã từ chối thanh toán',
-        data: bulkBill
-      });
-    } catch (error) {
-      // If error occurs, try to rollback bulk bill status
-      try {
-        bulkBill.status = 'paid';
-        bulkBill.confirmed_at = null;
-        bulkBill.confirmed_by = null;
-        bulkBill.remarks = '';
-        await bulkBill.save();
-      } catch (rollbackError) {
-        console.error('Rollback error:', rollbackError);
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error confirming bulk payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi xác nhận thanh toán: ' + error.message
-    });
-  }
-};
-
-// Cập nhật trạng thái thanh toán QR
-exports.updateBulkQRPaymentStatus = async (req, res) => {
-    try {
-        const { paymentCode } = req.params;
-    const { status } = req.body;
-
-    if (!paymentCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mã thanh toán không được để trống'
-      });
-    }
-
-    // Clean the payment code
-    const cleanPaymentCode = decodeURIComponent(paymentCode.trim());
-    console.log('Processing payment with code:', cleanPaymentCode);
-
-    const qrPayment = await QRPayment.findOne({ 
-      paymentCode: cleanPaymentCode,
-      status: 'pending'
-    });
-    
-    console.log('Found QR payment:', qrPayment);
-        
-        if (!qrPayment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy mã thanh toán hoặc mã đã được sử dụng'
-      });
-    }
-
-    if (qrPayment.expiryTime < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mã thanh toán đã hết hạn'
-      });
-    }
-
-    try {
-      // Cập nhật trạng thái QR Payment
-      qrPayment.status = status;
-        qrPayment.completedAt = new Date();
-        await qrPayment.save();
-
-      if (status === 'completed') {
-        // Cập nhật trạng thái hóa đơn tổng
-            const bulkBill = await BulkBill.findById(qrPayment.bulkBillId);
-        if (!bulkBill) {
-          throw new Error('Không tìm thấy hóa đơn tổng');
+        const transaction = await CompanyTransaction.findById(transactionId);
+        if (!transaction) {
+            return res.status(404).json({ message: 'Không tìm thấy giao dịch' });
         }
 
-                bulkBill.status = 'paid';
-                bulkBill.paid_at = new Date();
-                await bulkBill.save();
+        if (transaction.status !== 'disputed') {
+            return res.status(400).json({ message: 'Giao dịch không ở trạng thái tranh chấp để xử lý.' });
+        }
 
-        // Cập nhật trạng thái các giao dịch con
-        if (qrPayment.bulkTransactionIds && qrPayment.bulkTransactionIds.length > 0) {
-          const updateResult = await CompanyTransaction.updateMany(
-            { 
-              _id: { $in: qrPayment.bulkTransactionIds },
-              status: 'pending' // Only update pending transactions
-            },
-                    { 
-                        $set: { 
-                            status: 'paid',
-                paid_at: new Date()
-              }
+        // Thực hiện logic hoàn tiền/giải ngân lại (nếu có tích hợp với cổng thanh toán)
+        // Ví dụ: gọi API hoàn tiền của VNPAY nếu type là 'refund'
+        // Đối với ví dụ này, chúng ta chỉ cập nhật trạng thái nội bộ.
+
+        if (newStatus === 'refunded_to_user') {
+            // Logic hoàn tiền cho user
+            // Có thể tạo một bản ghi giao dịch hoàn tiền riêng
+            transaction.status = 'refunded_to_user';
+            transaction.type = 'refund';
+            transaction.processed_by = adminId;
+            transaction.processed_at = new Date();
+            transaction.remarks = remarks || 'Đã hoàn tiền cho người dùng sau tranh chấp.';
+
+            // Cập nhật trạng thái Order
+            await require('../model/orderModel').findByIdAndUpdate(
+                transaction.orderId,
+                { paymentStatus: 'refunded', status: 'refunded' }
+            );
+
+        } else if (newStatus === 'disbursed_to_driver') {
+            // Logic giải ngân cho tài xế (nếu admin quyết định tài xế đúng)
+            transaction.status = 'disbursed_to_driver';
+            transaction.type = 'payout_to_driver';
+            transaction.processed_by = adminId;
+            transaction.processed_at = new Date();
+            transaction.remarks = remarks || 'Đã giải ngân cho tài xế sau tranh chấp.';
+
+            // Tăng số dư cho tài xế (nếu chưa giải ngân)
+            const driver = await Driver.findByIdAndUpdate(
+                transaction.driverId,
+                { $inc: { balance: transaction.amount } }, // Giải ngân toàn bộ số tiền tranh chấp
+                { new: true }
+            );
+            if (!driver) {
+                console.error('Driver not found for dispute payout:', transaction.driverId);
+                throw new Error('Không tìm thấy tài xế để giải ngân sau tranh chấp.');
             }
-          );
-          console.log('Updated transactions:', updateResult);
+            // Cập nhật trạng thái Order
+            await require('../model/orderModel').findByIdAndUpdate(
+                transaction.orderId,
+                { paymentStatus: 'paid', status: 'user_confirmed_completion' } // Giả định đã xác nhận hoàn thành
+            );
+        } else {
+            return res.status(400).json({ message: 'Trạng thái xử lý không hợp lệ.' });
         }
-      }
+        
+        await transaction.save();
+        res.json({ message: 'Giải quyết tranh chấp thành công', transaction });
 
-      res.status(200).json({
-            success: true,
-        message: 'Đã cập nhật trạng thái thanh toán',
-        data: qrPayment
-        });
     } catch (error) {
-      // If any error occurs, try to rollback QR payment status
-      try {
-        qrPayment.status = 'pending';
-        qrPayment.completedAt = null;
-        await qrPayment.save();
-      } catch (rollbackError) {
-        console.error('Rollback error:', rollbackError);
-      }
-      throw error;
+        console.error('Error resolving transaction dispute:', error);
+        res.status(500).json({ message: 'Lỗi server khi giải quyết tranh chấp', error: error.message });
     }
-  } catch (error) {
-    console.error('Error updating QR payment status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi cập nhật trạng thái thanh toán: ' + error.message
-    });
-  }
 };
+
+// Loại bỏ các hàm `createBulkBill`, `getDriverBulkBills`, `adminConfirmBulkPayment`, `updateBulkQRPaymentStatus`, `cancelBulkBill`
+// hoặc tái cấu trúc chúng nếu chúng được sử dụng cho mục đích khác (ví dụ: tài xế rút tiền).
+// Hiện tại, tôi sẽ xóa chúng để làm rõ luồng thanh toán mới.
+
+/*
+// Các hàm quản lý BulkBill và QRPayment cũ (TÀI XẾ TRẢ HOA HỒNG) - Sẽ không còn được sử dụng trong luồng mới hoặc được tái cấu trúc cho mục đích rút tiền
+// Tạo hóa đơn tổng cho nhiều giao dịch (driver tạo)
+exports.createBulkBill = async (req, res) => { /* LOGIC CŨ */ // }
+
+// Lấy danh sách hóa đơn tổng của tài xế (driver xem)
+// exports.getDriverBulkBills = async (req, res) => { /* LOGIC CŨ */ // }
+
+// ADMIN: Xác nhận thanh toán hóa đơn tổng (admin xác nhận driver đã trả hoa hồng)
+// exports.adminConfirmBulkPayment = async (req, res) => { /* LOGIC CŨ */ // }
+
+// Cập nhật trạng thái thanh toán QR (driver xác nhận đã quét QR)
+// exports.updateBulkQRPaymentStatus = async (req, res) => { /* LOGIC CŨ */ // }
 
 // Hủy hóa đơn tổng khi đóng QR không thanh toán
-exports.cancelBulkBill = async (req, res) => {
-  try {
-    const { bulkBillId } = req.params;
-    const driverId = req.user._id;
-
-    // Tìm bulk bill
-    const bulkBill = await BulkBill.findOne({
-      _id: bulkBillId,
-      driverId: driverId,
-      status: "pending" // Chỉ hủy được bill đang pending
-    });
-
-    if (!bulkBill) {
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy hóa đơn tổng hoặc không có quyền hủy"
-      });
-    }
-
-    // Tìm và hủy QR payment liên quan
-    if (bulkBill.qr_payment_id) {
-      await QRPayment.findByIdAndUpdate(
-        bulkBill.qr_payment_id,
-        {
-          status: "cancelled",
-          completedAt: new Date()
-        }
-      );
-    }
-
-    // Xóa bulk bill
-    await BulkBill.findByIdAndDelete(bulkBillId);
-
-    res.json({
-      success: true,
-      message: "Đã hủy hóa đơn tổng thành công"
-    });
-  } catch (error) {
-    console.error("Lỗi khi hủy hóa đơn tổng:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi khi hủy hóa đơn tổng",
-      error: error.message
-    });
-  }
-};
+// exports.cancelBulkBill = async (req, res) => { /* LOGIC CŨ */ // }

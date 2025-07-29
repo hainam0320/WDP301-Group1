@@ -22,7 +22,7 @@ const OrderTracking = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}/api/orders`, {
+      const response = await axios.get(`${BASE_URL}/api/orders/user`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

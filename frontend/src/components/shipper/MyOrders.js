@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaRoute, FaMapMarkerAlt, FaUser, FaStar, FaArrowLeft } from 'react-icons/fa';
+import { FaRoute, FaMapMarkerAlt, FaUser, FaStar, FaArrowLeft, FaInfoCircle } from 'react-icons/fa';
 import axios from 'axios';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, OverlayTrigger, Tooltip, Badge } from 'react-bootstrap'; // Thêm OverlayTrigger, Tooltip, Badge
 import ShipperHeader from './ShipperHeader';
 import { toast } from 'react-hot-toast';
 
@@ -14,7 +14,6 @@ const MyOrders = () => {
   const [messages, setMessages] = useState({ type: '', content: '' });
   const BASE_URL = 'http://localhost:9999';
 
-  // Modal states
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderRate, setOrderRate] = useState(null);
@@ -31,17 +30,21 @@ const MyOrders = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
+      // Lấy các đơn hàng của shipper, loại trừ các trạng thái đã hoàn tất hoặc bị hủy/hoàn tiền
       const response = await axios.get(`${BASE_URL}/api/shipper/orders`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Chỉ lấy những đơn hàng chưa hoàn thành và chưa thất bại
+      // Filter các đơn hàng ĐANG thực hiện (accepted, in_progress)
       const activeOrders = response.data
-        .filter(order => order.status !== 'completed' && order.status !== 'failed')
+        .filter(order => 
+          order.status === 'accepted' || 
+          order.status === 'in_progress'
+        )
         .map(order => ({
           ...order,
-          selectedStatus: 'Giao thành công'
+          selectedStatus: 'Giao thành công' // Default cho trạng thái hoàn thành
         }));
       setMyOrders(activeOrders);
     } catch (err) {
@@ -63,10 +66,10 @@ const MyOrders = () => {
       const order = myOrders.find(o => o._id === orderId);
       
       const requestData = {
-        status: newStatus
+        status: newStatus // Shipper chỉ cập nhật trạng thái đơn hàng (accepted -> in_progress -> shipper_completed)
       };
 
-      if (newStatus === 'completed') {
+      if (newStatus === 'shipper_completed' || newStatus === 'failed') { // Đổi 'completed' thành 'shipper_completed'
         requestData.statusDescription = order.selectedStatus;
       }
 
@@ -79,9 +82,7 @@ const MyOrders = () => {
         }
       );
 
-      // Refresh danh sách đơn hàng
       fetchMyOrders();
-      
       toast.success('Cập nhật trạng thái thành công!');
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -123,7 +124,12 @@ const MyOrders = () => {
   const handleShowOrderDetail = async (order) => {
     setSelectedOrder(order);
     setShowOrderDetailModal(true);
-    await fetchOrderRate(order._id);
+    // Chỉ fetch rate nếu đơn hàng đã được user xác nhận hoàn thành
+    if (order.status === 'user_confirmed_completion') {
+        await fetchOrderRate(order._id);
+    } else {
+        setOrderRate(null);
+    }
   };
 
   const handleCloseOrderDetailModal = () => {
@@ -146,6 +152,8 @@ const MyOrders = () => {
 
   const handleShowFailureModal = (order) => {
     setOrderToFail(order);
+    setFailureReason(''); // Reset lý do khi mở modal
+    setFailureReasonError(''); // Reset lỗi
     setShowFailureModal(true);
   };
 
@@ -174,7 +182,7 @@ const MyOrders = () => {
       
       await axios.put(`${BASE_URL}/api/shipper/orders/${orderToFail._id}/status`, 
         {
-          status: 'failed',
+          status: 'failed', // Trạng thái 'failed' cho cả đơn hàng và paymentStatus
           statusDescription: failureReason
         },
         {
@@ -192,6 +200,22 @@ const MyOrders = () => {
       toast.error('Lỗi khi cập nhật trạng thái đơn hàng');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getOrderStatusBadge = (status) => {
+    switch (status) {
+        case 'accepted': return <Badge bg="primary">Đã nhận</Badge>;
+        case 'in_progress': return <Badge bg="warning">Đang giao</Badge>;
+        case 'shipper_completed': return <Badge bg="info">Shipper Hoàn thành</Badge>; // Mới
+        case 'user_confirmed_completion': return <Badge bg="success">Đã Hoàn tất</Badge>; // Mới
+        case 'disputed': return <Badge bg="danger">Tranh chấp</Badge>; // Mới
+        case 'failed': return <Badge bg="danger">Thất bại</Badge>;
+        case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
+        case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
+        case 'payment_failed': return <Badge bg="danger">TT Thất bại</Badge>;
+        case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
+        default: return <Badge bg="secondary">{status}</Badge>;
     }
   };
 
@@ -257,34 +281,30 @@ const MyOrders = () => {
                           <FaUser className="text-primary me-2" />
                           <strong>KH:</strong> {order.userId?.phone || order.phone}
                         </p>
-                        {order.type === 'delivery' && order.weight && (
+                        {order.type === 'delivery' && order.weight_kg && ( // Sử dụng weight_kg
                           <p className="mb-1">
-                            <strong>Khối lượng:</strong> {order.weight} kg
+                            <strong>Khối lượng:</strong> {order.weight_kg} kg
                           </p>
                         )}
                       </div>
                       <div className="col-md-3">
-                        <span className={`badge fs-6 ${
-                          order.status === 'in-progress' ? 'bg-warning' : 'bg-info'
-                        }`}>
-                          {order.status === 'in-progress' ? 'Đang giao' : 'Đã nhận'}
-                        </span>
+                        {getOrderStatusBadge(order.status)} {/* Sử dụng hàm mới */}
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
                       </div>
                       <div className="col-md-3">
                         {order.status === 'accepted' && (
                           <button 
                             className="btn btn-warning btn-sm mb-2 w-100"
-                            onClick={() => handleStatusChange(order._id, 'in-progress')}
+                            onClick={() => handleStatusChange(order._id, 'in_progress')} // Đổi 'in-progress' -> 'in_progress'
                           >
                             Bắt đầu giao
                           </button>
                         )}
-                        {order.status === 'in-progress' && (
+                        {order.status === 'in_progress' && ( // Đổi 'in-progress' -> 'in_progress'
                           <>
                             <button 
                               className="btn btn-success btn-sm mb-2 w-100"
-                              onClick={() => handleStatusChange(order._id, 'completed')}
+                              onClick={() => handleStatusChange(order._id, 'shipper_completed')} // Đổi 'completed' -> 'shipper_completed'
                             >
                               Giao thành công
                             </button>
@@ -373,7 +393,7 @@ const MyOrders = () => {
                   </p>
                   <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
                 </div>
-                {selectedOrder.status === 'completed' && (
+                {(selectedOrder.status === 'shipper_completed' || selectedOrder.status === 'user_confirmed_completion') && (
                   <>
                     <div className="mb-3">
                       <p className="mb-1">
@@ -487,4 +507,4 @@ const MyOrders = () => {
   );
 };
 
-export default MyOrders; 
+export default MyOrders;  

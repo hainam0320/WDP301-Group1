@@ -1,32 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { transactionAPI } from '../../services/api';
+import { transactionAPI } from '../../services/api'; // Sử dụng transactionAPI mới
 import { format } from 'date-fns';
 import { Table, Form, Button, Row, Col, Card, Badge, Modal } from 'react-bootstrap';
-import { FaCheck, FaTimes, FaFilter, FaEye, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaFilter, FaEye, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegMoneyBillAlt } from 'react-icons/fa'; // Thêm icons
 
 const AdminCommissionManagement = () => {
-    const [bills, setBills] = useState([]);
+    const [transactions, setTransactions] = useState([]); // Đổi từ bills sang transactions
     const [stats, setStats] = useState({
         totalAmount: 0,
-        pendingAmount: 0,
-        paidAmount: 0,
-        confirmedAmount: 0,
-        rejectedAmount: 0
+        heldAmount: 0,
+        commissionCollectedAmount: 0,
+        payoutDisbursedAmount: 0,
+        refundedAmount: 0,
+        disputedAmount: 0
     });
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
-        driverName: '',
-        status: ''
+        driverId: '', // Thêm filter theo driverId
+        userId: '', // Thêm filter theo userId
+        status: '', // Trạng thái giao dịch mới
+        type: '' // Loại giao dịch mới
     });
-    const [drivers, setDrivers] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [selectedBill, setSelectedBill] = useState(null);
+    const [showResolveModal, setShowResolveModal] = useState(false); // Đổi tên từ ConfirmModal
+    const [selectedTransaction, setSelectedTransaction] = useState(null); // Đổi từ selectedBill
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [remarks, setRemarks] = useState('');
-    const [confirmAction, setConfirmAction] = useState('');
+    const [resolveAction, setResolveAction] = useState(''); // confirmAction -> resolveAction (refund/disburse)
 
     useEffect(() => {
         fetchData();
@@ -35,16 +37,16 @@ const AdminCommissionManagement = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await transactionAPI.getAdminBulkBills(filters);
+            const response = await transactionAPI.getAdminTransactions(filters); // Gọi API mới
             if (response.data.success) {
-                setBills(response.data.bills || []);
+                setTransactions(response.data.transactions || []);
                 setStats(response.data.stats || {});
             } else {
-                toast.error('Không thể tải danh sách bill');
+                toast.error('Không thể tải danh sách giao dịch');
             }
         } catch (error) {
-            console.error('Error fetching bills:', error);
-            toast.error('Không thể tải danh sách bill');
+            console.error('Error fetching transactions:', error);
+            toast.error('Không thể tải danh sách giao dịch');
         } finally {
             setLoading(false);
         }
@@ -63,55 +65,52 @@ const AdminCommissionManagement = () => {
         fetchData();
     };
 
-    const handleViewDetails = async (billId) => {
+    const handleViewDetails = async (transactionId) => {
         try {
             setLoading(true);
-            const response = await transactionAPI.getAdminBulkBillDetails(billId);
+            const response = await transactionAPI.getAdminTransactionDetails(transactionId); // Gọi API mới
             if (response.data.success) {
-                setSelectedBill(response.data.bill);
+                setSelectedTransaction(response.data.transaction);
                 setShowDetailsModal(true);
             } else {
-                toast.error('Không thể tải chi tiết bill');
+                toast.error('Không thể tải chi tiết giao dịch');
             }
         } catch (error) {
-            console.error('Error fetching bill details:', error);
-            toast.error('Không thể tải chi tiết bill');
+            console.error('Error fetching transaction details:', error);
+            toast.error('Không thể tải chi tiết giao dịch');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleConfirmPayment = async (status) => {
+    // Hàm xử lý khi admin giải quyết tranh chấp (hoàn tiền hoặc giải ngân)
+    const handleResolveTransaction = async () => {
         try {
-            if (!selectedBill) {
-                toast.error('Không tìm thấy thông tin bill');
+            if (!selectedTransaction) {
+                toast.error('Không tìm thấy thông tin giao dịch');
                 return;
             }
 
             setLoading(true);
-            console.log('Confirming payment:', {
-                billId: selectedBill._id,
-                status,
-                remarks
-            });
             
-            const response = await transactionAPI.adminConfirmBulkPayment(selectedBill._id, {
-                status,
+            const response = await transactionAPI.adminResolveTransaction(selectedTransaction._id, {
+                newStatus: resolveAction, // 'refunded_to_user' hoặc 'disbursed_to_driver'
                 remarks: remarks.trim()
             });
 
-            if (response.data && response.data.success) {
-                toast.success(status === 'confirmed' ? 'Đã xác nhận thanh toán' : 'Đã từ chối thanh toán');
-                setShowConfirmModal(false);
-                setSelectedBill(null);
+            if (response.data && response.data.message) {
+                toast.success(response.data.message);
+                setShowResolveModal(false);
+                setSelectedTransaction(null);
                 setRemarks('');
-                fetchData();
+                setResolveAction('');
+                fetchData(); // Tải lại dữ liệu sau khi xử lý
             } else {
-                throw new Error(response.data?.message || 'Không thể xác nhận thanh toán');
+                throw new Error(response.data?.message || 'Không thể xử lý giao dịch');
             }
         } catch (error) {
-            console.error('Error confirming payment:', error);
-            toast.error(error.response?.data?.message || 'Không thể xác nhận thanh toán');
+            console.error('Error resolving transaction:', error);
+            toast.error(error.response?.data?.message || 'Không thể xử lý giao dịch');
         } finally {
             setLoading(false);
         }
@@ -125,21 +124,28 @@ const AdminCommissionManagement = () => {
     };
 
     const formatDate = (dateString) => {
+        if (!dateString) return '-';
         return new Date(dateString).toLocaleString('vi-VN');
     };
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case 'pending':
-                return <Badge bg="warning" className="px-3 py-2"><FaClock className="me-1" /> Chờ thanh toán</Badge>;
-            case 'paid':
-                return <Badge bg="info" className="px-3 py-2"><FaHourglassHalf className="me-1" /> Đã thanh toán - Chờ xác nhận</Badge>;
-            case 'confirmed':
-                return <Badge bg="success" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã xác nhận</Badge>;
-            case 'rejected':
-                return <Badge bg="danger" className="px-3 py-2"><FaTimesCircle className="me-1" /> Đã từ chối</Badge>;
-            default:
-                return <Badge bg="secondary" className="px-3 py-2">{status}</Badge>;
+            case 'held': return <Badge bg="primary" className="px-3 py-2"><FaClock className="me-1" /> Đang giữ</Badge>;
+            case 'commission_collected': return <Badge bg="success" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã trích hoa hồng</Badge>;
+            case 'disbursed_to_driver': return <Badge bg="info" className="px-3 py-2"><FaRegMoneyBillAlt className="me-1" /> Đã giải ngân</Badge>;
+            case 'refunded_to_user': return <Badge bg="secondary" className="px-3 py-2"><FaTimesCircle className="me-1" /> Đã hoàn tiền</Badge>;
+            case 'disputed': return <Badge bg="danger" className="px-3 py-2"><FaExclamationTriangle className="me-1" /> Tranh chấp</Badge>;
+            default: return <Badge bg="secondary" className="px-3 py-2">{status}</Badge>;
+        }
+    };
+
+    const getTypeBadge = (type) => {
+        switch (type) {
+            case 'user_payment_held': return <Badge bg="primary">Tiền người dùng</Badge>;
+            case 'commission': return <Badge bg="success">Hoa hồng</Badge>;
+            case 'payout_to_driver': return <Badge bg="info">Giải ngân</Badge>;
+            case 'refund': return <Badge bg="secondary">Hoàn tiền</Badge>;
+            default: return <Badge bg="dark">{type}</Badge>;
         }
     };
 
@@ -154,7 +160,7 @@ const AdminCommissionManagement = () => {
                                 <FaMoneyBillWave className="text-primary fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Tổng hoa hồng</h6>
+                                <h6 className="text-muted mb-1">Tổng giao dịch</h6>
                                 <h4 className="mb-0 fw-bold text-primary">{formatCurrency(stats.totalAmount)}</h4>
                             </div>
                         </Card.Body>
@@ -163,25 +169,12 @@ const AdminCommissionManagement = () => {
                 <Col sm={6} md={4} lg>
                     <Card className="h-100 border-0 shadow-sm hover-shadow">
                         <Card.Body className="d-flex align-items-center p-4">
-                            <div className="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
-                                <FaClock className="text-warning fs-3" />
-                            </div>
-                            <div>
-                                <h6 className="text-muted mb-1">Chờ thanh toán</h6>
-                                <h4 className="mb-0 fw-bold text-warning">{formatCurrency(stats.pendingAmount)}</h4>
-                            </div>
-                        </Card.Body>
-                    </Card>
-                </Col>
-                <Col sm={6} md={4} lg>
-                    <Card className="h-100 border-0 shadow-sm hover-shadow">
-                        <Card.Body className="d-flex align-items-center p-4">
                             <div className="rounded-circle bg-info bg-opacity-10 p-3 me-3">
-                                <FaHourglassHalf className="text-info fs-3" />
+                                <FaClock className="text-info fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Chờ xác nhận</h6>
-                                <h4 className="mb-0 fw-bold text-info">{formatCurrency(stats.paidAmount)}</h4>
+                                <h6 className="text-muted mb-1">Đang giữ</h6>
+                                <h4 className="mb-0 fw-bold text-info">{formatCurrency(stats.heldAmount)}</h4>
                             </div>
                         </Card.Body>
                     </Card>
@@ -193,8 +186,21 @@ const AdminCommissionManagement = () => {
                                 <FaCheckCircle className="text-success fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Đã xác nhận</h6>
-                                <h4 className="mb-0 fw-bold text-success">{formatCurrency(stats.confirmedAmount)}</h4>
+                                <h6 className="text-muted mb-1">Đã trích hoa hồng</h6>
+                                <h4 className="mb-0 fw-bold text-success">{formatCurrency(stats.commissionCollectedAmount)}</h4>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col sm={6} md={4} lg>
+                    <Card className="h-100 border-0 shadow-sm hover-shadow">
+                        <Card.Body className="d-flex align-items-center p-4">
+                            <div className="rounded-circle bg-secondary bg-opacity-10 p-3 me-3">
+                                <FaRegMoneyBillAlt className="text-secondary fs-3" />
+                            </div>
+                            <div>
+                                <h6 className="text-muted mb-1">Đã giải ngân</h6>
+                                <h4 className="mb-0 fw-bold text-secondary">{formatCurrency(stats.payoutDisbursedAmount)}</h4>
                             </div>
                         </Card.Body>
                     </Card>
@@ -203,11 +209,24 @@ const AdminCommissionManagement = () => {
                     <Card className="h-100 border-0 shadow-sm hover-shadow">
                         <Card.Body className="d-flex align-items-center p-4">
                             <div className="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
-                                <FaTimesCircle className="text-danger fs-3" />
+                                <FaExclamationTriangle className="text-danger fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Đã từ chối</h6>
-                                <h4 className="mb-0 fw-bold text-danger">{formatCurrency(stats.rejectedAmount)}</h4>
+                                <h6 className="text-muted mb-1">Đang tranh chấp</h6>
+                                <h4 className="mb-0 fw-bold text-danger">{formatCurrency(stats.disputedAmount)}</h4>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col sm={6} md={4} lg>
+                    <Card className="h-100 border-0 shadow-sm hover-shadow">
+                        <Card.Body className="d-flex align-items-center p-4">
+                            <div className="rounded-circle bg-dark bg-opacity-10 p-3 me-3">
+                                <FaTimesCircle className="text-dark fs-3" />
+                            </div>
+                            <div>
+                                <h6 className="text-muted mb-1">Đã hoàn tiền</h6>
+                                <h4 className="mb-0 fw-bold text-dark">{formatCurrency(stats.refundedAmount)}</h4>
                             </div>
                         </Card.Body>
                     </Card>
@@ -244,7 +263,7 @@ const AdminCommissionManagement = () => {
                                     />
                                 </Form.Group>
                             </Col>
-                            <Col md={2}>
+                            <Col md={3}>
                                 <Form.Group>
                                     <Form.Label className="text-muted small mb-2">Trạng thái</Form.Label>
                                     <Form.Select
@@ -254,27 +273,58 @@ const AdminCommissionManagement = () => {
                                         className="border-0 shadow-sm"
                                     >
                                         <option value="">Tất cả</option>
-                                        <option value="pending">Chờ thanh toán</option>
-                                        <option value="paid">Chờ xác nhận</option>
-                                        <option value="confirmed">Đã xác nhận</option>
-                                        <option value="rejected">Đã từ chối</option>
+                                        <option value="held">Đang giữ</option>
+                                        <option value="commission_collected">Đã trích hoa hồng</option>
+                                        <option value="disbursed_to_driver">Đã giải ngân</option>
+                                        <option value="refunded_to_user">Đã hoàn tiền</option>
+                                        <option value="disputed">Tranh chấp</option>
                                     </Form.Select>
                                 </Form.Group>
                             </Col>
                             <Col md={3}>
                                 <Form.Group>
-                                    <Form.Label className="text-muted small mb-2">Tên tài xế</Form.Label>
+                                    <Form.Label className="text-muted small mb-2">Loại giao dịch</Form.Label>
+                                    <Form.Select
+                                        name="type"
+                                        value={filters.type}
+                                        onChange={handleFilterChange}
+                                        className="border-0 shadow-sm"
+                                    >
+                                        <option value="">Tất cả</option>
+                                        <option value="user_payment_held">Tiền người dùng giữ</option>
+                                        <option value="commission">Hoa hồng</option>
+                                        <option value="payout_to_driver">Giải ngân tài xế</option>
+                                        <option value="refund">Hoàn tiền</option>
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                            <Col md={3}>
+                                <Form.Group>
+                                    <Form.Label className="text-muted small mb-2">ID Tài xế</Form.Label>
                                     <Form.Control
                                         type="text"
-                                        name="driverName"
-                                        value={filters.driverName}
+                                        name="driverId"
+                                        value={filters.driverId}
                                         onChange={handleFilterChange}
-                                        placeholder="Nhập tên tài xế..."
+                                        placeholder="Nhập Driver ID..."
                                         className="border-0 shadow-sm"
                                     />
                                 </Form.Group>
                             </Col>
-                            <Col md={1} className="d-flex align-items-end">
+                            <Col md={3}>
+                                <Form.Group>
+                                    <Form.Label className="text-muted small mb-2">ID Người dùng</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        name="userId"
+                                        value={filters.userId}
+                                        onChange={handleFilterChange}
+                                        placeholder="Nhập User ID..."
+                                        className="border-0 shadow-sm"
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={2} className="d-flex align-items-end">
                                 <Button 
                                     type="submit" 
                                     variant="primary" 
@@ -289,10 +339,10 @@ const AdminCommissionManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Bills Table */}
+            {/* Transactions Table */}
             <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
-                    <h5 className="mb-4">Danh sách hóa đơn</h5>
+                    <h5 className="mb-4">Danh sách giao dịch</h5>
                     {loading ? (
                         <div className="text-center py-5">
                             <div className="spinner-border text-primary" role="status">
@@ -305,42 +355,48 @@ const AdminCommissionManagement = () => {
                             <Table hover className="align-middle">
                                 <thead>
                                     <tr className="bg-light">
-                                        <th className="text-nowrap py-3">Mã Bill</th>
+                                        <th className="text-nowrap py-3">Mã GD</th>
+                                        <th className="text-nowrap py-3">Loại</th>
                                         <th className="text-nowrap py-3">Tài xế</th>
-                                        <th className="text-center text-nowrap py-3">Số giao dịch</th>
-                                        <th className="text-end text-nowrap py-3">Tổng tiền</th>
+                                        <th className="text-nowrap py-3">Người dùng</th>
+                                        <th className="text-end text-nowrap py-3">Số tiền</th>
                                         <th className="text-center text-nowrap py-3">Trạng thái</th>
-                                        <th className="text-nowrap py-3">Ngày tạo</th>
-                                        <th className="text-nowrap py-3">Ngày thanh toán</th>
+                                        <th className="text-nowrap py-3">Ngày xử lý</th>
                                         <th className="text-center text-nowrap py-3">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {bills.map(bill => (
-                                        <tr key={bill._id} className="border-bottom">
-                                            <td className="text-primary fw-medium">{bill._id}</td>
+                                    {transactions.map(trans => (
+                                        <tr key={trans._id} className="border-bottom">
+                                            <td className="text-primary fw-medium">{trans._id.slice(-6)}</td>
+                                            <td>{getTypeBadge(trans.type)}</td>
                                             <td>
-                                                {bill.driverId ? (
+                                                {trans.driverId ? (
                                                     <div>
-                                                        <div className="fw-medium">{bill.driverId.fullName}</div>
-                                                        <small className="text-muted">{bill.driverId.email}</small>
+                                                        <div className="fw-medium">{trans.driverId.fullName}</div>
+                                                        <small className="text-muted">{trans.driverId.email}</small>
                                                     </div>
                                                 ) : (
                                                     'N/A'
                                                 )}
                                             </td>
-                                            <td className="text-center fw-medium">{bill.transactions?.length || 0}</td>
-                                            <td className="text-end fw-bold">{formatCurrency(bill.total_amount)}</td>
-                                            <td className="text-center">{getStatusBadge(bill.status)}</td>
-                                            <td className="text-nowrap">
-                                                <div className="fw-medium">{new Date(bill.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                <small className="text-muted">{new Date(bill.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                            <td>
+                                                {trans.userId ? (
+                                                    <div>
+                                                        <div className="fw-medium">{trans.userId.fullName}</div>
+                                                        <small className="text-muted">{trans.userId.email}</small>
+                                                    </div>
+                                                ) : (
+                                                    'N/A'
+                                                )}
                                             </td>
+                                            <td className="text-end fw-bold">{formatCurrency(trans.amount)}</td>
+                                            <td className="text-center">{getStatusBadge(trans.status)}</td>
                                             <td className="text-nowrap">
-                                                {bill.paid_at ? (
+                                                {trans.processed_at ? (
                                                     <>
-                                                        <div className="fw-medium">{new Date(bill.paid_at).toLocaleDateString('vi-VN')}</div>
-                                                        <small className="text-muted">{new Date(bill.paid_at).toLocaleTimeString('vi-VN')}</small>
+                                                        <div className="fw-medium">{new Date(trans.processed_at).toLocaleDateString('vi-VN')}</div>
+                                                        <small className="text-muted">{new Date(trans.processed_at).toLocaleTimeString('vi-VN')}</small>
                                                     </>
                                                 ) : '-'}
                                             </td>
@@ -350,35 +406,35 @@ const AdminCommissionManagement = () => {
                                                         variant="outline-info"
                                                         size="sm"
                                                         className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
-                                                        onClick={() => handleViewDetails(bill._id)}
+                                                        onClick={() => handleViewDetails(trans._id)}
                                                     >
                                                         <FaEye /> Chi tiết
                                                     </Button>
-                                                    {bill.status === 'paid' && (
+                                                    {trans.status === 'disputed' && ( // Chỉ cho phép xử lý khi trạng thái là disputed
                                                         <>
                                                             <Button
                                                                 variant="outline-success"
                                                                 size="sm"
                                                                 className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
                                                                 onClick={() => {
-                                                                    setSelectedBill(bill);
-                                                                    setConfirmAction('confirm');
-                                                                    setShowConfirmModal(true);
+                                                                    setSelectedTransaction(trans);
+                                                                    setResolveAction('disbursed_to_driver'); // Hành động giải ngân cho tài xế
+                                                                    setShowResolveModal(true);
                                                                 }}
                                                             >
-                                                                <FaCheck /> Xác nhận
+                                                                <FaCheck /> Giải ngân cho TX
                                                             </Button>
                                                             <Button
                                                                 variant="outline-danger"
                                                                 size="sm"
                                                                 className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
                                                                 onClick={() => {
-                                                                    setSelectedBill(bill);
-                                                                    setConfirmAction('reject');
-                                                                    setShowConfirmModal(true);
+                                                                    setSelectedTransaction(trans);
+                                                                    setResolveAction('refunded_to_user'); // Hành động hoàn tiền cho user
+                                                                    setShowResolveModal(true);
                                                                 }}
                                                             >
-                                                                <FaTimes /> Từ chối
+                                                                <FaTimes /> Hoàn tiền cho KH
                                                             </Button>
                                                         </>
                                                     )}
@@ -386,12 +442,12 @@ const AdminCommissionManagement = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {bills.length === 0 && (
+                                    {transactions.length === 0 && (
                                         <tr>
                                             <td colSpan={8} className="text-center py-5">
                                                 <div className="text-muted">
                                                     <FaMoneyBillWave className="fs-1 mb-3 text-muted" />
-                                                    <div>Không có dữ liệu</div>
+                                                    <div>Không có dữ liệu giao dịch</div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -403,27 +459,27 @@ const AdminCommissionManagement = () => {
                 </Card.Body>
             </Card>
 
-            {/* Confirm Modal */}
+            {/* Resolve Transaction Modal */}
             <Modal 
-                show={showConfirmModal} 
+                show={showResolveModal} 
                 onHide={() => {
-                    setShowConfirmModal(false);
-                    setConfirmAction('');
+                    setShowResolveModal(false);
+                    setResolveAction('');
                     setRemarks('');
                 }}
                 centered
             >
                 <Modal.Header closeButton className="border-0 pb-0">
                     <Modal.Title className="fs-5">
-                        {confirmAction === 'confirm' ? (
+                        {resolveAction === 'disbursed_to_driver' ? (
                             <span className="text-success">
                                 <FaCheckCircle className="me-2" />
-                                Xác nhận thanh toán
+                                Giải ngân cho tài xế
                             </span>
                         ) : (
                             <span className="text-danger">
                                 <FaTimesCircle className="me-2" />
-                                Từ chối thanh toán
+                                Hoàn tiền cho khách hàng
                             </span>
                         )}
                     </Modal.Title>
@@ -435,39 +491,40 @@ const AdminCommissionManagement = () => {
                                 <FaMoneyBillWave className="fs-3 text-primary" />
                             </div>
                             <div>
-                                <h6 className="mb-1">Thông tin thanh toán</h6>
-                                <div className="text-muted small">Mã bill: {selectedBill?._id}</div>
+                                <h6 className="mb-1">Thông tin giao dịch</h6>
+                                <div className="text-muted small">Mã GD: {selectedTransaction?._id.slice(-6)}</div>
+                                <div className="text-muted small">Đơn hàng: {selectedTransaction?.orderId?._id ? selectedTransaction.orderId._id.slice(-6) : 'N/A'}</div>
                             </div>
                         </div>
                         <div className="d-flex justify-content-between align-items-center">
-                            <div className="text-muted">Tổng tiền:</div>
-                            <div className="fs-5 fw-bold text-primary">{selectedBill ? formatCurrency(selectedBill.total_amount) : ''}</div>
+                            <div className="text-muted">Số tiền:</div>
+                            <div className="fs-5 fw-bold text-primary">{selectedTransaction ? formatCurrency(selectedTransaction.amount) : ''}</div>
                         </div>
                     </div>
 
                     <Form.Group className="mb-4">
-                        <Form.Label className="text-muted small mb-2">Ghi chú</Form.Label>
+                        <Form.Label className="text-muted small mb-2">Ghi chú xử lý</Form.Label>
                         <Form.Control
                             as="textarea"
                             rows={3}
                             value={remarks}
                             onChange={(e) => setRemarks(e.target.value)}
-                            placeholder="Nhập ghi chú (nếu có)"
+                            placeholder="Nhập ghi chú xử lý (nếu có)"
                             className="border-0 shadow-sm"
                         />
                     </Form.Group>
 
                     <div className="alert alert-warning border-0 rounded-3">
                         <FaHourglassHalf className="me-2" />
-                        Bạn có chắc chắn muốn {confirmAction === 'confirm' ? 'xác nhận' : 'từ chối'} thanh toán cho bill này?
+                        Bạn có chắc chắn muốn {resolveAction === 'disbursed_to_driver' ? 'giải ngân' : 'hoàn tiền'} cho giao dịch này?
                     </div>
                 </Modal.Body>
                 <Modal.Footer className="border-0 pt-0">
                     <Button 
                         variant="light" 
                         onClick={() => {
-                            setShowConfirmModal(false);
-                            setConfirmAction('');
+                            setShowResolveModal(false);
+                            setResolveAction('');
                             setRemarks('');
                         }}
                         className="rounded-pill px-4"
@@ -475,20 +532,20 @@ const AdminCommissionManagement = () => {
                         Hủy
                     </Button>
                     <Button
-                        variant={confirmAction === 'confirm' ? 'success' : 'danger'}
-                        onClick={() => handleConfirmPayment(confirmAction === 'confirm' ? 'confirmed' : 'rejected')}
+                        variant={resolveAction === 'disbursed_to_driver' ? 'success' : 'danger'}
+                        onClick={handleResolveTransaction}
                         disabled={loading}
                         className="rounded-pill px-4"
                     >
-                        {confirmAction === 'confirm' ? (
+                        {resolveAction === 'disbursed_to_driver' ? (
                             <>
                         <FaCheck className="me-2" />
-                        Xác nhận
+                        Xác nhận giải ngân
                             </>
                         ) : (
                             <>
                         <FaTimes className="me-2" />
-                        Từ chối
+                        Xác nhận hoàn tiền
                             </>
                         )}
                     </Button>
@@ -505,7 +562,7 @@ const AdminCommissionManagement = () => {
                 <Modal.Header closeButton className="border-0 pb-0">
                     <Modal.Title className="fs-5">
                         <FaEye className="me-2" />
-                        Chi tiết Bill
+                        Chi tiết Giao dịch
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="px-4">
@@ -516,7 +573,7 @@ const AdminCommissionManagement = () => {
                             </div>
                             <div className="mt-3 text-muted">Đang tải dữ liệu...</div>
                         </div>
-                    ) : selectedBill ? (
+                    ) : selectedTransaction ? (
                         <>
                             <div className="alert alert-light border-0 rounded-3 mb-4">
                                 <div className="d-flex align-items-center mb-3">
@@ -525,91 +582,65 @@ const AdminCommissionManagement = () => {
                                     </div>
                                     <div>
                                         <h6 className="mb-1">Thông tin chung</h6>
-                                        <div className="text-muted small">Mã bill: {selectedBill._id}</div>
+                                        <div className="text-muted small">Mã GD: {selectedTransaction._id}</div>
                                     </div>
                                 </div>
                                 <Row className="g-3">
                                     <Col md={6}>
+                                        <div className="text-muted small mb-1">Loại giao dịch</div>
+                                        <div>{getTypeBadge(selectedTransaction.type)}</div>
+                                    </Col>
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Số tiền</div>
+                                        <div className="fw-bold text-primary">{formatCurrency(selectedTransaction.amount)}</div>
+                                    </Col>
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Trạng thái</div>
+                                        <div>{getStatusBadge(selectedTransaction.status)}</div>
+                                    </Col>
+                                    <Col md={6}>
+                                        <div className="text-muted small mb-1">Ngày tạo</div>
+                                        <div className="fw-medium">{formatDate(selectedTransaction.createdAt)}</div>
+                                    </Col>
+                                    <Col md={6}>
                                         <div className="text-muted small mb-1">Tài xế</div>
                                         <div className="fw-medium">
-                                            {selectedBill.driverId ? (
-                                        <>
-                                            {selectedBill.driverId.fullName}
-                                            <small className="text-muted d-block">{selectedBill.driverId.email}</small>
-                                        </>
+                                            {selectedTransaction.driverId ? (
+                                                <>
+                                                    {selectedTransaction.driverId.fullName}
+                                                    <small className="text-muted d-block">{selectedTransaction.driverId.email}</small>
+                                                </>
                                             ) : 'N/A'}
                                         </div>
                                     </Col>
                                     <Col md={6}>
-                                        <div className="text-muted small mb-1">Tổng tiền</div>
-                                        <div className="fw-bold text-primary">{formatCurrency(selectedBill.total_amount)}</div>
+                                        <div className="text-muted small mb-1">Người dùng</div>
+                                        <div className="fw-medium">
+                                            {selectedTransaction.userId ? (
+                                                <>
+                                                    {selectedTransaction.userId.fullName}
+                                                    <small className="text-muted d-block">{selectedTransaction.userId.email}</small>
+                                                </>
+                                            ) : 'N/A'}
+                                        </div>
                                     </Col>
                                     <Col md={6}>
-                                        <div className="text-muted small mb-1">Trạng thái</div>
-                                        <div>{getStatusBadge(selectedBill.status)}</div>
+                                        <div className="text-muted small mb-1">Đơn hàng ID</div>
+                                        <div className="fw-medium">{selectedTransaction.orderId?._id || 'N/A'}</div>
                                     </Col>
-                                    <Col md={6}>
-                                        <div className="text-muted small mb-1">Ngày tạo</div>
-                                        <div className="fw-medium">{formatDate(selectedBill.createdAt)}</div>
-                                    </Col>
-                                    {selectedBill.paid_at && (
+                                    {selectedTransaction.processed_at && (
                                         <Col md={6}>
-                                            <div className="text-muted small mb-1">Ngày thanh toán</div>
-                                            <div className="fw-medium">{formatDate(selectedBill.paid_at)}</div>
-                                        </Col>
-                                    )}
-                                    {selectedBill.confirmed_at && (
-                                        <Col md={6}>
-                                            <div className="text-muted small mb-1">Ngày xác nhận</div>
-                                            <div className="fw-medium">{formatDate(selectedBill.confirmed_at)}</div>
+                                            <div className="text-muted small mb-1">Ngày xử lý</div>
+                                            <div className="fw-medium">{formatDate(selectedTransaction.processed_at)}</div>
                                         </Col>
                                     )}
                                 </Row>
-                                {selectedBill.remarks && (
+                                {selectedTransaction.remarks && (
                                     <div className="mt-3 pt-3 border-top">
                                         <div className="text-muted small mb-1">Ghi chú</div>
-                                        <div>{selectedBill.remarks}</div>
+                                        <div>{selectedTransaction.remarks}</div>
                                     </div>
                                 )}
-                            </div>
-
-                            <div className="mb-3">
-                                <h6 className="mb-4">Danh sách giao dịch</h6>
-                                <div className="table-responsive">
-                                    <Table hover className="align-middle">
-                                    <thead>
-                                            <tr className="bg-light">
-                                                <th className="py-3">Mã giao dịch</th>
-                                                <th className="text-end py-3">Số tiền</th>
-                                                <th className="text-center py-3">Trạng thái</th>
-                                                <th className="py-3">Ngày tạo</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {selectedBill.transactions?.map(transaction => (
-                                                <tr key={transaction._id} className="border-bottom">
-                                                    <td className="text-primary fw-medium">{transaction._id}</td>
-                                                    <td className="text-end fw-bold">{formatCurrency(transaction.amount)}</td>
-                                                    <td className="text-center">{getStatusBadge(transaction.status)}</td>
-                                                    <td className="text-nowrap">
-                                                        <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                        <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
-                                                    </td>
-                                            </tr>
-                                        ))}
-                                        {(!selectedBill.transactions || selectedBill.transactions.length === 0) && (
-                                            <tr>
-                                                    <td colSpan={4} className="text-center py-5">
-                                                        <div className="text-muted">
-                                                            <FaMoneyBillWave className="fs-1 mb-3" />
-                                                            <div>Không có giao dịch nào</div>
-                                                        </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
-                                </div>
                             </div>
                         </>
                     ) : null}
@@ -628,4 +659,4 @@ const AdminCommissionManagement = () => {
     );
 };
 
-export default AdminCommissionManagement; 
+export default AdminCommissionManagement;

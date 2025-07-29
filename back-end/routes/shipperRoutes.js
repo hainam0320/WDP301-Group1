@@ -26,11 +26,9 @@ const upload = multer({ storage: storage });
 // Hàm chuyển đổi đường dẫn file thành định dạng URL
 const getRelativePath = (filePath) => {
     if (!filePath) return '';
-    // Nếu path đã là đường dẫn tương đối
     if (filePath.startsWith('uploads/')) {
         return filePath;
     }
-    // Chuyển đổi đường dẫn đầy đủ thành tương đối
     const relativePath = filePath.split('\\uploads\\')[1];
     if (relativePath) {
         return `uploads/${relativePath}`;
@@ -41,32 +39,23 @@ const getRelativePath = (filePath) => {
 // Route cập nhật profile shipper
 router.put('/profile', protect, async (req, res) => {
     try {
-        console.log('=== UPDATE PROFILE ===');
-        console.log('User:', req.user);
-        console.log('Body:', req.body);
-
-        // Kiểm tra xem user có phải là driver không
         if (req.user.constructor.modelName !== 'Driver') {
-            console.log('Not authorized as driver');
             return res.status(403).json({ 
                 success: false,
-                message: 'Not authorized as driver' 
+                message: 'Không có quyền tài xế' 
             });
         }
 
         const { fullName, phone, avatar, cmndFront, cmndBack, licensePlateImage } = req.body;
         const driverId = req.user._id;
 
-        // Validate input
         if (!fullName || !phone) {
-            console.log('Missing required fields');
             return res.status(400).json({
                 success: false,
-                message: 'Full name and phone are required'
+                message: 'Họ và tên và số điện thoại là bắt buộc'
             });
         }
 
-        // Cập nhật thông tin driver trong database
         const updatedDriver = await Driver.findByIdAndUpdate(
             driverId,
             {
@@ -85,39 +74,29 @@ router.put('/profile', protect, async (req, res) => {
         );
 
         if (!updatedDriver) {
-            console.log('Driver not found');
             return res.status(404).json({ 
                 success: false,
-                message: 'Driver not found' 
+                message: 'Không tìm thấy tài xế' 
             });
         }
 
-        console.log('Profile updated successfully');
-        console.log('Updated driver:', updatedDriver);
-
-        // Loại bỏ password trước khi gửi response
         const { password, ...driverData } = updatedDriver.toObject();
         res.json({
             success: true,
             data: driverData
         });
     } catch (error) {
-        console.error('Error updating profile:', error);
-        
-        // Handle validation errors
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({
                 success: false,
-                message: 'Validation Error',
+                message: 'Lỗi xác thực',
                 errors: messages
             });
         }
-
-        // Handle other errors
         res.status(500).json({ 
             success: false,
-            message: 'Error updating profile',
+            message: 'Lỗi cập nhật hồ sơ',
             error: error.message 
         });
     }
@@ -126,40 +105,29 @@ router.put('/profile', protect, async (req, res) => {
 // Route upload file
 router.post('/upload', protect, upload.single('file'), (req, res) => {
     try {
-        console.log('=== UPLOAD FILE ===');
-        console.log('User:', req.user);
-        console.log('File:', req.file);
-
-        // Kiểm tra xem user có phải là driver không
         if (req.user.constructor.modelName !== 'Driver') {
-            console.log('Not authorized as driver');
             return res.status(403).json({ 
                 success: false,
-                message: 'Not authorized as driver' 
+                message: 'Không có quyền tài xế' 
             });
         }
 
         if (!req.file) {
-            console.log('No file uploaded');
             return res.status(400).json({ 
                 success: false,
-                message: 'No file uploaded' 
+                message: 'Không có file nào được tải lên' 
             });
         }
         
-        // Trả về đường dẫn file đã upload
-        const filePath = `uploads/${req.file.filename}`; // Sử dụng đường dẫn tương đối
-        console.log('File uploaded successfully:', filePath);
-        
+        const filePath = `uploads/${req.file.filename}`;
         res.json({ 
             success: true,
             filePath 
         });
     } catch (error) {
-        console.error('Error uploading file:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error uploading file',
+            message: 'Lỗi tải file lên',
             error: error.message 
         });
     }
@@ -168,60 +136,50 @@ router.post('/upload', protect, upload.single('file'), (req, res) => {
 // Get available orders
 router.get('/available', protect, async (req, res) => {
   try {
-    // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Không có quyền tài xế' 
       });
     }
 
-    // Kiểm tra hoa hồng chưa thanh toán quá 3 ngày
-    const now = new Date();
-    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    const oldPending = await CompanyTransaction.findOne({
-      driverId: req.user._id,
-      status: 'pending',
-      createdAt: { $lte: threeDaysAgo }
-    });
-    if (oldPending) {
-      return res.status(403).json({
-        success: false,
-        message: 'Bạn có đơn hoa hồng chưa thanh toán quá 3 ngày. Vui lòng thanh toán trước khi nhận đơn mới.'
-      });
-    }
+    // Kiểm tra các giao dịch hoa hồng loại 'pending' (tức là tài xế còn nợ hoa hồng theo luồng cũ)
+    // Hoặc nếu quy định là tài xế có số dư âm thì không cho nhận đơn mới.
+    // Nếu luồng thanh toán thay đổi, phần này cần được xem xét lại.
+    // Hiện tại, ta sẽ bỏ qua điều kiện hoa hồng quá 3 ngày nếu luồng là user trả trước.
 
+    // Theo luồng mới, tài xế có thể nhận đơn ngay khi user thanh toán thành công
     const availableOrders = await Order.find({ 
-      status: 'pending',
+      status: 'payment_successful', // Chỉ lấy đơn đã thanh toán và đang chờ shipper
       driverId: { $exists: false }
-    }).populate('userId', 'name phone');
+    }).populate('userId', 'fullName phone');
 
     res.json(availableOrders);
   } catch (error) {
-    console.error('Error fetching available orders:', error);
-    res.status(500).json({ message: 'Error fetching available orders' });
+    console.error('Lỗi lấy danh sách đơn hàng khả dụng:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi lấy đơn hàng khả dụng' });
   }
 });
 
-// Accept order
+// Accept order (logic này vẫn giữ nguyên vì nó xác nhận shipper nhận đơn)
 router.post('/:orderId/accept', protect, async (req, res) => {
   try {
-    // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Không có quyền tài xế' 
       });
     }
 
     const order = await Order.findById(req.params.orderId);
     
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     }
 
-    if (order.driverId) {
-      return res.status(400).json({ message: 'Order already accepted by another driver' });
+    // Kiểm tra trạng thái đơn hàng: chỉ chấp nhận đơn khi đã thanh toán thành công và chưa có tài xế
+    if (order.status !== 'payment_successful' || order.driverId) {
+      return res.status(400).json({ message: 'Đơn hàng không khả dụng để nhận' });
     }
 
     order.driverId = req.user._id;
@@ -230,42 +188,40 @@ router.post('/:orderId/accept', protect, async (req, res) => {
 
     res.json({ success: true, order });
   } catch (error) {
-    console.error('Error accepting order:', error);
-    res.status(500).json({ message: 'Error accepting order' });
+    console.error('Lỗi chấp nhận đơn hàng:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi chấp nhận đơn hàng' });
   }
 });
 
 // Get shipper's orders
 router.get('/orders', protect, async (req, res) => {
   try {
-    // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Không có quyền tài xế' 
       });
     }
 
     const orders = await Order.find({ 
-      driverId: req.user._id 
-    }).populate('userId', 'name phone');
+      driverId: req.user._id,
+      status: { $nin: ['pending_payment', 'payment_successful', 'payment_failed', 'refunded'] } // Loại trừ các trạng thái liên quan đến thanh toán ban đầu
+    }).populate('userId', 'fullName phone');
 
     res.json(orders);
   } catch (error) {
-    console.error('Error fetching shipper orders:', error);
-    res.status(500).json({ message: 'Error fetching shipper orders' });
+    console.error('Lỗi lấy đơn hàng của shipper:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi lấy đơn hàng của shipper' });
   }
 });
 
-// Update order status
+// Update order status by shipper
 router.put('/orders/:orderId/status', protect, async (req, res) => {
   try {
-    console.log('=== UPDATE ORDER STATUS ===');
-    // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Không có quyền tài xế' 
       });
     }
 
@@ -273,7 +229,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: 'Status is required'
+        message: 'Trạng thái là bắt buộc'
       });
     }
 
@@ -281,139 +237,62 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found'
+        message: 'Không tìm thấy đơn hàng'
       });
     }
 
-    // Kiểm tra xem đơn hàng có phải của shipper này không
     if (order.driverId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to update this order'
+        message: 'Không có quyền cập nhật đơn hàng này'
       });
     }
 
     const oldStatus = order.status;
     order.status = status;
-    if ((status === 'completed' || status === 'failed') && statusDescription) {
+    if ((status === 'shipper_completed' || status === 'failed') && statusDescription) {
       order.statusDescription = statusDescription;
+    } else {
+        order.statusDescription = undefined; // Clear description if not applicable
     }
     await order.save();
 
-    console.log('Order updated:', {
-      orderId: order._id,
-      oldStatus,
-      newStatus: status,
-      statusDescription: order.statusDescription,
-      price: order.price
-    });
-
-    // Nếu đơn hàng vừa được cập nhật thành completed
-    if (status === 'completed' && oldStatus !== 'completed') {
-      try {
-        console.log('Creating earnings records...');
-        
-        // Tạo bản ghi DriverAssignment
-        const driverAssignment = new DriverAssignment({
-          driverId: req.user._id,
-          orderId: order._id,
-          amount: order.price,
-          status: true,
-          date: new Date().toISOString().split('T')[0]
-        });
-        await driverAssignment.save();
-        console.log('Driver assignment created:', driverAssignment);
-
-        // Tạo bản ghi TotalEarning
-        const totalEarning = new TotalEarning({
-          driverAssigmentId: driverAssignment._id,
-          driverId: req.user._id,
-          amount: order.price,
-          date: new Date().toISOString().split('T')[0]
-        });
-        await totalEarning.save();
-        console.log('Total earning created:', totalEarning);
-
-        // Tính hoa hồng (10% giá trị đơn hàng)
-        const commissionRate = 0.1;
-        const commissionAmount = order.price * commissionRate;
-
-        // Tạo bản ghi CompanyTransaction
-        const transaction = new CompanyTransaction({
-          driverId: req.user._id,
-          total_earning_id: totalEarning._id,
-          amount: commissionAmount,
-          status: 'pending'
-        });
-        await transaction.save();
-        console.log('Commission transaction created:', transaction);
-      } catch (error) {
-        console.error('Error creating earnings records:', error);
-        // Không throw error ở đây để vẫn trả về success cho việc update order
-      }
-    }
+    // Loại bỏ logic tạo CompanyTransaction và TotalEarning ở đây
+    // vì việc này sẽ được xử lý khi người dùng xác nhận hoàn tất đơn hàng.
 
     res.json({
       success: true,
       order
     });
   } catch (error) {
-    console.error('Error updating order status:', error);
+    console.error('Lỗi cập nhật trạng thái đơn hàng:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Error updating order status',
+      message: 'Lỗi cập nhật trạng thái đơn hàng',
       error: error.message
     });
   }
 });
 
-// Get shipper's earnings statistics
+// Get shipper's earnings statistics (logic này vẫn cần để hiển thị thu nhập)
 router.get('/earnings', protect, async (req, res) => {
   try {
-    console.log('=== GET EARNINGS ===');
-    console.log('User:', req.user);
-
-    // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
-      console.log('Not authorized as driver');
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Không có quyền tài xế' 
       });
     }
-
-    if (!req.user._id) {
-      console.log('User ID not found');
-      return res.status(400).json({
-        success: false,
-        message: 'User ID not found'
-      });
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const oneWeekAgo = new Date(today);
-    oneWeekAgo.setDate(today.getDate() - 7);
-
-    const oneMonthAgo = new Date(today);
-    oneMonthAgo.setMonth(today.getMonth() - 1);
-
-    console.log('Dates:', {
-      today: today.toISOString(),
-      oneWeekAgo: oneWeekAgo.toISOString(),
-      oneMonthAgo: oneMonthAgo.toISOString()
-    });
 
     const driverId = new mongoose.Types.ObjectId(req.user._id);
-    console.log('Driver ID:', driverId);
 
-    // Sử dụng aggregation để tính toán
-    const stats = await Order.aggregate([
+    // Tính toán thu nhập dựa trên các giao dịch payout_to_driver thành công
+    const stats = await CompanyTransaction.aggregate([
       {
         $match: {
           driverId: driverId,
-          status: 'completed'
+          type: 'payout_to_driver',
+          status: 'disbursed_to_driver' // Chỉ tính tiền đã giải ngân
         }
       },
       {
@@ -421,13 +300,13 @@ router.get('/earnings', protect, async (req, res) => {
           today: [
             {
               $match: {
-                updatedAt: { $gte: today }
+                processed_at: { $gte: new Date(new Date().setHours(0,0,0,0)) }
               }
             },
             {
               $group: {
                 _id: null,
-                earnings: { $sum: '$price' },
+                earnings: { $sum: '$amount' },
                 count: { $sum: 1 }
               }
             }
@@ -435,13 +314,13 @@ router.get('/earnings', protect, async (req, res) => {
           thisWeek: [
             {
               $match: {
-                updatedAt: { $gte: oneWeekAgo }
+                processed_at: { $gte: new Date(new Date().setDate(new Date().getDate() - 7)) }
               }
             },
             {
               $group: {
                 _id: null,
-                earnings: { $sum: '$price' },
+                earnings: { $sum: '$amount' },
                 count: { $sum: 1 }
               }
             }
@@ -449,13 +328,13 @@ router.get('/earnings', protect, async (req, res) => {
           thisMonth: [
             {
               $match: {
-                updatedAt: { $gte: oneMonthAgo }
+                processed_at: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) }
               }
             },
             {
               $group: {
                 _id: null,
-                earnings: { $sum: '$price' },
+                earnings: { $sum: '$amount' },
                 count: { $sum: 1 }
               }
             }
@@ -464,18 +343,21 @@ router.get('/earnings', protect, async (req, res) => {
             {
               $group: {
                 _id: null,
-                earnings: { $sum: '$price' },
+                earnings: { $sum: '$amount' },
                 count: { $sum: 1 }
               }
             }
+          ],
+          // Lấy số dư hiện tại từ Driver model
+          currentBalance: [
+            { $lookup: { from: 'drivers', localField: 'driverId', foreignField: '_id', as: 'driverInfo' } },
+            { $unwind: '$driverInfo' },
+            { $project: { _id: 0, balance: '$driverInfo.balance' } }
           ]
         }
       }
     ]);
 
-    console.log('Aggregation results:', JSON.stringify(stats, null, 2));
-
-    // Format kết quả
     const earnings = {
       today: stats[0].today[0]?.earnings || 0,
       thisWeek: stats[0].thisWeek[0]?.earnings || 0,
@@ -486,20 +368,19 @@ router.get('/earnings', protect, async (req, res) => {
         thisWeek: stats[0].thisWeek[0]?.count || 0,
         thisMonth: stats[0].thisMonth[0]?.count || 0,
         total: stats[0].total[0]?.count || 0
-      }
+      },
+      currentBalance: stats[0].currentBalance[0]?.balance || 0 // Thêm số dư hiện tại
     };
-
-    console.log('Final earnings:', earnings);
 
     res.json({
       success: true,
       data: earnings
     });
   } catch (error) {
-    console.error('Error getting earnings:', error);
+    console.error('Lỗi lấy thống kê thu nhập:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Error getting earnings statistics',
+      message: 'Lỗi lấy thống kê thu nhập',
       error: error.message 
     });
   }
@@ -512,7 +393,7 @@ router.get('/orders/available/count', protect, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
     const count = await Order.countDocuments({ 
-      status: 'pending',
+      status: 'payment_successful', // Chỉ đếm đơn đã thanh toán
       driverId: { $exists: false } 
     });
     res.json({ count });
@@ -529,7 +410,7 @@ router.get('/orders/ongoing/count', protect, async (req, res) => {
     }
     const count = await Order.countDocuments({
       driverId: req.user._id,
-      status: { $in: ['accepted', 'in-progress', 'delivering'] } // Thêm các trạng thái đang thực hiện nếu có
+      status: { $in: ['accepted', 'in_progress'] } // Trạng thái đang thực hiện
     });
     res.json({ count });
   } catch (error) {
@@ -537,4 +418,4 @@ router.get('/orders/ongoing/count', protect, async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { FaEye, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
-import { adminAPI } from '../../services/api';
-import { toast } from 'react-toastify';
+import { FaEye, FaCheck, FaTimes, FaExclamationTriangle, FaInfoCircle } from 'react-icons/fa';
+import { adminAPI, transactionAPI } from '../../services/api'; // Import transactionAPI
+import { toast } from 'react-toastify'; // Dùng react-toastify
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
+import Form from 'react-bootstrap/Form'; // Import Form
 
 const ReportManagement = () => {
   const [reports, setReports] = useState([]);
@@ -13,6 +14,7 @@ const ReportManagement = () => {
   const [adminNote, setAdminNote] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState('');
+  const [resolveLoading, setResolveLoading] = useState(false); // Thêm state cho loading khi xử lý tranh chấp
 
   useEffect(() => {
     fetchReports();
@@ -33,7 +35,7 @@ const ReportManagement = () => {
 
   const handleViewReport = (report) => {
     setSelectedReport(report);
-    setAdminNote('');
+    setAdminNote(report.admin_note || ''); // Set ghi chú cũ nếu có
     setShowReportModal(true);
   };
 
@@ -45,17 +47,86 @@ const ReportManagement = () => {
 
   const handleUpdateReportStatus = async (reportId, status) => {
     try {
+      setResolveLoading(true); // Bắt đầu loading
       await adminAPI.updateReportStatus(reportId, {
         status,
         admin_note: adminNote
       });
       toast.success('Cập nhật trạng thái báo cáo thành công');
+      // Nếu trạng thái là resolved hoặc rejected, và có orderId, kiểm tra và cập nhật trạng thái đơn hàng
+      if ((status === 'resolved' || status === 'rejected') && selectedReport?.order_id?._id) {
+          // Xử lý đơn hàng bị tranh chấp:
+          // Nếu báo cáo được giải quyết/từ chối, và đơn hàng đang ở trạng thái disputed,
+          // admin có thể giải quyết giao dịch tương ứng.
+          // Đây là điểm tích hợp với luồng thanh toán mới.
+          // Tùy theo kết quả xử lý báo cáo, admin có thể hoàn tiền cho user hoặc giải ngân cho tài xế.
+          // Logic này phức tạp và sẽ được kích hoạt bởi admin trong ReportManagement hoặc AdminCommissionManagement
+          // For now, if the report is resolved/rejected, the order status might return to its previous state or a new 'resolved_dispute' state.
+          // Hoặc bạn có thể thêm một modal/form để admin xác nhận hành động cụ thể (hoàn tiền/giải ngân)
+          // ở đây hoặc trong AdminCommissionManagement.
+
+          // Để đơn giản hóa, ta sẽ giả định report 'resolved' sẽ kết thúc tranh chấp.
+          // Quyết định hoàn tiền/giải ngân sẽ do admin thực hiện thủ công trong CommissionManagement
+          // hoặc một module riêng biệt.
+      }
       handleCloseReportModal();
       fetchReports();
     } catch (error) {
       console.error('Error updating report status:', error);
       toast.error('Có lỗi xảy ra khi cập nhật trạng thái báo cáo');
+    } finally {
+        setResolveLoading(false); // Kết thúc loading
     }
+  };
+
+  // Hàm xử lý khi admin quyết định hoàn tiền hoặc giải ngân trong trường hợp tranh chấp
+  const handleResolveOrderDispute = async (orderId, newTransactionStatus) => {
+      // Tìm giao dịch 'disputed' liên quan đến orderId này
+      try {
+          setResolveLoading(true);
+          // Để thực hiện hành động này, chúng ta cần tìm transaction ID có trạng thái 'disputed'
+          // và thuộc về orderId này. Giả định rằng sẽ có 1 transaction 'held' ban đầu
+          // và khi phát sinh tranh chấp thì CompanyTransaction chuyển sang 'disputed'.
+          // Tuy nhiên, việc báo cáo có thể không tạo ra một CompanyTransaction ngay lập tức.
+          // Cách tiếp cận tốt hơn là ReportModel có thể có một trường `relatedTransactionId`
+          // hoặc AdminCommissionManagement sẽ là nơi xử lý các transaction disputed.
+          // Ở đây, ta sẽ gọi API adminResolveTransaction và truyền orderId để backend tự tìm.
+          // Backend sẽ tìm giao dịch 'disputed' liên quan đến orderId này và xử lý.
+
+          // Nếu report.order_id có một giao dịch đang ở trạng thái disputed, thì gọi API này
+          // Giả sử có một API để lấy transactionId từ orderId nếu nó đang disputed
+          // Hoặc đơn giản hơn, admin có thể xem giao dịch disputed trong AdminCommissionManagement
+          // và xử lý ở đó.
+          // Để demo tích hợp, ta giả định selectedReport.order_id có một disputed transaction liên quan.
+          if (selectedReport?.order_id?._id) {
+              const transactionRes = await transactionAPI.getAdminTransactions({ 
+                  orderId: selectedReport.order_id._id, 
+                  status: 'disputed' 
+              });
+              if (transactionRes.data.transactions.length > 0) {
+                  const disputedTransaction = transactionRes.data.transactions[0];
+                  await transactionAPI.adminResolveTransaction(disputedTransaction._id, { 
+                      newStatus: newTransactionStatus, 
+                      remarks: adminNote || 'Giải quyết từ quản lý báo cáo' 
+                  });
+                  toast.success('Đã giải quyết tranh chấp đơn hàng thành công!');
+                  // Cập nhật trạng thái báo cáo thành resolved
+                  await adminAPI.updateReportStatus(selectedReport._id, { status: 'resolved', admin_note: adminNote || 'Đã giải quyết tranh chấp đơn hàng và xử lý tài chính.' });
+                  handleCloseReportModal();
+                  fetchReports();
+              } else {
+                  toast.error('Không tìm thấy giao dịch tranh chấp cho đơn hàng này.');
+              }
+          } else {
+              toast.error('Không tìm thấy ID đơn hàng liên quan.');
+          }
+
+      } catch (error) {
+          console.error('Error resolving order dispute:', error);
+          toast.error(error.response?.data?.message || 'Lỗi khi giải quyết tranh chấp đơn hàng.');
+      } finally {
+          setResolveLoading(false);
+      }
   };
 
   const getReportStatusBadge = (status) => {
@@ -100,7 +171,6 @@ const ReportManagement = () => {
   const renderImages = (imagePaths) => {
     if (!imagePaths) return null;
     
-    // Convert to array if it's a string, or use existing array
     const images = Array.isArray(imagePaths) 
       ? imagePaths 
       : typeof imagePaths === 'string' 
@@ -281,11 +351,19 @@ const ReportManagement = () => {
                   <p className="border rounded p-3 bg-light">{selectedReport.admin_note}</p>
                 </div>
               )}
+
+              {/* Action buttons for resolving dispute related to order payment */}
+              {selectedReport.order_id?.status === 'disputed' && (
+                <div className="alert alert-warning">
+                    <FaInfoCircle className="me-2" />
+                    Đơn hàng này đang ở trạng thái tranh chấp. Admin có thể quyết định hoàn tiền cho khách hàng hoặc giải ngân cho tài xế.
+                </div>
+              )}
             </div>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseReportModal}>
+          <Button variant="secondary" onClick={handleCloseReportModal} disabled={resolveLoading}>
             Đóng
           </Button>
           {selectedReport && selectedReport.status === 'pending' && (
@@ -293,7 +371,7 @@ const ReportManagement = () => {
               <Button 
                 variant="info" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'reviewed')}
-                disabled={adminNote.length > 256}
+                disabled={adminNote.length > 256 || resolveLoading}
               >
                 <FaEye className="me-1" />
                 Đang xem xét
@@ -301,7 +379,7 @@ const ReportManagement = () => {
               <Button 
                 variant="success" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
-                disabled={adminNote.length > 256}
+                disabled={adminNote.length > 256 || resolveLoading}
               >
                 <FaCheck className="me-1" />
                 Giải quyết
@@ -309,7 +387,7 @@ const ReportManagement = () => {
               <Button 
                 variant="danger" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
-                disabled={adminNote.length > 256}
+                disabled={adminNote.length > 256 || resolveLoading}
               >
                 <FaTimes className="me-1" />
                 Từ chối
@@ -321,7 +399,7 @@ const ReportManagement = () => {
               <Button 
                 variant="success" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'resolved')}
-                disabled={adminNote.length > 256}
+                disabled={adminNote.length > 256 || resolveLoading}
               >
                 <FaCheck className="me-1" />
                 Giải quyết
@@ -329,10 +407,33 @@ const ReportManagement = () => {
               <Button 
                 variant="danger" 
                 onClick={() => handleUpdateReportStatus(selectedReport._id, 'rejected')}
-                disabled={adminNote.length > 256}
+                disabled={adminNote.length > 256 || resolveLoading}
               >
                 <FaTimes className="me-1" />
                 Từ chối
+              </Button>
+            </>
+          )}
+          {selectedReport && selectedReport.order_id?.status === 'disputed' && (selectedReport.status !== 'resolved' && selectedReport.status !== 'rejected') && (
+            // Các nút này sẽ gọi API để giải quyết tranh chấp tài chính của đơn hàng
+            // Lưu ý: Logic này có thể phức tạp hơn tùy thuộc vào tích hợp VNPAY (hoàn tiền)
+            // Và có thể nên được xử lý tập trung ở AdminCommissionManagement
+            <>
+              <Button
+                variant="outline-success"
+                onClick={() => handleResolveOrderDispute(selectedReport.order_id._id, 'disbursed_to_driver')}
+                disabled={resolveLoading}
+              >
+                <FaCheck className="me-1" />
+                Giải ngân cho TX
+              </Button>
+              <Button
+                variant="outline-danger"
+                onClick={() => handleResolveOrderDispute(selectedReport.order_id._id, 'refunded_to_user')}
+                disabled={resolveLoading}
+              >
+                <FaTimes className="me-1" />
+                Hoàn tiền cho KH
               </Button>
             </>
           )}
@@ -359,4 +460,4 @@ const ReportManagement = () => {
   );
 };
 
-export default ReportManagement; 
+export default ReportManagement;
