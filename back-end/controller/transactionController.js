@@ -6,7 +6,7 @@ const qrcode = require('qrcode');
 const crypto = require('crypto');
 const Driver = require('../model/driverModel');
 const mongoose = require('mongoose');
-
+const AdminToDriverPayout = require("../model/adminToDriverPayoutModel");
 // ===== DRIVER COMMISSION MANAGEMENT =====
 
 // Lấy danh sách các khoản hoa hồng cần thanh toán của tài xế
@@ -615,5 +615,48 @@ exports.cancelBulkBill = async (req, res) => {
       message: "Lỗi khi hủy hóa đơn tổng",
       error: error.message
     });
+  }
+};
+// ===== DRIVER PAYOUTS (NEW FLOW: ADMIN PAYS DRIVER) =====
+
+// Lấy số dư công ty nợ tài xế
+exports.getDriverPayoutsBalance = async (req, res) => {
+  try {
+    const driverId = req.user._id; // Lấy ID tài xế từ req.user (đã được authenticate)
+
+    const driver = await Driver.findById(driverId).select('balanceOwedByCompany fullName');
+
+    if (!driver) {
+      return res.status(404).json({ message: "Không tìm thấy tài xế." });
+    }
+
+    res.json({
+      success: true,
+      balance: driver.balanceOwedByCompany,
+      driverName: driver.fullName
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy số dư của tài xế:", error);
+    res.status(500).json({ message: "Lỗi server khi lấy số dư." });
+  }
+};
+
+// Lấy lịch sử chi trả từ Admin cho tài xế
+exports.getDriverPayoutsHistory = async (req, res) => {
+  try {
+    const driverId = req.user._id; // Lấy ID tài xế từ req.user
+
+    const payouts = await AdminToDriverPayout.find({ driverId })
+      .populate('adminId', 'fullName email') // Populate thông tin admin nếu cần
+      .sort('-payoutDate'); // Sắp xếp theo ngày chi trả mới nhất
+
+    res.json({
+      success: true,
+      payouts: payouts,
+      count: payouts.length
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy lịch sử chi trả của tài xế:", error);
+    res.status(500).json({ message: "Lỗi server khi lấy lịch sử chi trả." });
   }
 };

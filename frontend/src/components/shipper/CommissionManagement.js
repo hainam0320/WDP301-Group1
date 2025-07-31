@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Form, Modal, Alert, Badge, Card, Row, Col, Nav } from 'react-bootstrap';
-import { FaQrcode, FaCheck, FaTimes, FaFileInvoiceDollar, FaEye, FaArrowLeft, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa';
+import { FaQrcode, FaCheck, FaTimes, FaFileInvoiceDollar, FaEye, FaArrowLeft, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle, FaExclamationTriangle, FaCoins } from 'react-icons/fa'; // Added FaCoins
 import { toast } from 'react-toastify';
 import { transactionAPI } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 const CommissionManagement = () => {
     const navigate = useNavigate();
     const [pendingCommissions, setPendingCommissions] = useState([]);
-    const [bulkBills, setBulkBills] = useState([]);
+    const [bulkBills, setBulkBills] = useState([]); // This state still holds old flow bulk bills, might be removed later if not displayed
     const [selectedTransactions, setSelectedTransactions] = useState([]);
     const [showQRModal, setShowQRModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -17,76 +17,72 @@ const CommissionManagement = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('pending');
+
+    // Stats for old flow (driver owes company)
     const [stats, setStats] = useState({
-        totalAmount: 0,
-        pendingAmount: 0,
-        paidAmount: 0
+        totalAmount: 0, // Tổng hoa hồng tài xế đã/đang nợ công ty
+        pendingAmount: 0, // Chờ thanh toán (tài xế nợ công ty)
+        paidAmount: 0 // Đã thanh toán (tài xế đã trả công ty)
     });
+
+    // New states for new flow (company owes driver)
+    const [driverBalance, setDriverBalance] = useState(0); // Số tiền công ty nợ tài xế
+    const [payoutHistory, setPayoutHistory] = useState([]); // Lịch sử chi trả từ Admin cho tài xế
+
+    // Pagination states
     const [pendingPage, setPendingPage] = useState(1);
-    const [historyPage, setHistoryPage] = useState(1);
+    const [adminPayoutHistoryPage, setAdminPayoutHistoryPage] = useState(1); // New page state for admin payout history
     const itemsPerPage = 5;
 
-    // Add pagination state
     const [paginatedPending, setPaginatedPending] = useState([]);
-    const [paginatedHistory, setPaginatedHistory] = useState([]);
+    const [paginatedAdminPayoutHistory, setPaginatedAdminPayoutHistory] = useState([]); // New paginated state for admin payout history
     const [totalPendingPages, setTotalPendingPages] = useState(0);
-    const [totalHistoryPages, setTotalHistoryPages] = useState(0);
+    const [totalAdminPayoutHistoryPages, setTotalAdminPayoutHistoryPages] = useState(0); // New total pages state
 
     useEffect(() => {
         fetchData();
     }, [activeTab]);
 
-    // Add pagination effect
+    // Pagination effect for pending commissions
     useEffect(() => {
-        // Calculate paginated data for pending commissions
         const startPending = (pendingPage - 1) * itemsPerPage;
         const endPending = startPending + itemsPerPage;
         setPaginatedPending(pendingCommissions.slice(startPending, endPending));
         setTotalPendingPages(Math.ceil(pendingCommissions.length / itemsPerPage));
     }, [pendingCommissions, pendingPage, itemsPerPage]);
 
-    // Add pagination effect for history
+    // Pagination effect for admin payout history
     useEffect(() => {
-        // Calculate paginated data for history
-        const startHistory = (historyPage - 1) * itemsPerPage;
+        const startHistory = (adminPayoutHistoryPage - 1) * itemsPerPage;
         const endHistory = startHistory + itemsPerPage;
-        setPaginatedHistory(bulkBills.slice(startHistory, endHistory));
-        setTotalHistoryPages(Math.ceil(bulkBills.length / itemsPerPage));
-    }, [bulkBills, historyPage, itemsPerPage]);
+        setPaginatedAdminPayoutHistory(payoutHistory.slice(startHistory, endHistory));
+        setTotalAdminPayoutHistoryPages(Math.ceil(payoutHistory.length / itemsPerPage));
+    }, [payoutHistory, adminPayoutHistoryPage, itemsPerPage]);
+
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
             setError('');
-            
-            // Luôn lấy cả pending transactions và bulk bills để tính toán stats chính xác
+
+            // Fetch data for old flow (driver owes company commission)
             const [pendingResponse, bulkResponse] = await Promise.all([
                 transactionAPI.getPendingCommissions(),
                 transactionAPI.getDriverBulkBills()
             ]);
 
-            const pendingTransactions = pendingResponse.data.transactions || [];
-            const bills = bulkResponse.data.data || [];
+            const fetchedPendingTransactions = pendingResponse.data.transactions || [];
+            const fetchedBulkBills = bulkResponse.data.data || []; // Old flow bulk bills
 
-            // Cập nhật state tùy theo tab
-            if (activeTab === 'pending') {
-                setPendingCommissions(pendingTransactions);
-                setBulkBills(bills);
-            } else {
-                setBulkBills(bills);
-            }
+            setPendingCommissions(fetchedPendingTransactions);
+            setBulkBills(fetchedBulkBills); // Keep for stats calculation if needed
 
-            // Tính toán stats
-            // 1. Tính tổng tiền chờ thanh toán từ các giao dịch pending
-            const pendingAmount = pendingTransactions
+            // Calculate stats for old flow (driver owes company)
+            const pendingAmount = fetchedPendingTransactions
                 .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
-
-            // 2. Tính tổng tiền đã thanh toán từ các bill đã confirmed hoặc completed
-            const paidAmount = bills
+            const paidAmount = fetchedBulkBills
                 .filter(bill => bill.status === 'completed' || bill.status === 'confirmed')
                 .reduce((sum, bill) => sum + (bill.total_amount || 0), 0);
-
-            // 3. Tổng hoa hồng = Chờ thanh toán + Đã thanh toán
             const totalAmount = pendingAmount + paidAmount;
 
             setStats({
@@ -94,6 +90,16 @@ const CommissionManagement = () => {
                 pendingAmount,
                 paidAmount
             });
+
+            // Fetch data for new flow (company owes driver)
+            const [balanceResponse, payoutsResponse] = await Promise.all([
+                transactionAPI.getDriverPayoutsBalance(),
+                transactionAPI.getDriverPayoutsHistory()
+            ]);
+
+            setDriverBalance(balanceResponse.data.balance || 0);
+            setPayoutHistory(payoutsResponse.data.payouts || []);
+
 
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -112,14 +118,13 @@ const CommissionManagement = () => {
 
             setIsLoading(true);
             setError('');
-            
+
             const response = await transactionAPI.createBulkBill(transactionIds);
-            
+
             if (response.data && response.data.data) {
                 const { qrPayment } = response.data.data;
                 console.log('QR Payment data:', qrPayment);
 
-                // Ensure we have a valid payment code
                 if (!qrPayment.paymentCode) {
                     setError('Không nhận được mã thanh toán hợp lệ');
                     return;
@@ -128,13 +133,12 @@ const CommissionManagement = () => {
                 setQRData({
                     qrCode: qrPayment.qrCode,
                     amount: qrPayment.amount,
-                    paymentCode: qrPayment.paymentCode.trim() // Ensure no whitespace
+                    paymentCode: qrPayment.paymentCode.trim()
                 });
-                
+
                 setShowQRModal(true);
                 setSelectedTransactions([]);
-                // Refresh data after creating bulk bill
-                fetchData();
+                fetchData(); // Refresh data after creating bulk bill
             }
         } catch (err) {
             console.error('Error creating bulk payment:', err);
@@ -157,11 +161,10 @@ const CommissionManagement = () => {
     const handleCloseQRModal = async () => {
         try {
             if (qrData) {
-                // Tìm bulk bill tương ứng với QR payment
                 const response = await transactionAPI.getDriverBulkBills();
                 const bills = response.data.data || [];
-                const pendingBill = bills.find(bill => 
-                    bill.status === 'pending' && 
+                const pendingBill = bills.find(bill =>
+                    bill.status === 'pending' &&
                     bill.qr_payment_id?.paymentCode === qrData.paymentCode
                 );
 
@@ -188,15 +191,15 @@ const CommissionManagement = () => {
 
             setError('');
             setIsLoading(true);
-            
+
             console.log('Payment data:', qrData);
             console.log('Simulating payment with code:', qrData.paymentCode);
-            
+
             const response = await transactionAPI.updateBulkQRPaymentStatus(
-                qrData.paymentCode.trim(), // Ensure no whitespace
+                qrData.paymentCode.trim(),
                 'completed'
             );
-            
+
             if (response.data && response.data.success) {
                 toast.success('Thanh toán thành công!');
                 await fetchData();
@@ -226,16 +229,18 @@ const CommissionManagement = () => {
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case 'completed':
+            case 'completed': // For AdminToDriverPayout
                 return <Badge bg="success" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã hoàn thành</Badge>;
-            case 'confirmed':
+            case 'confirmed': // For BulkBill (driver paid company)
                 return <Badge bg="primary" className="px-3 py-2"><FaCheckCircle className="me-1" /> Đã xác nhận</Badge>;
-            case 'rejected':
+            case 'rejected': // For BulkBill
                 return <Badge bg="danger" className="px-3 py-2"><FaTimesCircle className="me-1" /> Đã từ chối</Badge>;
-            case 'paid':
+            case 'paid': // For BulkBill (status after QR scan)
                 return <Badge bg="info" className="px-3 py-2"><FaHourglassHalf className="me-1" /> Đã thanh toán - Chờ xác nhận</Badge>;
-            case 'pending':
-                return <Badge bg="warning" className="px-3 py-2"><FaClock className="me-1" /> Chờ thanh toán</Badge>;
+            case 'pending': // For CompanyTransaction (driver owes company) & AdminToDriverPayout (if pending payout request)
+                return <Badge bg="warning" className="px-3 py-2"><FaClock className="me-1" /> Chờ xử lý</Badge>;
+            case 'cancelled': // For AdminToDriverPayout
+                return <Badge bg="secondary" className="px-3 py-2"><FaTimesCircle className="me-1" /> Đã hủy</Badge>;
             default:
                 return <Badge bg="secondary" className="px-3 py-2">{status}</Badge>;
         }
@@ -245,6 +250,7 @@ const CommissionManagement = () => {
         try {
             setIsLoading(true);
             setError('');
+            // Get driver's bulk bills (old flow history)
             const response = await transactionAPI.getDriverBulkBills();
             const bill = response.data.data.find(b => b._id === billId);
             if (bill) {
@@ -276,7 +282,7 @@ const CommissionManagement = () => {
                 <>
                     {selectedTransactions.length > 0 && (
                         <div className="p-3 border-bottom">
-                            <Button 
+                            <Button
                                 variant="primary"
                                 onClick={() => handleBulkPayment()}
                                 disabled={isLoading}
@@ -287,10 +293,10 @@ const CommissionManagement = () => {
                         </div>
                     )}
                     <div className="table-responsive">
-                        <Table className="mb-0">
+                        <Table hover className="align-middle mb-0">
                             <thead>
-                                <tr>
-                                    <th>
+                                <tr className="bg-light">
+                                    <th className="py-3">
                                         <Form.Check
                                             type="checkbox"
                                             onChange={(e) => {
@@ -306,44 +312,57 @@ const CommissionManagement = () => {
                                             }
                                         />
                                     </th>
-                                    <th>Mã giao dịch</th>
-                                    <th>Số tiền</th>
-                                    <th>Trạng thái</th>
-                                    <th>Ngày tạo</th>
-                                    <th>Thao tác</th>
+                                    <th className="py-3">Mã giao dịch</th>
+                                    <th className="py-3">Số tiền</th>
+                                    <th className="py-3">Trạng thái</th>
+                                    <th className="py-3">Ngày tạo</th>
+                                    <th className="py-3">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedPending.map(transaction => (
-                                    <tr key={transaction._id}>
-                                        <td>
-                                            <Form.Check
-                                                type="checkbox"
-                                                onChange={() => handleSelectTransaction(transaction._id)}
-                                                checked={selectedTransactions.includes(transaction._id)}
-                                            />
-                                        </td>
-                                        <td>{transaction._id}</td>
-                                        <td>{formatCurrency(transaction.amount)}</td>
-                                        <td>{getStatusBadge(transaction.status)}</td>
-                                        <td>{formatDate(transaction.createdAt)}</td>
-                                        <td>
-                                            <Button 
-                                                variant="primary"
-                                                size="sm"
-                                                onClick={() => handleBulkPayment([transaction._id])}
-                                                disabled={isLoading}
-                                            >
-                                                <FaQrcode className="me-1" />
-                                                Thanh toán
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {paginatedPending.map(transaction => {
+                                    const overdue = isOverdue(transaction.createdAt);
+                                    return (
+                                        <tr key={transaction._id} className={`border-bottom${overdue ? ' bg-danger bg-opacity-25' : ''}`}>
+                                            <td>
+                                                <Form.Check
+                                                    type="checkbox"
+                                                    onChange={() => handleSelectTransaction(transaction._id)}
+                                                    checked={selectedTransactions.includes(transaction._id)}
+                                                />
+                                            </td>
+                                            <td className="text-primary fw-medium">
+                                                {transaction._id}
+                                                {overdue && <FaExclamationTriangle className="ms-2 text-danger" title="Quá hạn 3 ngày" />}
+                                            </td>
+                                            <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
+                                            <td>{getStatusBadge(transaction.status)}</td>
+                                            <td>
+                                                <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
+                                                <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
+                                            </td>
+                                            <td>
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    onClick={() => handleBulkPayment([transaction._id])}
+                                                    disabled={isLoading}
+                                                    className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                                                >
+                                                    <FaQrcode />
+                                                    Thanh toán
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {paginatedPending.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-3">
-                                            Không có giao dịch nào chờ thanh toán
+                                        <td colSpan={6} className="text-center py-5">
+                                            <div className="text-muted">
+                                                <FaMoneyBillWave className="fs-1 mb-3" />
+                                                <div>Không có giao dịch nào chờ thanh toán</div>
+                                            </div>
                                         </td>
                                     </tr>
                                 )}
@@ -352,47 +371,39 @@ const CommissionManagement = () => {
                     </div>
                 </>
             );
-        } else {
+        } else { // activeTab === 'adminPayoutHistory' (Lịch sử nhận tiền từ Admin)
             return (
                 <div className="table-responsive">
-                    <Table className="mb-0">
+                    <Table hover className="align-middle mb-0">
                         <thead>
-                            <tr>
-                                <th>Mã Bill</th>
-                                <th>Số giao dịch</th>
-                                <th>Tổng tiền</th>
-                                <th>Trạng thái</th>
-                                <th>Ngày tạo</th>
-                                <th>Ngày xác nhận</th>
-                                <th>Ghi chú</th>
-                                <th>Thao tác</th>
+                            <tr className="bg-light">
+                                <th className="py-3">Mã chi trả</th>
+                                <th className="py-3">Số tiền</th>
+                                <th className="py-3">Trạng thái</th>
+                                <th className="py-3">Ngày chi trả</th>
+                                <th className="py-3">Ghi chú từ Admin</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {paginatedHistory.map(bill => (
-                                <tr key={bill._id}>
-                                    <td>{bill._id}</td>
-                                    <td>{bill.transactions.length}</td>
-                                    <td>{formatCurrency(bill.total_amount)}</td>
-                                    <td>{getStatusBadge(bill.status)}</td>
-                                    <td>{formatDate(bill.createdAt)}</td>
-                                    <td>{bill.confirmed_at ? formatDate(bill.confirmed_at) : '-'}</td>
-                                    <td className="text-muted small">{bill.remarks || '-'}</td>
+                            {paginatedAdminPayoutHistory.map(payout => (
+                                <tr key={payout._id} className="border-bottom">
+                                    <td className="text-primary fw-medium">{payout._id}</td>
+                                    <td className="fw-bold">{formatCurrency(payout.amount)}</td>
+                                    <td>{getStatusBadge(payout.status)}</td>
                                     <td>
-                                        <Button
-                                            variant="info"
-                                            size="sm"
-                                            onClick={() => handleViewDetails(bill._id)}
-                                        >
-                                            <FaEye />
-                                        </Button>
+                                        <div className="fw-medium">{new Date(payout.payoutDate).toLocaleDateString('vi-VN')}</div>
+                                        <small className="text-muted">{new Date(payout.payoutDate).toLocaleTimeString('vi-VN')}</small>
                                     </td>
+                                    <td className="text-muted small">{payout.notes || '-'}</td>
                                 </tr>
                             ))}
-                            {paginatedHistory.length === 0 && (
+                            {paginatedAdminPayoutHistory.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-3">
-                                        Không có lịch sử thanh toán
+                                    <td colSpan={5} className="text-center py-5">
+                                        <div className="text-muted">
+                                            <FaMoneyBillWave className="fs-1 mb-3" />
+                                            <div>Không có lịch sử nhận tiền nào từ Admin</div>
+                                        </div>
                                     </td>
                                 </tr>
                             )}
@@ -408,8 +419,8 @@ const CommissionManagement = () => {
             {/* Header */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <h4 className="mb-0">Quản lý hoa hồng</h4>
-                <Button 
-                    variant="outline-secondary" 
+                <Button
+                    variant="outline-secondary"
                     onClick={() => navigate(-1)}
                     className="d-flex align-items-center gap-2"
                 >
@@ -419,40 +430,42 @@ const CommissionManagement = () => {
 
             {/* Stats Cards */}
             <Row className="mb-4 g-3">
-                <Col sm={6} md={4}>
+                {/* New Card: Số tiền Công ty nợ bạn */}
+                <Col sm={6} md={4} lg={4}>
                     <Card className="h-100 border-0 shadow-sm hover-shadow">
                         <Card.Body className="d-flex align-items-center p-4">
-                            <div className="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                                <FaMoneyBillWave className="text-primary fs-3" />
+                            <div className="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                                <FaCoins className="text-info fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Tổng hoa hồng</h6>
-                                <h4 className="mb-0 fw-bold text-primary">{formatCurrency(stats.totalAmount)}</h4>
+                                <h6 className="text-muted mb-1">Số tiền Công ty chưa thanh toán</h6>
+                                <h4 className="mb-0 fw-bold text-info">{formatCurrency(driverBalance)}</h4>
                             </div>
                         </Card.Body>
                     </Card>
                 </Col>
-                <Col sm={6} md={4}>
+                {/* Existing cards (Old flow: driver owes company) */}
+                <Col sm={6} md={4} lg={4}>
                     <Card className="h-100 border-0 shadow-sm hover-shadow">
                         <Card.Body className="d-flex align-items-center p-4">
                             <div className="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
                                 <FaClock className="text-warning fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Chờ thanh toán</h6>
+                                <h6 className="text-muted mb-1">Hoa hồng chờ thanh toán</h6>
                                 <h4 className="mb-0 fw-bold text-warning">{formatCurrency(stats.pendingAmount)}</h4>
                             </div>
                         </Card.Body>
                     </Card>
                 </Col>
-                <Col sm={6} md={4}>
+                <Col sm={6} md={4} lg={4}>
                     <Card className="h-100 border-0 shadow-sm hover-shadow">
                         <Card.Body className="d-flex align-items-center p-4">
                             <div className="rounded-circle bg-success bg-opacity-10 p-3 me-3">
                                 <FaCheckCircle className="text-success fs-3" />
                             </div>
                             <div>
-                                <h6 className="text-muted mb-1">Đã thanh toán</h6>
+                                <h6 className="text-muted mb-1">Hoa hồng đã thanh toán</h6>
                                 <h4 className="mb-0 fw-bold text-success">{formatCurrency(stats.paidAmount)}</h4>
                             </div>
                         </Card.Body>
@@ -465,21 +478,21 @@ const CommissionManagement = () => {
                 <Card.Body className="p-0">
                     <Nav variant="tabs" className="nav-tabs-custom" activeKey={activeTab} onSelect={setActiveTab}>
                         <Nav.Item>
-                            <Nav.Link 
-                                eventKey="pending" 
+                            <Nav.Link
+                                eventKey="pending"
                                 className="px-4 py-3 text-center"
                             >
                                 <FaClock className="me-2" />
-                                Chờ thanh toán
+                                Hoa hồng cần thanh toán
                             </Nav.Link>
                         </Nav.Item>
                         <Nav.Item>
-                            <Nav.Link 
-                                eventKey="history" 
+                            <Nav.Link
+                                eventKey="adminPayoutHistory" // Changed eventKey
                                 className="px-4 py-3 text-center"
                             >
                                 <FaFileInvoiceDollar className="me-2" />
-                                Lịch sử thanh toán
+                                Lịch sử nhận tiền từ Admin
                             </Nav.Link>
                         </Nav.Item>
                     </Nav>
@@ -496,193 +509,59 @@ const CommissionManagement = () => {
             {/* Content Card */}
             <Card className="border-0 shadow-sm">
                 <Card.Body className="p-0">
-                    {activeTab === 'pending' ? (
-                        <>
-                            {selectedTransactions.length > 0 && (
-                                <div className="p-4 border-bottom">
-                                    <Button 
-                                        variant="primary"
-                                        onClick={() => handleBulkPayment()}
-                                        disabled={isLoading}
-                                        className="d-flex align-items-center gap-2 px-4 py-2"
-                                    >
-                                        <FaQrcode />
-                                        Thanh toán {selectedTransactions.length} khoản đã chọn
-                                    </Button>
-                                </div>
-                            )}
-                            <div className="table-responsive">
-                                <Table hover className="align-middle mb-0">
-                                    <thead>
-                                        <tr className="bg-light">
-                                            <th className="py-3">
-                                                <Form.Check
-                                                    type="checkbox"
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedTransactions(pendingCommissions.map(t => t._id));
-                                                        } else {
-                                                            setSelectedTransactions([]);
-                                                        }
-                                                    }}
-                                                    checked={
-                                                        pendingCommissions.length > 0 &&
-                                                        selectedTransactions.length === pendingCommissions.length
-                                                    }
-                                                />
-                                            </th>
-                                            <th className="py-3">Mã giao dịch</th>
-                                            <th className="py-3">Số tiền</th>
-                                            <th className="py-3">Trạng thái</th>
-                                            <th className="py-3">Ngày tạo</th>
-                                            <th className="py-3">Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paginatedPending.map(transaction => {
-                                            const overdue = isOverdue(transaction.createdAt);
-                                            return (
-                                                <tr key={transaction._id} className={`border-bottom${overdue ? ' bg-danger bg-opacity-25' : ''}`}> 
-                                                <td>
-                                                    <Form.Check
-                                                        type="checkbox"
-                                                        onChange={() => handleSelectTransaction(transaction._id)}
-                                                        checked={selectedTransactions.includes(transaction._id)}
-                                                    />
-                                                </td>
-                                                    <td className="text-primary fw-medium">
-                                                        {transaction._id}
-                                                        {overdue && <FaExclamationTriangle className="ms-2 text-danger" title="Quá hạn 3 ngày" />}
-                                                    </td>
-                                                <td className="fw-bold">{formatCurrency(transaction.amount)}</td>
-                                                <td>{getStatusBadge(transaction.status)}</td>
-                                                <td>
-                                                    <div className="fw-medium">{new Date(transaction.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                    <small className="text-muted">{new Date(transaction.createdAt).toLocaleTimeString('vi-VN')}</small>
-                                                </td>
-                                                <td>
-                                                    <Button 
-                                                        variant="outline-primary"
-                                                        size="sm"
-                                                        onClick={() => handleBulkPayment([transaction._id])}
-                                                        disabled={isLoading}
-                                                        className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
-                                                    >
-                                                        <FaQrcode />
-                                                        Thanh toán
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                            );
-                                        })}
-                                        {paginatedPending.length === 0 && (
-                                            <tr>
-                                                <td colSpan={6} className="text-center py-5">
-                                                    <div className="text-muted">
-                                                        <FaMoneyBillWave className="fs-1 mb-3" />
-                                                        <div>Không có giao dịch nào chờ thanh toán</div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
+                    {isLoading ? ( // Show loading spinner for content area
+                        <div className="text-center py-5">
+                            <div className="spinner-border text-primary" role="status">
+                                <span className="visually-hidden">Loading...</span>
                             </div>
-                        </>
-                    ) : (
-                        <div className="table-responsive">
-                            <Table hover className="align-middle mb-0">
-                                <thead>
-                                    <tr className="bg-light">
-                                        <th className="py-3">Mã Bill</th>
-                                        <th className="py-3">Số giao dịch</th>
-                                        <th className="py-3">Tổng tiền</th>
-                                        <th className="py-3">Trạng thái</th>
-                                        <th className="py-3">Ngày tạo</th>
-                                        <th className="py-3">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedHistory.map(bill => (
-                                        <tr key={bill._id} className="border-bottom">
-                                            <td className="text-primary fw-medium">{bill._id}</td>
-                                            <td className="fw-medium">{bill.transactions?.length || 0}</td>
-                                            <td className="fw-bold">{formatCurrency(bill.total_amount)}</td>
-                                            <td>{getStatusBadge(bill.status)}</td>
-                                            <td>
-                                                <div className="fw-medium">{new Date(bill.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                <small className="text-muted">{new Date(bill.createdAt).toLocaleTimeString('vi-VN')}</small>
-                                            </td>
-                                            <td>
-                                                <Button
-                                                    variant="outline-info"
-                                                    size="sm"
-                                                    onClick={() => handleViewDetails(bill._id)}
-                                                    className="d-flex align-items-center gap-2 px-3 py-2 rounded-pill"
-                                                >
-                                                    <FaEye />
-                                                    Chi tiết
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {paginatedHistory.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="text-center py-5">
-                                                <div className="text-muted">
-                                                    <FaMoneyBillWave className="fs-1 mb-3" />
-                                                    <div>Không có lịch sử thanh toán</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </Table>
+                            <div className="mt-3 text-muted">Đang tải dữ liệu...</div>
                         </div>
+                    ) : (
+                        renderContent()
                     )}
                 </Card.Body>
             </Card>
 
             {/* Pagination controls - show based on active tab */}
             {activeTab === 'pending' && totalPendingPages > 1 && (
-              <nav className="d-flex justify-content-center my-3">
-                <ul className="pagination">
-                  <li className={`page-item${pendingPage === 1 ? ' disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPendingPage(pendingPage - 1)}>&laquo;</button>
-                  </li>
-                  {Array.from({ length: totalPendingPages }, (_, i) => (
-                    <li key={i} className={`page-item${pendingPage === i + 1 ? ' active' : ''}`}>
-                      <button className="page-link" onClick={() => setPendingPage(i + 1)}>{i + 1}</button>
-                    </li>
-                  ))}
-                  <li className={`page-item${pendingPage === totalPendingPages ? ' disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setPendingPage(pendingPage + 1)}>&raquo;</button>
-                  </li>
-                </ul>
-              </nav>
+                <nav className="d-flex justify-content-center my-3">
+                    <ul className="pagination">
+                        <li className={`page-item${pendingPage === 1 ? ' disabled' : ''}`}>
+                            <button className="page-link" onClick={() => setPendingPage(pendingPage - 1)}>&laquo;</button>
+                        </li>
+                        {Array.from({ length: totalPendingPages }, (_, i) => (
+                            <li key={i} className={`page-item${pendingPage === i + 1 ? ' active' : ''}`}>
+                                <button className="page-link" onClick={() => setPendingPage(i + 1)}>{i + 1}</button>
+                            </li>
+                        ))}
+                        <li className={`page-item${pendingPage === totalPendingPages ? ' disabled' : ''}`}>
+                            <button className="page-link" onClick={() => setPendingPage(pendingPage + 1)}>&raquo;</button>
+                        </li>
+                    </ul>
+                </nav>
             )}
 
-            {activeTab === 'history' && totalHistoryPages > 1 && (
-              <nav className="d-flex justify-content-center my-3">
-                <ul className="pagination">
-                  <li className={`page-item${historyPage === 1 ? ' disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setHistoryPage(historyPage - 1)}>&laquo;</button>
-                  </li>
-                  {Array.from({ length: totalHistoryPages }, (_, i) => (
-                    <li key={i} className={`page-item${historyPage === i + 1 ? ' active' : ''}`}>
-                      <button className="page-link" onClick={() => setHistoryPage(i + 1)}>{i + 1}</button>
-                    </li>
-                  ))}
-                  <li className={`page-item${historyPage === totalHistoryPages ? ' disabled' : ''}`}>
-                    <button className="page-link" onClick={() => setHistoryPage(historyPage + 1)}>&raquo;</button>
-                  </li>
-                </ul>
-              </nav>
+            {activeTab === 'adminPayoutHistory' && totalAdminPayoutHistoryPages > 1 && ( // Changed totalHistoryPages
+                <nav className="d-flex justify-content-center my-3">
+                    <ul className="pagination">
+                        <li className={`page-item${adminPayoutHistoryPage === 1 ? ' disabled' : ''}`}>
+                            <button className="page-link" onClick={() => setAdminPayoutHistoryPage(adminPayoutHistoryPage - 1)}>&laquo;</button>
+                        </li>
+                        {Array.from({ length: totalAdminPayoutHistoryPages }, (_, i) => (
+                            <li key={i} className={`page-item${adminPayoutHistoryPage === i + 1 ? ' active' : ''}`}>
+                                <button className="page-link" onClick={() => setAdminPayoutHistoryPage(i + 1)}>{i + 1}</button>
+                            </li>
+                        ))}
+                        <li className={`page-item${adminPayoutHistoryPage === totalAdminPayoutHistoryPages ? ' disabled' : ''}`}>
+                            <button className="page-link" onClick={() => setAdminPayoutHistoryPage(adminPayoutHistoryPage + 1)}>&raquo;</button>
+                        </li>
+                    </ul>
+                </nav>
             )}
 
             {/* QR Modal */}
-            <Modal 
-                show={showQRModal} 
+            <Modal
+                show={showQRModal}
                 onHide={handleCloseQRModal}
                 centered
             >
@@ -712,9 +591,9 @@ const CommissionManagement = () => {
                             </div>
 
                             <div className="mb-4 p-3 border rounded-3">
-                                <img 
-                                    src={qrData.qrCode} 
-                                    alt="QR Code" 
+                                <img
+                                    src={qrData.qrCode}
+                                    alt="QR Code"
                                     style={{ maxWidth: '100%', height: 'auto' }}
                                 />
                             </div>
@@ -738,8 +617,8 @@ const CommissionManagement = () => {
                     )}
                 </Modal.Body>
                 <Modal.Footer className="border-0 pt-0">
-                    <Button 
-                        variant="light" 
+                    <Button
+                        variant="light"
                         onClick={handleCloseQRModal}
                         className="rounded-pill px-4"
                     >
@@ -749,8 +628,8 @@ const CommissionManagement = () => {
             </Modal>
 
             {/* Details Modal */}
-            <Modal 
-                show={showDetailsModal} 
+            <Modal
+                show={showDetailsModal}
                 onHide={() => setShowDetailsModal(false)}
                 size="lg"
                 centered
@@ -858,8 +737,8 @@ const CommissionManagement = () => {
                     ) : null}
                 </Modal.Body>
                 <Modal.Footer className="border-0 pt-0">
-                    <Button 
-                        variant="light" 
+                    <Button
+                        variant="light"
                         onClick={() => setShowDetailsModal(false)}
                         className="rounded-pill px-4"
                     >
@@ -871,4 +750,4 @@ const CommissionManagement = () => {
     );
 };
 
-export default CommissionManagement; 
+export default CommissionManagement;

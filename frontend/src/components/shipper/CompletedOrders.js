@@ -32,7 +32,7 @@ const CompletedOrders = () => {
         }
       });
       // Lấy những đơn hàng đã hoàn thành hoặc thất bại
-      const finishedOrders = response.data.filter(order => 
+      const finishedOrders = response.data.filter(order =>
         order.status === 'completed' || order.status === 'failed'
       );
       setCompletedOrders(finishedOrders);
@@ -101,7 +101,7 @@ const CompletedOrders = () => {
     <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
       <ShipperHeader />
       <div className="container my-5">
-        <button 
+        <button
           className="btn btn-outline-primary mb-4"
           onClick={() => navigate('/shipper')}
         >
@@ -160,8 +160,11 @@ const CompletedOrders = () => {
                           {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
                         </span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
-                        <p className="mb-1 text-muted">
-                          <strong>Ghi chú:</strong> {order.statusDescription || 'Giao thành công'}
+                        {/* HIỂN THỊ TRẠNG THÁI THANH TOÁN */}
+                        <p className="mb-1">
+                          <span className={`badge ${order.paymentStatus === 'paid' ? 'bg-success' : 'bg-secondary'}`}>
+                            {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                          </span>
                         </p>
                         <p className="text-muted mb-0">
                           <small>
@@ -170,7 +173,7 @@ const CompletedOrders = () => {
                         </p>
                       </div>
                       <div className="col-md-3">
-                        <button 
+                        <button
                           className="btn btn-outline-primary btn-sm w-100"
                           onClick={() => handleShowOrderDetail(order)}
                         >
@@ -259,7 +262,7 @@ const CompletedOrders = () => {
                   <p className="text-muted">{selectedOrder.statusDescription || 'Giao thành công'}</p>
                 </div>
               </div>
-              
+
               <div className="col-md-6">
                 <h6 className="fw-bold text-success mb-3">Thông tin thời gian</h6>
                 <div className="mb-3">
@@ -274,7 +277,7 @@ const CompletedOrders = () => {
                   </p>
                   <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
                 </div>
-                
+
                 <h6 className="fw-bold text-success mb-3">Thông tin thanh toán</h6>
                 <div className="mb-3">
                   <p className="mb-1">
@@ -284,7 +287,18 @@ const CompletedOrders = () => {
                     {selectedOrder.price.toLocaleString()} VNĐ
                   </p>
                 </div>
-                
+                {/* HIỂN THỊ TRẠNG THÁI THANH TOÁN TRONG MODAL */}
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Trạng thái thanh toán:</strong>
+                  </p>
+                  <p>
+                    <span className={`badge ${selectedOrder.paymentStatus === 'paid' ? 'bg-success' : 'bg-secondary'}`}>
+                      {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                    </span>
+                  </p>
+                </div>
+
                 <h6 className="fw-bold text-success mb-3">Đánh giá từ khách hàng</h6>
                 <div className="mb-3">
                   {orderRate ? (
@@ -322,4 +336,4 @@ const CompletedOrders = () => {
   );
 };
 
-export default CompletedOrders; 
+export default CompletedOrders;

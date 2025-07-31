@@ -71,7 +71,7 @@ export const shipperAPI = {
   updateProfile: (data) => api.put('/shipper/profile', data),
 
   // ---- Upload File ----
-  uploadFile: (formData) => 
+  uploadFile: (formData) =>
     api.post('/shipper/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
@@ -88,7 +88,7 @@ export const userAPI = {
   updateProfile: (data) => api.put('/users/profile', data),
 
   // ---- Upload File ----
-  uploadFile: (formData) => 
+  uploadFile: (formData) =>
     api.post('/users/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
@@ -108,7 +108,9 @@ export const userAPI = {
   // ---- Upload Report Images ----
   uploadReportImages: async (files) => {
     const formData = new FormData();
-    files.forEach(file => {
+    // Vòng lặp files có thể cần kiểm tra nếu files là FileList hoặc Array
+    // Hiện tại bạn truyền thẳng FileList/Array vào đây, nên cần map để lấy từng file
+    Array.from(files).forEach(file => { // Đảm bảo files là một mảng hoặc FileList
       formData.append('files', file);
     });
     const response = await api.post('/reports/upload', formData, {
@@ -187,10 +189,10 @@ export const adminAPI = {
 };
 
 export const transactionAPI = {
-  // Lấy danh sách hoa hồng chưa thanh toán
+  // Lấy danh sách hoa hồng chưa thanh toán (tài xế nợ công ty)
   getPendingCommissions: () => api.get('/transactions/driver/pending'),
 
-  // Lấy lịch sử thanh toán hoa hồng
+  // Lấy lịch sử thanh toán hoa hồng (tài xế đã trả công ty)
   getCommissionHistory: () => api.get('/transactions/driver/history'),
 
   // Lấy tổng quan về hoa hồng
@@ -225,7 +227,11 @@ export const transactionAPI = {
   },
 
   // Lấy chi tiết bulk bill cho admin
-  getAdminBulkBillDetails: (billId) => api.get(`/transactions/admin/bulk-bills/${billId}`)
+  getAdminBulkBillDetails: (billId) => api.get(`/transactions/admin/bulk-bills/${billId}`),
+
+  // NEW FUNCTIONS FOR ADMIN PAYS DRIVER FLOW
+  getDriverPayoutsBalance: () => api.get('/transactions/driver/payouts/balance'),
+  getDriverPayoutsHistory: () => api.get('/transactions/driver/payouts/history')
 };
 
 export const notificationAPI = {
@@ -238,46 +244,3 @@ export const notificationAPI = {
   // Đánh dấu tất cả là đã đọc
   markAllAsRead: () => api.patch('/notifications/read-all')
 };
-
-// Admin Commission Management APIs
-export const getAdminCommissions = async (filters) => {
-    try {
-        const queryString = new URLSearchParams(filters).toString();
-        const response = await axios.get(`${API_BASE_URL}/transactions/admin/commissions?${queryString}`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        throw handleError(error);
-    }
-};
-
-export const getAdminCommissionStats = async () => {
-    try {
-        const response = await axios.get(`${API_BASE_URL}/transactions/admin/commission-stats`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        throw handleError(error);
-    }
-};
-
-export const getDriverCommissionStats = async () => {
-    try {
-        const response = await axios.get(`${API_BASE_URL}/transactions/admin/driver-commission-stats`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        throw handleError(error);
-    }
-};
-
-

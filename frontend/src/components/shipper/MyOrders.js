@@ -270,6 +270,12 @@ const MyOrders = () => {
                           {order.status === 'in-progress' ? 'Đang giao' : 'Đã nhận'}
                         </span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
+                        {/* HIỂN THỊ TRẠNG THÁI THANH TOÁN */}
+                        <p className="mb-0">
+                          <span className={`badge ${order.paymentStatus === 'paid' ? 'bg-success' : 'bg-secondary'}`}>
+                            {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                          </span>
+                        </p>
                       </div>
                       <div className="col-md-3">
                         {order.status === 'accepted' && (
@@ -399,6 +405,17 @@ const MyOrders = () => {
                     {selectedOrder.price.toLocaleString()} VNĐ
                   </p>
                 </div>
+                {/* HIỂN THỊ TRẠNG THÁI THANH TOÁN TRONG MODAL */}
+                <div className="mb-3">
+                  <p className="mb-1">
+                    <strong>Trạng thái thanh toán:</strong>
+                  </p>
+                  <p>
+                    <span className={`badge ${selectedOrder.paymentStatus === 'paid' ? 'bg-success' : 'bg-secondary'}`}>
+                      {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                    </span>
+                  </p>
+                </div>
                 
                 <h6 className="fw-bold text-primary mb-3">Đánh giá từ khách hàng</h6>
                 <div className="mb-3">
@@ -487,4 +504,4 @@ const MyOrders = () => {
   );
 };
 
-export default MyOrders; 
+export default MyOrders;
