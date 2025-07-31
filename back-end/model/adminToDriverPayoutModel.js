@@ -14,24 +14,24 @@ const adminToDriverPayoutSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'completed', 'cancelled'], // pending (nếu có yêu cầu từ tài xế), completed (đã chi trả), cancelled (bị admin hủy)
-        default: 'completed' // Mặc định là 'completed' nếu admin trực tiếp ghi nhận chi trả thành công
+        enum: ['pending', 'completed', 'cancelled'],
+        default: 'pending' // Mặc định là 'pending' khi tài xế gửi yêu cầu
     },
     payoutDate: {
         type: Date,
-        default: Date.now // Thời gian chi trả được ghi nhận/thực hiện
+        default: Date.now
     },
     adminId: {
         type: Schema.Types.ObjectId,
-        ref: 'User', // Admin được quản lý trong User model (isAdmin: true)
-        required: true // Bắt buộc phải do một admin ghi nhận
+        ref: 'User',
+        required: false // THAY ĐỔI TỪ TRUE THÀNH FALSE, AdminId không bắt buộc khi yêu cầu đang pending
     },
     notes: {
         type: String,
         trim: true
     }
 }, {
-    timestamps: true // Thêm createdAt và updatedAt
+    timestamps: true
 });
 
 module.exports = mongoose.model('AdminToDriverPayout', adminToDriverPayoutSchema);
