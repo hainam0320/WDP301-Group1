@@ -12,12 +12,10 @@ const CompletedOrders = () => {
   const [error, setError] = useState('');
   const BASE_URL = 'http://localhost:9999';
 
-  // Modal states
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderRate, setOrderRate] = useState(null);
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
 
@@ -31,9 +29,10 @@ const CompletedOrders = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      // Lấy những đơn hàng đã hoàn thành hoặc thất bại
-      const finishedOrders = response.data.filter(order => 
-        order.status === 'completed' || order.status === 'failed'
+      // Lấy những đơn hàng đã xác nhận hoàn thành hoặc đã thanh toán
+      const finishedOrders = response.data.filter(order =>
+        order.status === 'user_confirmed_completion' ||
+        order.status === 'driver_paid'
       );
       setCompletedOrders(finishedOrders);
     } catch (err) {
@@ -98,10 +97,10 @@ const CompletedOrders = () => {
   );
 
   return (
-    <div className="min-vh-100" style={{backgroundColor: '#f5f7fa'}}>
+    <div className="min-vh-100" style={{ backgroundColor: '#f5f7fa' }}>
       <ShipperHeader />
       <div className="container my-5">
-        <button 
+        <button
           className="btn btn-outline-primary mb-4"
           onClick={() => navigate('/shipper')}
         >
@@ -154,10 +153,8 @@ const CompletedOrders = () => {
                         )}
                       </div>
                       <div className="col-md-3">
-                        <span className={`badge fs-6 ${
-                          order.status === 'failed' ? 'bg-danger' : 'bg-success'
-                        }`}>
-                          {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
+                        <span className="badge fs-6 bg-success">
+                          {order.status === 'user_confirmed_completion' ? 'Đã xác nhận' : 'Đã giải ngân'}
                         </span>
                         <p className="mt-2 fw-bold text-success">{order.price.toLocaleString()} VNĐ</p>
                         <p className="mb-1 text-muted">
@@ -165,12 +162,12 @@ const CompletedOrders = () => {
                         </p>
                         <p className="text-muted mb-0">
                           <small>
-                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}: {formatDate(order.updatedAt)}
+                            {order.status === 'user_confirmed_completion' ? 'Đã xác nhận' : 'Đã giải ngân'}: {formatDate(order.updatedAt)}
                           </small>
                         </p>
                       </div>
                       <div className="col-md-3">
-                        <button 
+                        <button
                           className="btn btn-outline-primary btn-sm w-100"
                           onClick={() => handleShowOrderDetail(order)}
                         >
@@ -183,7 +180,6 @@ const CompletedOrders = () => {
                 </div>
               ))
             )}
-            {/* Pagination controls */}
             {totalPages > 1 && (
               <nav>
                 <ul className="pagination justify-content-center mt-4">
@@ -211,7 +207,6 @@ const CompletedOrders = () => {
         </div>
       </div>
 
-      {/* Modal chi tiết đơn hàng */}
       <Modal show={showOrderDetailModal} onHide={handleCloseOrderDetailModal} size="lg" centered>
         <Modal.Header closeButton className="bg-success text-white">
           <Modal.Title>
@@ -225,66 +220,48 @@ const CompletedOrders = () => {
               <div className="col-md-6">
                 <h6 className="fw-bold text-success mb-3">Thông tin địa điểm</h6>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong className="text-success">Điểm đón:</strong>
-                  </p>
+                  <p className="mb-1"><strong className="text-success">Điểm đón:</strong></p>
                   <p className="text-muted">{selectedOrder.pickupaddress}</p>
                 </div>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong className="text-danger">Điểm đến:</strong>
-                  </p>
+                  <p className="mb-1"><strong className="text-danger">Điểm đến:</strong></p>
                   <p className="text-muted">{selectedOrder.dropupaddress}</p>
                 </div>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong>Khoảng cách:</strong>
-                  </p>
+                  <p className="mb-1"><strong>Khoảng cách:</strong></p>
                   <p className="text-muted">
                     {selectedOrder.distance_km ? `${selectedOrder.distance_km.toFixed(1)} km` : 'N/A'}
                   </p>
                 </div>
                 {selectedOrder.type === 'delivery' && selectedOrder.weight && (
                   <div className="mb-3">
-                    <p className="mb-1">
-                      <strong>Khối lượng:</strong>
-                    </p>
+                    <p className="mb-1"><strong>Khối lượng:</strong></p>
                     <p className="text-muted">{selectedOrder.weight} kg</p>
                   </div>
                 )}
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong>Trạng thái hoàn thành:</strong>
+                  <p className="mb-1"><strong>Trạng thái hoàn thành:</strong></p>
+                  <p className="text-muted">
+                    {selectedOrder.status === 'user_confirmed_completion' ? 'Đã xác nhận' : 'Đã thanh toán'}
+                    {selectedOrder.statusDescription && ` - ${selectedOrder.statusDescription}`}
                   </p>
-                  <p className="text-muted">{selectedOrder.statusDescription || 'Giao thành công'}</p>
                 </div>
               </div>
-              
               <div className="col-md-6">
                 <h6 className="fw-bold text-success mb-3">Thông tin thời gian</h6>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong>Thời gian nhận đơn:</strong>
-                  </p>
+                  <p className="mb-1"><strong>Thời gian nhận đơn:</strong></p>
                   <p className="text-muted">{formatDate(selectedOrder.createdAt)}</p>
                 </div>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong>Thời gian hoàn thành:</strong>
-                  </p>
+                  <p className="mb-1"><strong>Thời gian hoàn thành:</strong></p>
                   <p className="text-muted">{formatDate(selectedOrder.updatedAt)}</p>
                 </div>
-                
                 <h6 className="fw-bold text-success mb-3">Thông tin thanh toán</h6>
                 <div className="mb-3">
-                  <p className="mb-1">
-                    <strong>Giá tiền:</strong>
-                  </p>
-                  <p className="text-success fw-bold fs-5">
-                    {selectedOrder.price.toLocaleString()} VNĐ
-                  </p>
+                  <p className="mb-1"><strong>Giá tiền:</strong></p>
+                  <p className="text-success fw-bold fs-5">{selectedOrder.price.toLocaleString()} VNĐ</p>
                 </div>
-                
                 <h6 className="fw-bold text-success mb-3">Đánh giá từ khách hàng</h6>
                 <div className="mb-3">
                   {orderRate ? (
@@ -322,4 +299,4 @@ const CompletedOrders = () => {
   );
 };
 
-export default CompletedOrders; 
+export default CompletedOrders;

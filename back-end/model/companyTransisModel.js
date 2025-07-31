@@ -35,13 +35,13 @@ const companyTransactionSchema = new mongoose.Schema({
     status: {
         type: String,
         required: true,
-        enum: ['held', 'commission_collected', 'disbursed_to_driver', 'refunded_to_user', 'disputed'],
+        enum: ['held', 'commission_collected', 'disbursed_to_driver', 'refunded_to_user', 'disputed', 'completed'],
         default: 'held' // Mặc định là tiền đang được giữ
     },
-    type: { // Loại giao dịch: hoa hồng, giải ngân cho tài xế, hoàn tiền
+    type: { // Loại giao dịch: hoa hồng, giải ngân cho tài xế, hoàn tiền, rút tiền
         type: String,
         required: true,
-        enum: ['user_payment_held', 'commission', 'payout_to_driver', 'refund'],
+        enum: ['user_payment_held', 'commission', 'payout_to_driver', 'refund', 'withdrawal'],
     },
     // Các trường liên quan đến thanh toán/giải ngân có thể cần được chỉnh sửa
     payment_method: { // Phương thức thanh toán gốc của user (VNPAY) hoặc phương thức giải ngân

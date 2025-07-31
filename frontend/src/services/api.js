@@ -115,6 +115,10 @@ export const adminAPI = {
     const response = await api.get('/reports/all');
     return response;
   },
+  getReportsByOrderId: async (orderId) => {
+    const response = await api.get(`/reports/order/${orderId}`);
+    return response;
+  },
   updateReportStatus: async (reportId, data) => {
     const response = await api.patch(`/reports/${reportId}/status`, data);
     return response;
@@ -160,4 +164,5 @@ export const notificationAPI = {
 export const walletAPI = {
   getUserWallet: () => api.get('/transactions/user/wallet'),
   getDriverWallet: () => api.get('/transactions/driver/wallet'),
+  withdrawMoney: (data) => api.post('/transactions/withdraw', data),
 };

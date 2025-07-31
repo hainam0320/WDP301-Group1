@@ -38,6 +38,29 @@ router.post('/', protect, authorize('user'), reportController.createReport);
 // Get all reports (requires admin authentication)
 router.get('/all', protect, authorize('admin'), reportController.getAllReports);
 
+// Get reports by order ID (requires admin authentication)
+router.get('/order/:orderId', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const reports = await Report.find({ order_id: orderId })
+            .populate('reporterID', 'fullName email')
+            .populate('reported_user_id', 'fullName email')
+            .populate('order_id')
+            .sort('-createdAt');
+
+        res.json({
+            success: true,
+            reports
+        });
+    } catch (error) {
+        console.error('Error fetching reports by order ID:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Lỗi server khi lấy báo cáo theo đơn hàng' 
+        });
+    }
+});
+
 // Get reports by authenticated user
 router.get('/my-reports', protect, authorize('user'), async (req, res) => {
     try {

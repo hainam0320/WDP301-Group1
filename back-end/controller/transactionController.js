@@ -380,7 +380,10 @@ exports.getUserWallet = async (req, res) => {
     // Lấy lịch sử giao dịch liên quan đến user này
     const transactions = await CompanyTransaction.find({
       userId: userId,
-      status: { $in: ['refunded_to_user', 'disputed'] } // Chỉ lấy các giao dịch hoàn tiền hoặc tranh chấp
+      $or: [
+        { status: { $in: ['refunded_to_user', 'disputed'] } },
+        { type: 'withdrawal' }
+      ]
     })
     .populate('orderId')
     .populate('processed_by', 'fullName')
@@ -410,10 +413,13 @@ exports.getDriverWallet = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài xế." });
     }
 
-    // Lấy lịch sử giao dịch liên quan đến driver này (giải ngân và tranh chấp)
+    // Lấy lịch sử giao dịch liên quan đến driver này (giải ngân, tranh chấp và rút tiền)
     const transactions = await CompanyTransaction.find({
       driverId: driverId,
-      status: { $in: ['disbursed_to_driver', 'disputed'] } // Chỉ lấy các giao dịch giải ngân hoặc tranh chấp
+      $or: [
+        { status: { $in: ['disbursed_to_driver', 'disputed'] } },
+        { type: 'withdrawal' }
+      ]
     })
     .populate('orderId')
     .populate('processed_by', 'fullName')
@@ -461,5 +467,85 @@ exports.getDriverWallet = async (req, res) => {
   } catch (error) {
     console.error("Lỗi lấy thông tin ví driver:", error);
     res.status(500).json({ message: "Lỗi server." });
+  }
+};
+
+// Rút tiền từ ví (cho cả user và driver)
+exports.withdrawMoney = async (req, res) => {
+  try {
+    const { amount, remarks } = req.body;
+    const userId = req.user._id;
+    const userType = req.user.constructor.modelName; // 'User' hoặc 'Driver'
+
+    // Validate input
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Số tiền rút phải lớn hơn 0'
+      });
+    }
+
+    // Lấy thông tin user/driver
+    let user;
+    if (userType === 'User') {
+      user = await require('../model/userModel').findById(userId);
+    } else {
+      user = await Driver.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy người dùng'
+      });
+    }
+
+    // Kiểm tra số dư
+    if (user.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Số dư không đủ để rút tiền'
+      });
+    }
+
+    // Tạo giao dịch rút tiền
+    const withdrawalTransaction = new CompanyTransaction({
+      type: 'withdrawal',
+      amount: amount,
+      status: 'completed',
+      remarks: remarks || `Rút tiền từ ví - ${userType === 'User' ? 'Người dùng' : 'Tài xế'}`,
+      processed_at: new Date(),
+      processed_by: userId
+    });
+
+    // Gán userId hoặc driverId tùy theo loại user
+    if (userType === 'User') {
+      withdrawalTransaction.userId = userId;
+    } else {
+      withdrawalTransaction.driverId = userId;
+    }
+
+    await withdrawalTransaction.save();
+
+    // Cập nhật số dư
+    user.balance -= amount;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Rút tiền thành công',
+      data: {
+        newBalance: user.balance,
+        withdrawalAmount: amount,
+        transactionId: withdrawalTransaction._id
+      }
+    });
+
+  } catch (error) {
+    console.error('Lỗi khi rút tiền:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi rút tiền'
+    });
   }
 };

@@ -25,6 +25,7 @@ router.post("/admin/:transactionId/resolve", authorize('admin'), transactionCont
 // Routes cho ví tiền
 router.get("/user/wallet", authorize('user'), transactionController.getUserWallet);
 router.get("/driver/wallet", authorize('driver'), transactionController.getDriverWallet);
+router.post("/withdraw", protect, transactionController.withdrawMoney);
 
 // Các routes liên quan đến BulkBill và QRPayment của luồng cũ có thể được xóa hoặc tái cấu trúc
 // Tùy thuộc vào việc bạn có muốn giữ chức năng rút tiền của tài xế thông qua QR nữa không.

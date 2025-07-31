@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { walletAPI } from '../services/api'; // Assuming this path is correct in your project
-import { FaWallet, FaArrowUp, FaArrowDown, FaHistory, FaHome, FaUser } from 'react-icons/fa';
-import { Card, Table, Badge, Button } from 'react-bootstrap'; // Re-importing react-bootstrap components
-import Header from '../components/Header'; // Re-importing your custom Header component
+import { walletAPI } from '../services/api';
+import { FaWallet, FaArrowUp, FaArrowDown, FaHistory, FaHome, FaUser, FaMoneyBillWave } from 'react-icons/fa';
+import { Card, Table, Badge, Button, Modal, Form } from 'react-bootstrap';
+import Header from '../components/Header';
 
 const UserWallet = () => {
   const navigate = useNavigate();
@@ -13,6 +13,10 @@ const UserWallet = () => {
     transactions: []
   });
   const [loading, setLoading] = useState(true);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawRemarks, setWithdrawRemarks] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   useEffect(() => {
     fetchWalletData();
@@ -46,14 +50,17 @@ const UserWallet = () => {
     return new Date(dateString).toLocaleString('vi-VN');
   };
 
-  const getTransactionType = (status) => {
+  const getTransactionType = (status, type) => {
+    if (type === 'withdrawal') {
+      return { type: 'debit', label: 'Rút tiền', color: 'danger' };
+    }
+    
     switch (status) {
       case 'refunded_to_user':
         return { type: 'credit', label: 'Hoàn tiền', color: 'success' };
-      // Removed the 'disputed' case from here as per the request
-      // case 'disputed':
-      //   return { type: 'pending', label: 'Tranh chấp', color: 'warning' };
-      case 'completed': // Assuming 'completed' is a common successful transaction type
+      case 'disputed':
+        return { type: 'pending', label: 'Tranh chấp', color: 'warning' };
+      case 'completed':
         return { type: 'debit', label: 'Thanh toán', color: 'primary' };
       case 'pending':
         return { type: 'pending', label: 'Đang chờ', color: 'warning' };
@@ -66,6 +73,41 @@ const UserWallet = () => {
   const filteredTransactions = walletData.transactions.filter(
     (trans) => trans.status !== 'disputed'
   );
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || withdrawAmount <= 0) {
+      toast.error('Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+
+    if (withdrawAmount > walletData.balance) {
+      toast.error('Số dư không đủ để rút tiền');
+      return;
+    }
+
+    try {
+      setWithdrawLoading(true);
+      const response = await walletAPI.withdrawMoney({
+        amount: Number(withdrawAmount),
+        remarks: withdrawRemarks
+      });
+
+      if (response.data.success) {
+        toast.success('Rút tiền thành công!');
+        setShowWithdrawModal(false);
+        setWithdrawAmount('');
+        setWithdrawRemarks('');
+        fetchWalletData(); // Refresh wallet data
+      } else {
+        toast.error(response.data.message || 'Rút tiền thất bại');
+      }
+    } catch (error) {
+      console.error('Error withdrawing money:', error);
+      toast.error(error.response?.data?.message || 'Rút tiền thất bại');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -113,16 +155,27 @@ const UserWallet = () => {
         <Card className="mb-4 border-0 shadow-sm">
           <Card.Body className="p-4">
             <div className="row align-items-center">
-              <div className="col-md-8">
+              <div className="col-md-6">
                 <h5 className="text-muted mb-2">Số dư hiện tại</h5>
                 <h2 className="text-primary mb-0 fw-bold">
                   {formatCurrency(walletData.balance)}
                 </h2>
               </div>
-              <div className="col-md-4 text-end">
+              <div className="col-md-3 text-end">
                 <div className="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-3">
                   <FaWallet className="text-primary fs-1" />
                 </div>
+              </div>
+              <div className="col-md-3 text-end">
+                <Button 
+                  variant="success" 
+                  size="lg"
+                  onClick={() => setShowWithdrawModal(true)}
+                  disabled={walletData.balance <= 0}
+                >
+                  <FaMoneyBillWave className="me-2" />
+                  Rút tiền
+                </Button>
               </div>
             </div>
           </Card.Body>
@@ -156,7 +209,7 @@ const UserWallet = () => {
                   </thead>
                   <tbody>
                     {filteredTransactions.map(trans => {
-                      const transInfo = getTransactionType(trans.status);
+                      const transInfo = getTransactionType(trans.status, trans.type);
                       return (
                         <tr key={trans._id} className="border-bottom">
                           <td>
@@ -175,9 +228,9 @@ const UserWallet = () => {
                             </span>
                           </td>
                           <td className="text-end">
-                            <span className={`fw-bold ${transInfo.type === 'credit' ? 'text-success' : 'text-warning'}`}>
-                              {transInfo.type === 'credit' ? '+' : ''}{formatCurrency(trans.amount)}
-                            </span>
+                          <span className={`fw-bold ${transInfo.type === 'credit' ? 'text-success' : 'text-warning'}`}>
+                              {transInfo.type === 'credit' ? '+' : trans.type === 'withdrawal' ? '-' : ''}{formatCurrency(trans.amount)}
+                        </span>
                           </td>
                           <td className="text-center">
                             <Badge bg={transInfo.color} className="px-3 py-2">
@@ -212,6 +265,69 @@ const UserWallet = () => {
             )}
           </Card.Body>
         </Card>
+
+        {/* Withdraw Modal */}
+        <Modal show={showWithdrawModal} onHide={() => setShowWithdrawModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <FaMoneyBillWave className="me-2 text-success" />
+              Rút tiền từ ví
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="mb-3">
+              <h6>Số dư hiện tại: <span className="text-primary fw-bold">{formatCurrency(walletData.balance)}</span></h6>
+            </div>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Số tiền muốn rút (VNĐ)</Form.Label>
+                <Form.Control
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="Nhập số tiền..."
+                  min="1"
+                  max={walletData.balance}
+                />
+                <Form.Text className="text-muted">
+                  Số tiền tối đa có thể rút: {formatCurrency(walletData.balance)}
+                </Form.Text>
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Ghi chú (tùy chọn)</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows="3"
+                  value={withdrawRemarks}
+                  onChange={(e) => setWithdrawRemarks(e.target.value)}
+                  placeholder="Nhập ghi chú..."
+                />
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowWithdrawModal(false)}>
+              Hủy
+            </Button>
+            <Button 
+              variant="success" 
+              onClick={handleWithdraw}
+              disabled={withdrawLoading || !withdrawAmount || withdrawAmount <= 0 || withdrawAmount > walletData.balance}
+            >
+              {withdrawLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  <FaMoneyBillWave className="me-2" />
+                  Xác nhận rút tiền
+                </>
+              )}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     </div>
   );

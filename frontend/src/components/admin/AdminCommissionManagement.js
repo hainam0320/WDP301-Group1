@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { transactionAPI } from '../../services/api'; // Sử dụng transactionAPI mới
+import { transactionAPI, adminAPI } from '../../services/api'; // Thêm adminAPI
 import { format } from 'date-fns';
 import { Table, Form, Button, Row, Col, Card, Badge, Modal } from 'react-bootstrap';
-import { FaCheck, FaExclamationTriangle, FaTimes, FaFilter, FaEye, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegMoneyBillAlt } from 'react-icons/fa'; // Thêm icons
+import { FaCheck, FaExclamationTriangle, FaTimes, FaFilter, FaEye, FaMoneyBillWave, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegMoneyBillAlt, FaFileAlt } from 'react-icons/fa'; // Thêm FaFileAlt
 
 const AdminCommissionManagement = () => {
     const [transactions, setTransactions] = useState([]); // Đổi từ bills sang transactions
@@ -27,6 +27,9 @@ const AdminCommissionManagement = () => {
     const [showResolveModal, setShowResolveModal] = useState(false); // Đổi tên từ ConfirmModal
     const [selectedTransaction, setSelectedTransaction] = useState(null); // Đổi từ selectedBill
     const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false); // Modal cho báo cáo
+    const [selectedReport, setSelectedReport] = useState(null); // Báo cáo được chọn
+    const [orderReports, setOrderReports] = useState([]); // Danh sách báo cáo của đơn hàng
     const [remarks, setRemarks] = useState('');
     const [resolveAction, setResolveAction] = useState(''); // confirmAction -> resolveAction (refund/disburse)
 
@@ -72,6 +75,21 @@ const AdminCommissionManagement = () => {
             if (response.data.success) {
                 setSelectedTransaction(response.data.transaction);
                 setShowDetailsModal(true);
+                
+                // Nếu có orderId, lấy danh sách báo cáo của đơn hàng
+                if (response.data.transaction.orderId?._id) {
+                    try {
+                        const reportsResponse = await adminAPI.getReportsByOrderId(response.data.transaction.orderId._id);
+                        if (reportsResponse.data.success) {
+                            setOrderReports(reportsResponse.data.reports);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching order reports:', error);
+                        setOrderReports([]);
+                    }
+                } else {
+                    setOrderReports([]);
+                }
             } else {
                 toast.error('Không thể tải chi tiết giao dịch');
             }
@@ -126,6 +144,54 @@ const AdminCommissionManagement = () => {
     const formatDate = (dateString) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleString('vi-VN');
+    };
+
+    // Hàm xử lý xem chi tiết báo cáo
+    const handleViewReport = (report) => {
+        setSelectedReport(report);
+        setShowReportModal(true);
+    };
+
+    // Hàm đóng modal báo cáo
+    const handleCloseReportModal = () => {
+        setShowReportModal(false);
+        setSelectedReport(null);
+    };
+
+    // Hàm hiển thị trạng thái báo cáo
+    const getReportStatusBadge = (status) => {
+        switch (status) {
+            case 'pending':
+                return <Badge bg="warning">Chờ xử lý</Badge>;
+            case 'reviewed':
+                return <Badge bg="info">Đang xem xét</Badge>;
+            case 'resolved':
+                return <Badge bg="success">Đã giải quyết</Badge>;
+            case 'rejected':
+                return <Badge bg="danger">Đã từ chối</Badge>;
+            default:
+                return <Badge bg="secondary">Không xác định</Badge>;
+        }
+    };
+
+    // Hàm hiển thị loại báo cáo
+    const getReportTypeBadge = (type) => {
+        switch (type) {
+            case 'late':
+                return <Badge bg="warning">Trễ hẹn</Badge>;
+            case 'damage':
+                return <Badge bg="danger">Hư hỏng</Badge>;
+            case 'lost':
+                return <Badge bg="dark">Thất lạc</Badge>;
+            case 'inappropriate':
+                return <Badge bg="info">Không phù hợp</Badge>;
+            case 'fraud':
+                return <Badge bg="danger">Gian lận</Badge>;
+            case 'other':
+                return <Badge bg="secondary">Khác</Badge>;
+            default:
+                return <Badge bg="secondary">Không xác định</Badge>;
+        }
     };
 
     const getStatusBadge = (status) => {
@@ -637,8 +703,37 @@ const AdminCommissionManagement = () => {
                                 </Row>
                                 {selectedTransaction.remarks && (
                                     <div className="mt-3 pt-3 border-top">
-                                        <div className="text-muted small mb-1">Ghi chú</div>
+                                        <div className="text-muted small mb-1">Ghi chú của admin</div>
                                         <div>{selectedTransaction.remarks}</div>
+                                    </div>
+                                )}
+                                
+                                {/* Hiển thị statusDescription của đơn hàng */}
+                                {selectedTransaction.orderId?.statusDescription && (
+                                    <div className="mt-3 pt-3 border-top">
+                                        <div className="text-muted small mb-1">Báo cáo trạng thái đơn hàng của tài xế</div>
+                                        <div>{selectedTransaction.orderId.statusDescription}</div>
+                                    </div>
+                                )}
+                                
+                                {/* Hiển thị danh sách báo cáo nếu có */}
+                                {orderReports.length > 0 && (
+                                    <div className="mt-3 pt-3 border-top">
+                                        <div className="text-muted small mb-2">Báo cáo liên quan ({orderReports.length})</div>
+                                        <div className="d-flex flex-wrap gap-2">
+                                            {orderReports.map((report, index) => (
+                                                <Button
+                                                    key={report._id}
+                                                    variant="outline-warning"
+                                                    size="sm"
+                                                    className="d-flex align-items-center gap-2"
+                                                    onClick={() => handleViewReport(report)}
+                                                >
+                                                    <FaFileAlt />
+                                                    Báo cáo #{index + 1}
+                                                </Button>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -649,6 +744,131 @@ const AdminCommissionManagement = () => {
                     <Button 
                         variant="light" 
                         onClick={() => setShowDetailsModal(false)}
+                        className="rounded-pill px-4"
+                    >
+                        Đóng
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Report Details Modal */}
+            <Modal 
+                show={showReportModal} 
+                onHide={handleCloseReportModal} 
+                size="lg"
+                centered
+            >
+                <Modal.Header closeButton className="border-0 pb-0">
+                    <Modal.Title className="fs-5">
+                        <FaFileAlt className="me-2" />
+                        Chi tiết báo cáo
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="px-4">
+                    {selectedReport && (
+                        <div>
+                            <div className="row mb-4">
+                                <div className="col-md-6">
+                                    <h6>Thông tin báo cáo</h6>
+                                    <table className="table table-borderless">
+                                        <tbody>
+                                            <tr>
+                                                <th>Mã đơn hàng:</th>
+                                                <td>#{selectedReport.order_id?._id ? selectedReport.order_id._id.slice(-6) : 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Loại báo cáo:</th>
+                                                <td>{getReportTypeBadge(selectedReport.type)}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Trạng thái:</th>
+                                                <td>{getReportStatusBadge(selectedReport.status)}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Ngày tạo:</th>
+                                                <td>{new Date(selectedReport.createdAt).toLocaleString('vi-VN')}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="col-md-6">
+                                    <h6>Thông tin người liên quan</h6>
+                                    <table className="table table-borderless">
+                                        <tbody>
+                                            <tr>
+                                                <th>Người báo cáo:</th>
+                                                <td>{selectedReport.reporterID?.fullName || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Email:</th>
+                                                <td>{selectedReport.reporterID?.email || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Tài xế:</th>
+                                                <td>{selectedReport.reported_user_id?.fullName || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Email tài xế:</th>
+                                                <td>{selectedReport.reported_user_id?.email || 'N/A'}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <h6>Nội dung báo cáo</h6>
+                                <p className="border rounded p-3 bg-light">{selectedReport.description}</p>
+                            </div>
+
+                            {selectedReport && selectedReport.image && (
+                                <div className="mb-4">
+                                    <h6>Hình ảnh đính kèm</h6>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        {Array.isArray(selectedReport.image) 
+                                            ? selectedReport.image.map((img, index) => (
+                                                <img
+                                                    key={index}
+                                                    src={`http://localhost:9999/${img}`}
+                                                    alt={`Report evidence ${index + 1}`}
+                                                    className="img-thumbnail"
+                                                    style={{height: '100px', objectFit: 'cover'}}
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = 'https://via.placeholder.com/200x200?text=Image+Not+Found';
+                                                    }}
+                                                />
+                                            ))
+                                            : typeof selectedReport.image === 'string' && (
+                                                <img
+                                                    src={`http://localhost:9999/${selectedReport.image}`}
+                                                    alt="Report evidence"
+                                                    className="img-thumbnail"
+                                                    style={{height: '100px', objectFit: 'cover'}}
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = 'https://via.placeholder.com/200x200?text=Image+Not+Found';
+                                                    }}
+                                                />
+                                            )
+                                        }
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedReport.admin_note && (
+                                <div className="mb-4">
+                                    <h6>Ghi chú của admin</h6>
+                                    <p className="border rounded p-3 bg-light">{selectedReport.admin_note}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="border-0 pt-0">
+                    <Button 
+                        variant="light" 
+                        onClick={handleCloseReportModal}
                         className="rounded-pill px-4"
                     >
                         Đóng
