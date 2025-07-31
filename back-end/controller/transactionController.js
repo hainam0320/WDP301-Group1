@@ -277,7 +277,7 @@ exports.adminResolveTransaction = async (req, res) => {
             // Cập nhật trạng thái Order
             await require('../model/orderModel').findByIdAndUpdate(
                 transaction.orderId,
-                { paymentStatus: 'paid', status: 'user_confirmed_completion' }
+                { paymentStatus: 'paid', status: 'driver_paid' }
             );
             console.log('Order status updated');
             

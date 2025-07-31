@@ -166,6 +166,14 @@ exports.acceptOrder = async (req, res) => {
       }
     );
 
+    // === Cập nhật driverId cho transaction user_payment_held ===
+    if (order) {
+      await CompanyTransaction.updateMany(
+        { orderId: order._id, type: 'user_payment_held', driverId: { $exists: false } },
+        { $set: { driverId: driverId } }
+      );
+    }
+
     if (!order) {
       const existingOrder = await Order.findById(orderId);
       if (existingOrder && existingOrder.driverId) {
@@ -219,13 +227,37 @@ exports.completeOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
     const driverId = req.user._id;
-    const { statusDescription } = req.body; // Có thể có lý do cho đơn hàng thất bại
+    const { statusDescription, isFailed } = req.body; // Thêm trường isFailed để xác định giao hàng thất bại
+
+    // Nếu shipper báo giao hàng thất bại, chuyển trạng thái sang 'disputed'
+    let newStatus = 'shipper_completed';
+    if (isFailed === true || (statusDescription && (
+      statusDescription.toLowerCase().includes('fail') || 
+      statusDescription.toLowerCase().includes('thất bại') ||
+      statusDescription.toLowerCase().includes('dispute') ||
+      statusDescription.toLowerCase().includes('tranh chấp')
+    ))) {
+      newStatus = 'disputed';
+      console.log('Order will be marked as disputed due to delivery failure');
+    }
 
     const order = await Order.findOneAndUpdate(
       { _id: orderId, driverId: driverId, status: { $in: ['accepted', 'in_progress'] } }, // Chỉ hoàn thành đơn đang accepted/in_progress
-      { status: 'shipper_completed', timeEnd: new Date().toISOString(), statusDescription: statusDescription || 'Hoàn thành bởi tài xế' },
+      { status: newStatus, timeEnd: new Date().toISOString(), statusDescription: statusDescription || (newStatus === 'disputed' ? 'Giao hàng thất bại' : 'Hoàn thành bởi tài xế') },
       { new: true }
     );
+
+    // Nếu đơn hàng bị tranh chấp, cập nhật CompanyTransaction liên quan sang 'disputed'
+    if (order && newStatus === 'disputed') {
+      console.log('Updating CompanyTransaction to disputed for order:', order._id);
+      
+      const updateResult = await CompanyTransaction.updateMany(
+        { orderId: order._id },
+        { $set: { status: 'disputed' } }
+      );
+      
+      console.log('Updated CompanyTransaction count:', updateResult.modifiedCount);
+    }
 
     if (!order) {
       return res.status(404).json({ message: 'Đơn không tồn tại, không thuộc tài xế này hoặc không ở trạng thái phù hợp để hoàn thành' });
@@ -315,6 +347,10 @@ exports.userConfirmCompletion = async (req, res) => {
         remarks: `Giải ngân 90% cho tài xế từ đơn hàng ${order._id}`
     });
     await payoutTransaction.save();
+
+    // Cập nhật trạng thái đơn hàng sang driver_paid sau khi giải ngân thành công
+    order.status = 'driver_paid';
+    await order.save();
 
     // Tạo bản ghi TotalEarning để theo dõi tổng thu nhập của tài xế
     // (Nếu TotalEarning chỉ dùng để theo dõi tổng tiền trước hoa hồng, có thể tạo ở đây)

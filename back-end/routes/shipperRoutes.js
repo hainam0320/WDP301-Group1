@@ -248,17 +248,34 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
       });
     }
 
+    // Nếu status là 'failed', chuyển sang 'disputed' và cập nhật CompanyTransaction
+    let newStatus = status;
+    if (status === 'failed') {
+      newStatus = 'disputed';
+      console.log('Order will be marked as disputed due to delivery failure');
+    }
+
     const oldStatus = order.status;
-    order.status = status;
-    if ((status === 'shipper_completed' || status === 'failed') && statusDescription) {
+    order.status = newStatus;
+    if ((newStatus === 'shipper_completed' || newStatus === 'disputed') && statusDescription) {
       order.statusDescription = statusDescription;
     } else {
         order.statusDescription = undefined; // Clear description if not applicable
     }
     await order.save();
 
-    // Loại bỏ logic tạo CompanyTransaction và TotalEarning ở đây
-    // vì việc này sẽ được xử lý khi người dùng xác nhận hoàn tất đơn hàng.
+    // Nếu đơn hàng bị tranh chấp, cập nhật CompanyTransaction liên quan sang 'disputed'
+    if (newStatus === 'disputed') {
+      console.log('Updating CompanyTransaction to disputed for order:', order._id);
+      
+      const CompanyTransaction = require('../model/companyTransisModel');
+      const updateResult = await CompanyTransaction.updateMany(
+        { orderId: order._id },
+        { $set: { status: 'disputed' } }
+      );
+      
+      console.log('Updated CompanyTransaction count:', updateResult.modifiedCount);
+    }
 
     res.json({
       success: true,

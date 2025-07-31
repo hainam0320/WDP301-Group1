@@ -337,6 +337,7 @@ const OrderHistory = () => {
     switch (status) {
         case 'shipper_completed': return <Badge bg="info">Shipper Hoàn thành</Badge>;
         case 'user_confirmed_completion': return <Badge bg="success">Đã Hoàn tất</Badge>;
+        case 'driver_paid': return <Badge bg="success">Hoàn tiền cho shipper</Badge>;
         case 'disputed': return <Badge bg="danger">Tranh chấp</Badge>;
         case 'failed': return <Badge bg="danger">Thất bại</Badge>;
         case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;

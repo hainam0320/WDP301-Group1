@@ -22,6 +22,7 @@ const orderSchema = new Schema({
       'in_progress',          // Shipper đang thực hiện
       'shipper_completed',    // Shipper đã đánh dấu hoàn thành
       'user_confirmed_completion', // User đã xác nhận hoàn thành, tiền đã giải ngân cho shipper
+      'driver_paid',          // Đã hoàn tiền cho shipper (tương ứng với disbursed_to_driver)
       'disputed',             // Có tranh chấp, admin can thiệp
       'refunded',             // Đã hoàn tiền cho user
       'failed'                // Đơn hàng thất bại (không phải do thanh toán)

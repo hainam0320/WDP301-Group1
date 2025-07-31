@@ -3,6 +3,7 @@ const Order = require('../model/orderModel');
 const Notification = require('../model/notificationModel');
 const fs = require('fs').promises;
 const path = require('path');
+const CompanyTransaction = require('../model/companyTransisModel'); // Added import for CompanyTransaction
 
 // Helper function to delete image files
 const deleteImageFiles = async (imagePaths) => {
@@ -99,6 +100,20 @@ exports.createReport = async (req, res) => {
             message: 'Báo cáo đã được gửi thành công',
             report: populatedReport
         });
+
+        // === Cập nhật trạng thái đơn hàng sang 'disputed' ===
+        order.status = 'disputed';
+        await order.save();
+
+        // === Cập nhật CompanyTransaction liên quan sang 'disputed' ===
+        console.log('Updating CompanyTransaction to disputed due to user report for order:', order._id);
+        
+        const updateResult = await CompanyTransaction.updateMany(
+          { orderId: order._id },
+          { $set: { status: 'disputed' } }
+        );
+        
+        console.log('Updated CompanyTransaction count due to user report:', updateResult.modifiedCount);
 
     } catch (error) {
         console.error('Error creating report:', error);
