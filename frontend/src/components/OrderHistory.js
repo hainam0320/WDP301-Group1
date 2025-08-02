@@ -277,11 +277,18 @@ const OrderHistory = () => {
 
     try {
       setReportLoading(true);
+      console.log('Files to upload:', files.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type
+      })));
+      
       const formData = new FormData();
       files.forEach(file => {
         formData.append('files', file);
       });
 
+      console.log('FormData created, sending to API...');
       const response = await userAPI.uploadReportImages(formData);
       console.log('Upload response:', response);
 
@@ -293,6 +300,11 @@ const OrderHistory = () => {
       }
     } catch (error) {
       console.error('Error handling report image upload:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setMessage({ 
         type: 'error', 
         content: error.response?.data?.message || error.message || 'Lỗi khi tải ảnh lên' 

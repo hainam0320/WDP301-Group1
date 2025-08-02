@@ -9,7 +9,7 @@ const Report = require('../model/reportModel');
 // Configure multer for file upload
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/');
+        cb(null, path.join(__dirname, '..', 'uploads'));
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -60,29 +60,90 @@ router.patch('/:id/status', protect, authorize('admin'), reportController.update
 router.put('/:id', protect, authorize('user'), reportController.updateReport);
 
 // Upload file route - now supports multiple files
-router.post('/upload', protect, upload.array('files', 5), (req, res) => {
-    try {
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ 
+router.post('/upload', protect, (req, res, next) => {
+    console.log('=== UPLOAD REPORT IMAGES ===');
+    console.log('Request headers:', req.headers);
+    console.log('User authenticated:', req.user ? 'Yes' : 'No');
+    
+    upload.array('files', 5)(req, res, (err) => {
+        if (err) {
+            console.error('Multer error:', err);
+            if (err instanceof multer.MulterError) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'File quá lớn. Kích thước tối đa là 5MB'
+                    });
+                }
+                if (err.code === 'LIMIT_FILE_COUNT') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Quá nhiều file. Tối đa 5 file một lần'
+                    });
+                }
+                if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Tên field không đúng. Sử dụng "files"'
+                    });
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: 'Lỗi upload file: ' + err.message
+                });
+            }
+            
+            if (err.message && err.message.includes('Chỉ chấp nhận file ảnh')) {
+                return res.status(400).json({
+                    success: false,
+                    message: err.message
+                });
+            }
+            
+            return res.status(400).json({
                 success: false,
-                message: 'Không có file nào được tải lên' 
+                message: 'Lỗi upload file: ' + err.message
             });
         }
         
-        // Return the relative file paths
-        const filePaths = req.files.map(file => `uploads/${file.filename}`);
-        res.json({ 
-            success: true,
-            filePaths 
-        });
-    } catch (error) {
-        console.error('Error uploading files:', error);
-        res.status(500).json({ 
-            success: false,
-            message: error.message || 'Lỗi khi tải file lên',
-            error: error.message 
-        });
-    }
+        try {
+            console.log('Request body keys:', Object.keys(req.body));
+            console.log('Files received:', req.files ? req.files.length : 0);
+            
+            if (!req.files || req.files.length === 0) {
+                console.log('No files received');
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Không có file nào được tải lên' 
+                });
+            }
+            
+            console.log('Files details:', req.files.map(f => ({
+                originalname: f.originalname,
+                filename: f.filename,
+                size: f.size,
+                mimetype: f.mimetype
+            })));
+            
+            // Return the relative file paths
+            const filePaths = req.files.map(file => `uploads/${file.filename}`);
+            console.log('File paths to return:', filePaths);
+            
+            res.json({ 
+                success: true,
+                filePaths 
+            });
+        } catch (error) {
+            console.error('Error uploading files:', error);
+            res.status(500).json({ 
+                success: false,
+                message: error.message || 'Lỗi khi tải file lên',
+                error: error.message 
+            });
+        }
+    });
 });
+
+
 
 module.exports = router; 
