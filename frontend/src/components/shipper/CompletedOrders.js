@@ -35,7 +35,11 @@ const CompletedOrders = () => {
       const finishedOrders = response.data.filter(order =>
         order.status === 'completed' || order.status === 'failed'
       );
-      setCompletedOrders(finishedOrders);
+      // Sắp xếp theo thời gian cập nhật mới nhất lên trước
+      const sortedOrders = finishedOrders.sort((a, b) => 
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+      );
+      setCompletedOrders(sortedOrders);
     } catch (err) {
       console.error('Error fetching completed orders:', err);
       setError('Không thể tải danh sách đơn hàng đã hoàn thành');
