@@ -5,6 +5,7 @@ import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import { userAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import { createPayOSLink } from '../utils/payment';
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
@@ -32,7 +33,6 @@ const OrderHistory = () => {
   // Add a new state for description length error
   const [reportDescriptionError, setReportDescriptionError] = useState('');
   const [rateCommentError, setRateCommentError] = useState('');
-  const [userReports, setUserReports] = useState([]); // Thêm state lưu danh sách report
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -54,18 +54,6 @@ const OrderHistory = () => {
 
   useEffect(() => {
     fetchOrders();
-    // Fetch user reports khi load component
-    const fetchReports = async () => {
-      try {
-        const response = await userAPI.getUserReports();
-        if (response.data && response.data.reports) {
-          setUserReports(response.data.reports);
-        }
-      } catch (err) {
-        // Không cần báo lỗi ở đây
-      }
-    };
-    fetchReports();
   }, []);
 
   const fetchRatesForCompletedOrders = async (completedOrders) => {
@@ -370,8 +358,13 @@ const OrderHistory = () => {
     );
   };
 
-  const getOrderReport = (orderId) => {
-    return userReports.find(r => r.order_id && r.order_id._id === orderId);
+  const handlePay = async (orderId) => {
+    try {
+      const paymentUrl = await createPayOSLink(orderId);
+      window.location.href = paymentUrl;
+    } catch (err) {
+      alert('Không thể tạo link thanh toán. Vui lòng thử lại!');
+    }
   };
 
   const completedOrders = orders.filter(order => order.status === 'completed' || order.status === 'failed');
@@ -481,30 +474,41 @@ const OrderHistory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedOrders.map(order => {
-                      const orderReport = getOrderReport(order._id);
-                      let reportBtn = null;
-                      if (orderReport) {
-                        if (orderReport.status === 'resolved' || orderReport.status === 'rejected') {
-                          reportBtn = (
-                            <Button size="sm" variant="outline-secondary" disabled>
-                              {orderReport.status === 'resolved' ? 'Đã giải quyết' : 'Đã từ chối'}
+                    {paginatedOrders.map(order => (
+                      <tr key={order._id}>
+                        <td>#{order._id.slice(-6)}</td>
+                        <td>{order.pickupaddress}</td>
+                        <td>{order.dropupaddress}</td>
+                        <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
+                        <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
+                        <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
+                        <td>
+                          <span className={`badge ${order.status === 'failed' ? 'bg-danger' : 'bg-success'}`}>
+                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
+                          </span>
+                          {order.status === 'failed' && order.statusDescription && (
+                            <div className="small text-danger mt-1">
+                              Lý do: {order.statusDescription}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {order.status === 'failed' ? (
+                            <span className="text-danger small">Không thể đánh giá</span>
+                          ) : orderRates[order._id] ? (
+                            <div>
+                              <span className="text-warning">
+                                {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
+                              </span>
+                              <div className="small text-muted">{orderRates[order._id].comment}</div>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
+                              Đánh giá
                             </Button>
-                          );
-                        } else {
-                          reportBtn = (
-                            <Button 
-                              size="sm" 
-                              variant="outline-danger"
-                              onClick={() => handleOpenReportModal(order)}
-                            >
-                              <FaExclamationTriangle className="me-1" />
-                              Cập nhật báo cáo
-                            </Button>
-                          );
-                        }
-                      } else {
-                        reportBtn = (
+                          )}
+                        </td>
+                        <td>
                           <Button 
                             size="sm" 
                             variant="outline-danger"
@@ -513,48 +517,19 @@ const OrderHistory = () => {
                             <FaExclamationTriangle className="me-1" />
                             Báo cáo
                           </Button>
-                        );
-                      }
-                      return (
-                        <tr key={order._id}>
-                          <td>#{order._id.slice(-6)}</td>
-                          <td>{order.pickupaddress}</td>
-                          <td>{order.dropupaddress}</td>
-                          <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                          <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
-                          <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                          <td>
-                            <span className={`badge ${order.status === 'failed' ? 'bg-danger' : 'bg-success'}`}>
-                              {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
-                            </span>
-                            {order.status === 'failed' && order.statusDescription && (
-                              <div className="small text-danger mt-1">
-                                Lý do: {order.statusDescription}
-                              </div>
-                            )}
-                          </td>
-                          <td>
-                            {order.status === 'failed' ? (
-                              <span className="text-danger small">Không thể đánh giá</span>
-                            ) : orderRates[order._id] ? (
-                              <div>
-                                <span className="text-warning">
-                                  {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
-                                </span>
-                                <div className="small text-muted">{orderRates[order._id].comment}</div>
-                              </div>
-                            ) : (
-                              <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
-                                Đánh giá
-                              </Button>
-                            )}
-                          </td>
-                          <td>
-                            {reportBtn}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        </td>
+                        <td>
+                          {order.status === 'completed' && order.paymentStatus !== 'paid' && (
+                            <Button size="sm" variant="success" onClick={() => handlePay(order._id)}>
+                              Thanh toán
+                            </Button>
+                          )}
+                          {order.status === 'completed' && order.paymentStatus === 'paid' && (
+                            <span className="badge bg-success">Đã thanh toán</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
                 {totalPages > 1 && (

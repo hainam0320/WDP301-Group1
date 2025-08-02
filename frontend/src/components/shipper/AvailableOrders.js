@@ -13,6 +13,9 @@ const AvailableOrders = () => {
   const [messages, setMessages] = useState({ type: '', content: '' });
   const [showCommissionModal, setShowCommissionModal] = useState(false);
   const [commissionMessage, setCommissionMessage] = useState('');
+  const [ongoingOrders, setOngoingOrders] = useState({ delivery: 0, ride: 0 });
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
   const BASE_URL = 'http://localhost:9999';
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
@@ -42,12 +45,38 @@ const AvailableOrders = () => {
     }
   };
 
+  const fetchOngoingOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/shipper/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Lọc đơn hàng đang thực hiện (chưa hoàn thành và chưa thất bại)
+      const activeOrders = response.data.filter(order => 
+        order.status !== 'completed' && order.status !== 'failed'
+      );
+      
+      // Đếm theo loại đơn hàng
+      const deliveryCount = activeOrders.filter(order => order.type === 'delivery').length;
+      const rideCount = activeOrders.filter(order => order.type === 'order').length;
+      
+      setOngoingOrders({ delivery: deliveryCount, ride: rideCount });
+    } catch (error) {
+      console.error('Error fetching ongoing orders:', error);
+    }
+  };
+
   useEffect(() => {
     fetchAvailableOrders();
+    fetchOngoingOrders();
 
     const handleNewOrder = (event) => {
         console.log('Received new order event, refreshing list...');
         fetchAvailableOrders();
+        fetchOngoingOrders();
         // Optional: Add a more prominent sound or visual cue
         new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e));
     };
@@ -59,7 +88,23 @@ const AvailableOrders = () => {
     };
   }, []); // The dependency array is empty, so fetchAvailableOrders is not recreated
 
-  const acceptOrder = async (orderId) => {
+  const acceptOrder = async (orderId, orderType) => {
+    // Kiểm tra giới hạn số lượng đơn hàng
+    const maxDelivery = 3;
+    const maxRide = 1;
+    
+    if (orderType === 'delivery' && ongoingOrders.delivery >= maxDelivery) {
+      setLimitMessage(`Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`);
+      setShowLimitModal(true);
+      return;
+    }
+    
+    if (orderType === 'order' && ongoingOrders.ride >= maxRide) {
+      setLimitMessage(`Bạn đã nhận tối đa ${maxRide} đơn đưa đón. Vui lòng hoàn thành đơn hiện tại trước khi nhận thêm.`);
+      setShowLimitModal(true);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
@@ -73,6 +118,7 @@ const AvailableOrders = () => {
       setMessages({ type: 'success', content: 'Nhận đơn thành công!' });
       // Refresh the list after accepting
       fetchAvailableOrders();
+      fetchOngoingOrders();
     } catch (error) {
       console.error('Error accepting order:', error);
       if (error.response?.data?.message === 'Đơn hàng này đã được shipper khác nhận') {
@@ -128,6 +174,27 @@ const AvailableOrders = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Modal cảnh báo giới hạn đơn hàng */}
+      <Modal show={showLimitModal} onHide={() => setShowLimitModal(false)} centered>
+        <Modal.Header closeButton className="bg-danger text-white">
+          <Modal.Title>Giới hạn đơn hàng</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex align-items-center">
+            <span className="me-3" style={{fontSize:'2rem'}}>&#9888;</span>
+            <span>{limitMessage}</span>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowLimitModal(false)}>
+            Đóng
+          </Button>
+          <Button variant="primary" onClick={() => { setShowLimitModal(false); navigate('/shipper/my-orders'); }}>
+            Xem đơn hàng của tôi
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"
@@ -136,6 +203,26 @@ const AvailableOrders = () => {
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
+
+        {/* Hiển thị thông tin đơn hàng đang thực hiện */}
+        <div className="row mb-4">
+          <div className="col-md-6">
+            <div className="card bg-info text-white">
+              <div className="card-body text-center">
+                <h6 className="card-title">Đơn giao hàng đang thực hiện</h6>
+                <h3 className="mb-0">{ongoingOrders.delivery}/3</h3>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card bg-warning text-dark">
+              <div className="card-body text-center">
+                <h6 className="card-title">Đơn đưa đón đang thực hiện</h6>
+                <h3 className="mb-0">{ongoingOrders.ride}/1</h3>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="card" style={cardStyle}>
           <div className="card-header bg-success text-white">
@@ -194,14 +281,20 @@ const AvailableOrders = () => {
                       </div>
                       <div className="col-md-4 text-end">
                         <h5 className="text-success fw-bold">{order.price.toLocaleString()} VNĐ</h5>
-                        <button 
-                          className="btn btn-success"
-                          onClick={() => acceptOrder(order._id)}
-                          style={buttonStyle}
-                        >
-                          <FaCheck className="me-2" />
-                          Nhận đơn
-                        </button>
+                                                 <button 
+                           className="btn btn-success"
+                           onClick={() => acceptOrder(order._id, order.type)}
+                           style={buttonStyle}
+                           disabled={
+                             (order.type === 'delivery' && ongoingOrders.delivery >= 3) ||
+                             (order.type === 'order' && ongoingOrders.ride >= 1)
+                           }
+                         >
+                           <FaCheck className="me-2" />
+                           {((order.type === 'delivery' && ongoingOrders.delivery >= 3) ||
+                             (order.type === 'order' && ongoingOrders.ride >= 1)) 
+                             ? 'Đã đạt giới hạn' : 'Nhận đơn'}
+                         </button>
                       </div>
                     </div>
                   </div>

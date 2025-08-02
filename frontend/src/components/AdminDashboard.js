@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Routes, Route, Link } from 'react-router-dom';
-import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaExclamationTriangle } from 'react-icons/fa';
+import { FaUser, FaShippingFast, FaUsers, FaDollarSign, FaChartBar, FaCog, FaBell, FaSignOutAlt, FaExclamationTriangle, FaMoneyBillWave } from 'react-icons/fa'; // Import FaMoneyBillWave cho icon mới
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 
@@ -12,7 +12,10 @@ import OrderManagement from './admin/OrderManagement';
 import RevenueReport from './admin/RevenueReport';
 import ReportManagement from './admin/ReportManagement';
 
-import AdminCommissionManagement from './admin/AdminCommissionManagement';
+// THAY THẾ IMPORT CŨ BẰNG IMPORT MỚI
+import AdminPayoutManagement from './admin/AdminPayoutManagement'; 
+import PaymentSuccess from '../pages/PaymentSuccess';
+import PaymentFail from '../pages/PaymentFail';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -106,12 +109,13 @@ const AdminDashboard = () => {
                   <FaDollarSign className="me-2" />
                   Báo cáo doanh thu
                 </Link>
+                {/* CẬP NHẬT LINK TRỎ ĐẾN COMPONENT MỚI */}
                 <Link 
-                  to="/admin/commission-management"
+                  to="/admin/payout-management" // Đổi path
                   className="list-group-item list-group-item-action border-0"
                 >
-                  <FaDollarSign className="me-2" />
-                  Quản lý hoa hồng
+                  <FaMoneyBillWave className="me-2" /> {/* Icon mới */}
+                  Quản lý chi trả
                 </Link>
                 <Link 
                   to="/admin/reports"
@@ -128,14 +132,13 @@ const AdminDashboard = () => {
           {/* Main Content */}
           <div className="col-md-9">
             <Routes>
-              <Route path="/" element={<AdminDashboardHome />} />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/shippers" element={<ShipperManagement />} />
-              <Route path="/orders" element={<OrderManagement />} />
-              <Route path="/revenue" element={<RevenueReport />} />
-              <Route path="/reports" element={<ReportManagement />} />
-              
-              <Route path="/commission-management" element={<AdminCommissionManagement />} />
+              <Route index element={<AdminDashboardHome />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="shippers" element={<ShipperManagement />} />
+              <Route path="orders" element={<OrderManagement />} />
+              <Route path="revenue" element={<RevenueReport />} />
+              <Route path="reports" element={<ReportManagement />} />
+              <Route path="payout-management" element={<AdminPayoutManagement />} /> {/* Đổi path và component */}
             </Routes>
           </div>
         </div>
@@ -144,4 +147,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard; 
+export default AdminDashboard;

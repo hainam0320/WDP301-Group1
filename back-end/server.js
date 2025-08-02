@@ -13,8 +13,10 @@ const rateRoutes = require('./routes/rateRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const transactionRoutes = require("./routes/transactionRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const payosRoutes = require('./routes/payosRoutes');
 
 require('dotenv').config();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -82,6 +84,7 @@ app.use('/api/rate', rateRoutes);
 app.use('/api/reports', reportRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payos', payosRoutes);
 
 
 // Khởi động server

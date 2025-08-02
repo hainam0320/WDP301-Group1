@@ -48,7 +48,7 @@ const NewOrder = () => {
   const calculatePrice = (distance) => {
     if (!distance) return 0;
     
-    let basePrice = serviceType === 'delivery' ? 25000 : 20000;
+    let basePrice = serviceType === 'delivery' ? 1000 : 2000;
     let distancePrice = distance * 10000; // 10,000 VND per km
     let weightFactor = orderData.weight ? parseInt(orderData.weight) * 2000 : 0;
     let estimated = basePrice + distancePrice + weightFactor;

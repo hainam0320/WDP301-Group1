@@ -17,7 +17,8 @@ const ShipperDashboard = () => {
     total: 0,
     totalDeliveries: 0
   });
-  const [pendingCommissionCount, setPendingCommissionCount] = useState(0);
+  // Các state này không còn cần thiết nếu các API đã bị xóa
+  const [pendingCommissionCount, setPendingCommissionCount] = useState(0); 
   const [availableOrdersCount, setAvailableOrdersCount] = useState(0);
   const [ongoingOrdersCount, setOngoingOrdersCount] = useState(0);
 
@@ -33,7 +34,7 @@ const ShipperDashboard = () => {
     try {
         await Promise.all([
             fetchEarnings(),
-            fetchPendingCommissions(),
+            // fetchPendingCommissions(), // Bỏ gọi hàm này vì API đã bị xóa
             fetchOrderCounts()
         ]);
     } catch (error) {
@@ -70,14 +71,15 @@ const ShipperDashboard = () => {
     }
   };
 
-  const fetchPendingCommissions = async () => {
-    try {
-      const response = await transactionAPI.getPendingCommissions();
-      setPendingCommissionCount(response.data.count || 0);
-    } catch (error) {
-      console.error('Error fetching pending commissions:', error);
-    }
-  };
+  // HÀM NÀY ĐÃ BỊ XÓA VÌ API getPendingCommissions ĐÃ BỊ XÓA KHỎI BACKEND
+  // const fetchPendingCommissions = async () => {
+  //   try {
+  //     const response = await transactionAPI.getPendingCommissions();
+  //     setPendingCommissionCount(response.data.count || 0);
+  //   } catch (error) {
+  //     console.error('Error fetching pending commissions:', error);
+  //   }
+  // };
 
   const cardStyle = {
     borderRadius: '15px',
@@ -184,9 +186,10 @@ const ShipperDashboard = () => {
                     <FaPercentage className="me-2" />
                     Thanh toán hoa hồng
                   </span>
-                  {pendingCommissionCount > 0 && (
+                  {/* pendingCommissionCount đã bị loại bỏ nếu không còn API hỗ trợ */}
+                  {/* {pendingCommissionCount > 0 && (
                     <span className="badge bg-danger">{pendingCommissionCount}</span>
-                  )}
+                  )} */}
                 </button>
                 <button 
                   className="list-group-item list-group-item-action border-0"
@@ -232,9 +235,10 @@ const ShipperDashboard = () => {
                     >
                       <FaPercentage className="me-2" />
                       Thanh toán hoa hồng
-                      {pendingCommissionCount > 0 && (
+                      {/* pendingCommissionCount đã bị loại bỏ nếu không còn API hỗ trợ */}
+                      {/* {pendingCommissionCount > 0 && (
                         <span className="badge bg-danger rounded-pill ms-2">{pendingCommissionCount}</span>
-                      )}
+                      )} */}
                     </button>
                   </div>
                 </div>
@@ -247,4 +251,4 @@ const ShipperDashboard = () => {
   );
 };
 
-export default ShipperDashboard; 
+export default ShipperDashboard;

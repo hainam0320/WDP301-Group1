@@ -263,9 +263,9 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     console.log('=== UPDATE ORDER STATUS ===');
     // Kiểm tra xem user có phải là driver không
     if (req.user.constructor.modelName !== 'Driver') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: 'Not authorized as driver' 
+        message: 'Not authorized as driver'
       });
     }
 
@@ -311,44 +311,59 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     // Nếu đơn hàng vừa được cập nhật thành completed
     if (status === 'completed' && oldStatus !== 'completed') {
       try {
-        console.log('Creating earnings records...');
-        
+        console.log('Creating earnings records and updating driver balance...');
+
+        // Tính toán hoa hồng thực nhận của tài xế (ví dụ: tài xế nhận 90% giá trị đơn hàng)
+        const driverEarningPercentage = 0.9; // Tỷ lệ hoa hồng tài xế thực nhận
+        const driverActualEarning = order.price * driverEarningPercentage;
+
+        // Cập nhật balanceOwedByCompany cho tài xế
+        const driver = await Driver.findById(req.user._id);
+        if (driver) {
+          driver.balanceOwedByCompany += driverActualEarning;
+          await driver.save();
+          console.log(`Driver ${driver._id} balance updated. New balance owed by company: ${driver.balanceOwedByCompany}`);
+        } else {
+          console.error(`Driver with ID ${req.user._id} not found when updating balance.`);
+        }
+
         // Tạo bản ghi DriverAssignment
         const driverAssignment = new DriverAssignment({
           driverId: req.user._id,
           orderId: order._id,
-          amount: order.price,
+          amount: order.price, // Amount ở đây là giá trị đơn hàng đầy đủ
           status: true,
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split("T")[0]
         });
         await driverAssignment.save();
         console.log('Driver assignment created:', driverAssignment);
 
-        // Tạo bản ghi TotalEarning
+        // Tạo bản ghi TotalEarning (cho tổng thu nhập của tài xế)
         const totalEarning = new TotalEarning({
           driverAssigmentId: driverAssignment._id,
           driverId: req.user._id,
-          amount: order.price,
-          date: new Date().toISOString().split('T')[0]
+          amount: driverActualEarning, // TotalEarning giờ phản ánh số tiền tài xế thực nhận
+          date: driverAssignment.date
         });
         await totalEarning.save();
         console.log('Total earning created:', totalEarning);
 
-        // Tính hoa hồng (10% giá trị đơn hàng)
-        const commissionRate = 0.1;
-        const commissionAmount = order.price * commissionRate;
+        // Tính hoa hồng cho công ty (ví dụ: 10% giá trị đơn hàng)
+        const commissionRateForCompany = 0.1;
+        const commissionAmountForCompany = order.price * commissionRateForCompany;
 
-        // Tạo bản ghi CompanyTransaction
+        // Tạo bản ghi CompanyTransaction (tài xế nợ công ty hoa hồng này)
         const transaction = new CompanyTransaction({
           driverId: req.user._id,
-          total_earning_id: totalEarning._id,
-          amount: commissionAmount,
-          status: 'pending'
+          orderId: order._id,
+          amount: commissionAmountForCompany,
+          status: 'pending' // Trạng thái 'pending' vì tài xế cần thanh toán khoản này cho công ty
         });
         await transaction.save();
-        console.log('Commission transaction created:', transaction);
+        console.log('Company transaction (driver owes company commission) created:', transaction);
+
       } catch (error) {
-        console.error('Error creating earnings records:', error);
+        console.error('Error creating earnings records, updating driver balance, or creating company commission:', error);
         // Không throw error ở đây để vẫn trả về success cho việc update order
       }
     }
@@ -359,7 +374,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating order status:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Error updating order status',
       error: error.message
