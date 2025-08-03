@@ -140,6 +140,43 @@ exports.payosWebhook = async (req, res) => {
       if (order) {
         order.paymentStatus = "paid";
         await order.save();
+        
+        // Cập nhật balance của driver khi payment hoàn tất
+        if (order.status === 'completed' && order.driverId) {
+          try {
+            console.log('Payment completed - updating driver balance...');
+            
+            const Driver = require('../model/driverModel');
+            const TotalEarning = require('../model/totalEarning');
+            
+            // Tính toán hoa hồng thực nhận của tài xế (90% giá trị đơn hàng)
+            const driverEarningPercentage = 0.9;
+            const driverActualEarning = order.price * driverEarningPercentage;
+
+            // Cập nhật balanceOwedByCompany cho tài xế
+            const driver = await Driver.findById(order.driverId);
+            if (driver) {
+              driver.balanceOwedByCompany += driverActualEarning;
+              await driver.save();
+              console.log(`Driver ${driver._id} balance updated. New balance owed by company: ${driver.balanceOwedByCompany}`);
+            } else {
+              console.error(`Driver with ID ${order.driverId} not found when updating balance.`);
+            }
+
+            // Tạo bản ghi TotalEarning (cho tổng thu nhập của tài xế)
+            const totalEarning = new TotalEarning({
+              driverId: order.driverId,
+              amount: driverActualEarning,
+              date: new Date().toISOString().split("T")[0]
+            });
+            await totalEarning.save();
+            console.log('Total earning created:', totalEarning);
+
+            console.log(`Driver balance increased by ${driverActualEarning.toLocaleString()} VND for completed payment`);
+          } catch (error) {
+            console.error('Error updating driver balance after payment completion:', error);
+          }
+        }
       }
     } else {
       console.log("Payment is not successful:", { code, success });

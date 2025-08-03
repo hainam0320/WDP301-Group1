@@ -60,6 +60,11 @@ export const shipperAPI = {
     }),
   completeOrder: (orderId) => api.post(`/orders/${orderId}/complete`),
   updateOrderStatus: (orderId, status) => api.put(`/shipper/orders/${orderId}/status`, { status }),
+  updatePaymentStatus: (orderId, data) => api.put(`/shipper/orders/${orderId}/payment-status`, data),
+  getAvailableOrders: () => api.get('/shipper/available'),
+  acceptOrder: (orderId) => api.post(`/shipper/${orderId}/accept`),
+  getOrders: () => api.get('/shipper/orders'),
+  getEarnings: () => api.get('/shipper/earnings'),
 };
 
 export const userAPI = {
@@ -154,6 +159,8 @@ export const transactionAPI = {
     return api.get(`/transactions/admin/payouts/history${queryString ? `?${queryString}` : ''}`);
   },
 };
+
+
 
 export const notificationAPI = {
   getNotifications: () => api.get('/notifications'),

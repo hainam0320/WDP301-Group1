@@ -311,21 +311,7 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
     // Nếu đơn hàng vừa được cập nhật thành completed
     if (status === 'completed' && oldStatus !== 'completed') {
       try {
-        console.log('Creating earnings records and updating driver balance...');
-
-        // Tính toán hoa hồng thực nhận của tài xế (ví dụ: tài xế nhận 90% giá trị đơn hàng)
-        const driverEarningPercentage = 0.9; // Tỷ lệ hoa hồng tài xế thực nhận
-        const driverActualEarning = order.price * driverEarningPercentage;
-
-        // Cập nhật balanceOwedByCompany cho tài xế
-        const driver = await Driver.findById(req.user._id);
-        if (driver) {
-          driver.balanceOwedByCompany += driverActualEarning;
-          await driver.save();
-          console.log(`Driver ${driver._id} balance updated. New balance owed by company: ${driver.balanceOwedByCompany}`);
-        } else {
-          console.error(`Driver with ID ${req.user._id} not found when updating balance.`);
-        }
+        console.log('Creating earnings records...');
 
         // Tạo bản ghi DriverAssignment
         const driverAssignment = new DriverAssignment({
@@ -337,16 +323,6 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
         });
         await driverAssignment.save();
         console.log('Driver assignment created:', driverAssignment);
-
-        // Tạo bản ghi TotalEarning (cho tổng thu nhập của tài xế)
-        const totalEarning = new TotalEarning({
-          driverAssigmentId: driverAssignment._id,
-          driverId: req.user._id,
-          amount: driverActualEarning, // TotalEarning giờ phản ánh số tiền tài xế thực nhận
-          date: driverAssignment.date
-        });
-        await totalEarning.save();
-        console.log('Total earning created:', totalEarning);
 
         // Tính hoa hồng cho công ty (ví dụ: 10% giá trị đơn hàng)
         const commissionRateForCompany = 0.1;
@@ -362,8 +338,11 @@ router.put('/orders/:orderId/status', protect, async (req, res) => {
         await transaction.save();
         console.log('Company transaction (driver owes company commission) created:', transaction);
 
+        // Lưu ý: balanceOwedByCompany sẽ được cập nhật khi paymentStatus = 'paid'
+        console.log('Note: Driver balance will be updated when payment is completed (paymentStatus = paid)');
+
       } catch (error) {
-        console.error('Error creating earnings records, updating driver balance, or creating company commission:', error);
+        console.error('Error creating earnings records or creating company commission:', error);
         // Không throw error ở đây để vẫn trả về success cho việc update order
       }
     }
@@ -549,6 +528,104 @@ router.get('/orders/ongoing/count', protect, async (req, res) => {
     res.json({ count });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching ongoing orders count' });
+  }
+});
+
+// Update payment status and increase driver balance when payment is completed
+router.put('/orders/:orderId/payment-status', protect, async (req, res) => {
+  try {
+    console.log('=== UPDATE PAYMENT STATUS ===');
+    
+    // Kiểm tra xem user có phải là driver không
+    if (req.user.constructor.modelName !== 'Driver') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized as driver'
+      });
+    }
+
+    const { paymentStatus } = req.body;
+    if (!paymentStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment status is required'
+      });
+    }
+
+    const order = await Order.findById(req.params.orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Kiểm tra xem đơn hàng có phải của driver này không
+    if (order.driverId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this order'
+      });
+    }
+
+    const oldPaymentStatus = order.paymentStatus;
+    order.paymentStatus = paymentStatus;
+    await order.save();
+
+    console.log('Payment status updated:', {
+      orderId: order._id,
+      oldPaymentStatus,
+      newPaymentStatus: paymentStatus,
+      price: order.price
+    });
+
+    // Nếu payment status vừa được cập nhật thành 'paid' và order đã completed
+    if (paymentStatus === 'paid' && oldPaymentStatus !== 'paid' && order.status === 'completed') {
+      try {
+        console.log('Payment completed - updating driver balance...');
+
+        // Tính toán hoa hồng thực nhận của tài xế (90% giá trị đơn hàng)
+        const driverEarningPercentage = 0.9;
+        const driverActualEarning = order.price * driverEarningPercentage;
+
+        // Cập nhật balanceOwedByCompany cho tài xế
+        const driver = await Driver.findById(req.user._id);
+        if (driver) {
+          driver.balanceOwedByCompany += driverActualEarning;
+          await driver.save();
+          console.log(`Driver ${driver._id} balance updated. New balance owed by company: ${driver.balanceOwedByCompany}`);
+        } else {
+          console.error(`Driver with ID ${req.user._id} not found when updating balance.`);
+        }
+
+        // Tạo bản ghi TotalEarning (cho tổng thu nhập của tài xế)
+        const totalEarning = new TotalEarning({
+          driverId: req.user._id,
+          amount: driverActualEarning,
+          date: new Date().toISOString().split("T")[0]
+        });
+        await totalEarning.save();
+        console.log('Total earning created:', totalEarning);
+
+        console.log(`Driver balance increased by ${driverActualEarning.toLocaleString()} VND for completed payment`);
+
+      } catch (error) {
+        console.error('Error updating driver balance after payment completion:', error);
+        // Không throw error ở đây để vẫn trả về success cho việc update payment status
+      }
+    }
+
+    res.json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating payment status',
+      error: error.message
+    });
   }
 });
 
