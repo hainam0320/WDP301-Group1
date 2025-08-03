@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaCamera, FaEdit, FaImage, FaStar, FaArrowLeft } from 'react-icons/fa';
+import { FaUser, FaCamera, FaEdit, FaImage, FaStar, FaArrowLeft, FaEnvelope, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { shipperAPI } from '../../services/api';
 import axios from 'axios';
 import ShipperHeader from './ShipperHeader';
@@ -19,7 +19,14 @@ const ShipperProfile = () => {
     cmndBack: '',
     rating: 0,
     totalDeliveries: 0,
-    avatar: ''
+    avatar: '',
+    emailVerified: false
+  });
+
+  const [emailVerification, setEmailVerification] = useState({
+    code: '',
+    isSending: false,
+    isVerifying: false
   });
 
   const [driverAvgRate, setDriverAvgRate] = useState({ avg: 0, count: 0 });
@@ -36,7 +43,8 @@ const ShipperProfile = () => {
         cmndBack: user.cmndBack || '',
         rating: user.rating || 0,
         totalDeliveries: user.totalDeliveries || 0,
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        emailVerified: user.emailVerified || false
       }));
     }
   }, []);
@@ -145,6 +153,57 @@ const ShipperProfile = () => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Xử lý gửi mã xác thực email
+  const handleSendEmailVerification = async () => {
+    setEmailVerification(prev => ({ ...prev, isSending: true }));
+    setMessages({ type: '', content: '' });
+
+    try {
+      const response = await shipperAPI.sendEmailVerification();
+      setMessages({ type: 'success', content: response.data.message });
+    } catch (error) {
+      console.error('Error sending email verification:', error);
+      setMessages({ type: 'error', content: error.response?.data?.message || 'Lỗi khi gửi mã xác thực' });
+    } finally {
+      setEmailVerification(prev => ({ ...prev, isSending: false }));
+    }
+  };
+
+  // Xử lý xác thực mã email
+  const handleVerifyEmailCode = async (e) => {
+    e.preventDefault();
+    if (!emailVerification.code) {
+      setMessages({ type: 'error', content: 'Vui lòng nhập mã xác thực' });
+      return;
+    }
+
+    setEmailVerification(prev => ({ ...prev, isVerifying: true }));
+    setMessages({ type: '', content: '' });
+
+    try {
+      const response = await shipperAPI.verifyEmailCode(emailVerification.code);
+      setMessages({ type: 'success', content: response.data.message });
+      
+      // Cập nhật trạng thái emailVerified
+      setShipperProfile(prev => ({ ...prev, emailVerified: true }));
+      
+      // Cập nhật localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      localStorage.setItem('user', JSON.stringify({
+        ...user,
+        emailVerified: true
+      }));
+
+      // Reset form
+      setEmailVerification({ code: '', isSending: false, isVerifying: false });
+    } catch (error) {
+      console.error('Error verifying email code:', error);
+      setMessages({ type: 'error', content: error.response?.data?.message || 'Lỗi khi xác thực mã' });
+    } finally {
+      setEmailVerification(prev => ({ ...prev, isVerifying: false }));
     }
   };
 
@@ -390,6 +449,25 @@ const ShipperProfile = () => {
                 </div>
               </div>
 
+              <div className="row mb-3">
+                <div className="col-md-6">
+                  <label className="form-label fw-semibold">Trạng thái email</label>
+                  <div className="d-flex align-items-center">
+                    {shipperProfile.emailVerified ? (
+                      <>
+                        <FaCheckCircle className="text-success me-2" />
+                        <span className="text-success">Đã xác thực</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaTimesCircle className="text-danger me-2" />
+                        <span className="text-danger">Chưa xác thực</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
             
 
               <button 
@@ -408,6 +486,76 @@ const ShipperProfile = () => {
                 )}
               </button>
             </form>
+
+            {/* Email Verification Section */}
+            {!shipperProfile.emailVerified && (
+              <div className="mt-5">
+                <div className="card border-warning">
+                  <div className="card-header bg-warning text-dark">
+                    <h5 className="mb-0">
+                      <FaEnvelope className="me-2" />
+                      Xác thực email
+                    </h5>
+                  </div>
+                  <div className="card-body">
+                    <p className="text-muted mb-3">
+                      Vui lòng xác thực email của bạn để đảm bảo tài khoản được bảo mật.
+                    </p>
+                    
+                    <div className="row">
+                      <div className="col-md-6">
+                        <button 
+                          type="button" 
+                          className="btn btn-warning mb-3"
+                          onClick={handleSendEmailVerification}
+                          disabled={emailVerification.isSending}
+                        >
+                          {emailVerification.isSending ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                              Đang gửi...
+                            </>
+                          ) : (
+                            <>
+                              <FaEnvelope className="me-2" />
+                              Gửi mã xác thực
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="col-md-6">
+                        <form onSubmit={handleVerifyEmailCode}>
+                          <div className="input-group">
+                            <input 
+                              type="text" 
+                              className="form-control" 
+                              placeholder="Nhập mã xác thực 6 số"
+                              value={emailVerification.code}
+                              onChange={(e) => setEmailVerification(prev => ({ ...prev, code: e.target.value }))}
+                              maxLength={6}
+                            />
+                            <button 
+                              type="submit" 
+                              className="btn btn-success"
+                              disabled={emailVerification.isVerifying || !emailVerification.code}
+                            >
+                              {emailVerification.isVerifying ? (
+                                <>
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                  Đang xác thực...
+                                </>
+                              ) : (
+                                'Xác thực'
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

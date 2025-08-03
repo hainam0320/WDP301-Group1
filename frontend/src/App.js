@@ -33,11 +33,12 @@ import ReportManagement from './components/admin/ReportManagement';
 
 import AdminDashboardHome from './components/admin/AdminDashboardHome';
 import ForgotPassword from './pages/ForgotPassword';
+import ForgotPasswordDriver from './pages/ForgotPasswordDriver';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFail from './pages/PaymentFail';
 import UserWallet from './pages/UserWallet';
 import ShipperWallet from './components/shipper/ShipperWallet';
-
+import { GoogleOAuthProvider } from '@react-oauth/google';
 function App() {
   const socket = useRef(null);
 
@@ -102,6 +103,7 @@ function App() {
   }, []); // Chỉ chạy 1 lần khi App mount
 
   return (
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "539003291803-vre7diqbp5frh57ec971hn0h1nmvi07t.apps.googleusercontent.com"}>
     <Router>
       <div>
         <Toaster position="top-right" />
@@ -110,6 +112,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/forgot-password-driver" element={<ForgotPasswordDriver />} />
           
           {/* User Routes */}
           <Route 
@@ -244,6 +247,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    </GoogleOAuthProvider>
   );
 }
 

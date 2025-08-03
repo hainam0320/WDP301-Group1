@@ -39,6 +39,7 @@ const handleError = (error) => {
 
 export const authAPI = {
   login: (credentials) => api.post('auth/login', credentials),
+  loginWithGoogle: (idToken) => api.post('/auth/login/google', { idToken }),
   registerUser: (formData) =>
     api.post('/auth/register-user', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -60,6 +61,12 @@ export const shipperAPI = {
     }),
   // Shipper chỉ cập nhật trạng thái đã hoàn thành, không trigger giải ngân
   updateOrderStatus: (orderId, statusData) => api.put(`/shipper/orders/${orderId}/status`, statusData),
+  // Xác thực email cho driver
+  sendEmailVerification: () => api.post('/shipper/verify-email/send'),
+  verifyEmailCode: (code) => api.post('/shipper/verify-email/confirm', { code }),
+  sendForgotPasswordCode: (email) => api.post('/shipper/forgot-password/send', { email }),
+  resetPassword: (data) => api.post('/shipper/forgot-password/reset', data),
+  changePassword: (data) => api.post('/shipper/change-password', data),
 };
 
 export const userAPI = {

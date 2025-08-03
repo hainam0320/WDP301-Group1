@@ -16,5 +16,5 @@ router.post('/register-driver', upload.fields([
 
 // Đăng nhập
 router.post('/login', authController.login);
-
+router.post('/login/google', authController.loginWithGoogle);
 module.exports = router;

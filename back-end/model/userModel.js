@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
     emailVerified: { type: Boolean, default: false },
     emailVerificationCode: { type: String },
     balance: { type: Number, default: 0 }, // Thêm trường số dư ví cho user
+    loginMethod: { type: String, enum: ['local', 'google'], default: 'local' }, // Thêm trường để phân biệt phương thức đăng nhập
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

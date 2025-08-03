@@ -11,6 +11,8 @@ const driverSchema = new mongoose.Schema({
     cmndBack:{type: String, required: true}, // Ảnh CMND mặt sau
     status:{type: Boolean, default: false},
     balance: { type: Number, default: 0 }, // Thêm trường số dư ví cho tài xế
+    emailVerified: { type: Boolean, default: false }, // Thêm trường xác thực email
+    emailVerificationCode: { type: String }, // Thêm trường mã xác thực email
 }, { timestamps: true });
 
 module.exports = mongoose.model('Driver', driverSchema);

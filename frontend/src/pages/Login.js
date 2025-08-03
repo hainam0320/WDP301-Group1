@@ -6,7 +6,7 @@ import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import logo from '../assets/img/favicon.png';
 import axios from 'axios'; // Added for forgot password flow
-
+import { GoogleLogin } from '@react-oauth/google';
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,6 +58,33 @@ function Login() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const idToken = credentialResponse.credential;
+      console.log('Google login attempt with token:', idToken);
+      
+      // Gửi token lên backend sử dụng API service
+      const res = await authAPI.loginWithGoogle(idToken);
+      console.log('Google login response:', res.data);
+
+      // Lưu thông tin đăng nhập
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+
+      // Navigate dựa trên role
+      const role = res.data.user.role;
+      if (role === 'driver') {
+        navigate('/shipper');
+      } else if (role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/home');
+      }
+    } catch (err) {
+      console.error('Google login error:', err.response?.data || err);
+      setError(err.response?.data?.message || 'Đăng nhập Google thất bại');
+    }
   };
 
   const handleSendForgotCode = async (e) => {
@@ -239,6 +266,12 @@ function Login() {
           >
             Đăng nhập
           </button>
+          <div className="text-center my-3">
+  <GoogleLogin
+    onSuccess={handleGoogleSuccess}
+    onError={() => setError('Đăng nhập Google thất bại')}
+  />
+</div>
 
           <div className="text-center">
             <p className="mb-0">
@@ -249,6 +282,10 @@ function Login() {
 
         <div className="text-center mt-3">
           <a href="/forgot-password" className="btn btn-link">Quên mật khẩu?</a>
+          <br />
+          <small className="text-muted">
+            Bạn là tài xế? <a href="/forgot-password-driver" className="text-warning">Quên mật khẩu tài xế</a>
+          </small>
         </div>
 
         {showForgot && (
