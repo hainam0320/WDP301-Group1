@@ -67,6 +67,8 @@ const NotificationBell = () => {
                 return 'bi-box-seam text-primary';
             case 'REPORT_UPDATED':
                 return 'bi-shield-check text-success';
+            case 'REPORT_RESOLVED_PENALTY':
+                return 'bi-exclamation-triangle text-danger';
             default:
                 return 'bi-bell-fill text-secondary';
         }

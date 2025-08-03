@@ -191,21 +191,90 @@ exports.updateReportStatus = async (req, res) => {
                 runValidators: true 
             }
         ).populate('reporterID', 'fullName email')
-         .populate('reported_user_id', 'fullName email')
+         .populate('reported_user_id')
          .populate('order_id');
 
         if (!updatedReport) {
             return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
         }
 
-        // Tạo và lưu thông báo
+        // Nếu báo cáo được giải quyết (resolved), trừ tiền hoa hồng của driver
+        console.log('=== PROCESSING REPORT RESOLUTION ===');
+        console.log('Status:', status);
+        console.log('Updated report:', updatedReport);
+        console.log('Reported user ID exists:', !!updatedReport.reported_user_id);
+        
+        if (status === 'resolved' && updatedReport.reported_user_id) {
+            console.log('Report resolved, reported_user_id:', updatedReport.reported_user_id);
+            console.log('Reported user ID:', updatedReport.reported_user_id._id);
+            
+            try {
+                const Driver = require('../model/driverModel');
+                const driver = await Driver.findById(updatedReport.reported_user_id._id);
+                
+                if (driver) {
+                    console.log('Driver found:', driver.fullName);
+                    
+                    // Tính toán số tiền bị trừ: 90% giá trị đơn hàng
+                    const orderPrice = updatedReport.order_id?.price || 0;
+                    const penaltyAmount = Math.round(orderPrice * 0.9); // Trừ 90% giá trị đơn
+                    
+                    // Đảm bảo không trừ quá số dư hiện có
+                    const actualPenalty = Math.min(penaltyAmount, driver.balanceOwedByCompany);
+                    const newBalance = Math.max(0, driver.balanceOwedByCompany - actualPenalty);
+                    
+                    // Cập nhật balance của driver
+                    await Driver.findByIdAndUpdate(driver._id, {
+                        balanceOwedByCompany: newBalance
+                    });
+
+                    console.log(`Driver ${driver.fullName} bị trừ ${actualPenalty.toLocaleString()} VNĐ từ balance. Balance mới: ${newBalance.toLocaleString()} VNĐ`);
+
+                    // Tạo thông báo cho driver
+                    console.log('About to create notification with data:', {
+                        recipient: updatedReport.reported_user_id._id,
+                        recipientModel: 'Driver',
+                        type: 'REPORT_RESOLVED_PENALTY',
+                        title: 'Báo cáo đã được giải quyết - Bị trừ tiền hoa hồng',
+                        message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.toString()?.slice(-6) || 'N/A'} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`
+                    });
+                    
+                    const driverNotification = new Notification({
+                        recipient: updatedReport.reported_user_id._id,
+                        recipientModel: 'Driver',
+                        title: 'Báo cáo đã được giải quyết - Bị trừ tiền hoa hồng',
+                        message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.toString()?.slice(-6) || 'N/A'} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`,
+                        type: 'REPORT_RESOLVED_PENALTY',
+                        link: `/shipper/earnings`
+                    });
+                    
+                    console.log('Notification object created:', driverNotification);
+                    
+                    try {
+                        const savedNotification = await driverNotification.save();
+                        console.log('Notification saved successfully:', savedNotification._id);
+                    } catch (saveError) {
+                        console.error('Error saving notification:', saveError);
+                        console.error('Save error details:', saveError.message);
+                        throw saveError;
+                    }
+                }
+            } catch (driverError) {
+                console.error('Error updating driver balance:', driverError);
+                // Không dừng quá trình nếu có lỗi với driver
+            }
+        } else {
+            console.log('Report not resolved or no reported user ID');
+        }
+
+        // Tạo và lưu thông báo cho người báo cáo
         const notification = new Notification({
             recipient: updatedReport.reporterID._id,
             recipientModel: 'User',
             title: 'Báo cáo của bạn đã được cập nhật',
             message: `Trạng thái mới: ${status}. ${admin_note ? `Phản hồi: ${admin_note}` : ''}`,
             type: 'REPORT_UPDATED',
-            link: `/my-reports` // Hoặc có thể là một link chi tiết hơn
+            link: `/my-reports`
         });
         await notification.save();
 

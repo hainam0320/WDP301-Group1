@@ -9,6 +9,8 @@ import Form from 'react-bootstrap/Form'; // Import Form
 const ReportManagement = () => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const reportsPerPage = 10;
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [adminNote, setAdminNote] = useState('');
@@ -228,27 +230,78 @@ const ReportManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {reports.map(report => (
-                  <tr key={report._id}>
-                    <td>#{report.order_id?._id ? report.order_id._id.slice(-6) : 'N/A'}</td>
-                    <td>{report.reporterID?.fullName || 'N/A'}</td>
-                    <td>{report.reported_user_id?.fullName || 'N/A'}</td>
-                    <td>{getReportTypeBadge(report.type)}</td>
-                    <td>{getReportStatusBadge(report.status)}</td>
-                    <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
-                    <td>
-                      <button 
-                        className="btn btn-outline-primary btn-sm"
-                        onClick={() => handleViewReport(report)}
-                      >
-                        <FaEye className="me-1" />
-                        Chi tiết
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {reports
+                  .slice((currentPage - 1) * reportsPerPage, currentPage * reportsPerPage)
+                  .map(report => (
+                    <tr key={report._id}>
+                      <td>#{report.order_id?._id ? report.order_id._id.slice(-6) : 'N/A'}</td>
+                      <td>{report.reporterID?.fullName || 'N/A'}</td>
+                      <td>{report.reported_user_id?.fullName || 'N/A'}</td>
+                      <td>{getReportTypeBadge(report.type)}</td>
+                      <td>{getReportStatusBadge(report.status)}</td>
+                      <td>{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
+                      <td>
+                        <button 
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => handleViewReport(report)}
+                        >
+                          <FaEye className="me-1" />
+                          Chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+            
+            {/* Pagination */}
+            {reports.length > reportsPerPage && (
+              <nav className="mt-3">
+                <ul className="pagination pagination-sm justify-content-center">
+                  <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                      ‹
+                    </button>
+                  </li>
+                  {[...Array(Math.ceil(reports.length / reportsPerPage))].map((_, idx) => {
+                    // Chỉ hiển thị 5 trang gần nhất
+                    const totalPages = Math.ceil(reports.length / reportsPerPage);
+                    if (totalPages <= 5) {
+                      return (
+                        <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                          <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                            {idx + 1}
+                          </button>
+                        </li>
+                      );
+                    } else {
+                      // Logic hiển thị thông minh
+                      if (idx === 0 || idx === totalPages - 1 || (idx >= currentPage - 2 && idx <= currentPage + 2)) {
+                        return (
+                          <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                            <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                              {idx + 1}
+                            </button>
+                          </li>
+                        );
+                      } else if (idx === currentPage - 3 || idx === currentPage + 3) {
+                        return (
+                          <li key={idx} className="page-item disabled">
+                            <span className="page-link">...</span>
+                          </li>
+                        );
+                      }
+                      return null;
+                    }
+                  })}
+                  <li className={`page-item${currentPage === Math.ceil(reports.length / reportsPerPage) ? ' disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === Math.ceil(reports.length / reportsPerPage)}>
+                      ›
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            )}
           </div>
         )}
       </div>
@@ -269,6 +322,15 @@ const ReportManagement = () => {
                       <tr>
                         <th>Mã đơn hàng:</th>
                         <td>#{selectedReport.order_id?._id ? selectedReport.order_id._id.slice(-6) : 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <th>Giá đơn hàng:</th>
+                        <td className="fw-bold text-success">
+                          {selectedReport.order_id?.price ? 
+                            `${selectedReport.order_id.price.toLocaleString()} VNĐ` : 
+                            'N/A'
+                          }
+                        </td>
                       </tr>
                       <tr>
                         <th>Loại báo cáo:</th>

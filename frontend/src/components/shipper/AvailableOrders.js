@@ -12,8 +12,11 @@ const AvailableOrders = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState({ type: '', content: '' });
-  // const [showCommissionModal, setShowCommissionModal] = useState(false); // Bỏ modal này nếu luồng mới không còn cảnh báo hoa hồng
-  // const [commissionMessage, setCommissionMessage] = useState(''); // Bỏ state này
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [commissionMessage, setCommissionMessage] = useState('');
+  const [ongoingOrders, setOngoingOrders] = useState({ delivery: 0, ride: 0 });
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
   const BASE_URL = 'http://localhost:9999';
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
@@ -44,31 +47,82 @@ const AvailableOrders = () => {
     }
   };
 
+  const fetchOngoingOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/api/shipper/orders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Lọc đơn hàng đang thực hiện (chưa hoàn thành và chưa thất bại)
+      const activeOrders = response.data.filter(order => 
+        order.status !== 'completed' && order.status !== 'failed'
+      );
+      
+      // Đếm theo loại đơn hàng
+      const deliveryCount = activeOrders.filter(order => order.type === 'delivery').length;
+      const rideCount = activeOrders.filter(order => order.type === 'order').length;
+      
+      setOngoingOrders({ delivery: deliveryCount, ride: rideCount });
+    } catch (error) {
+      console.error('Error fetching ongoing orders:', error);
+    }
+  };
+
   useEffect(() => {
     fetchAvailableOrders();
+    fetchOngoingOrders();
 
-    const handleNewOrder = (event) => {
-        console.log('Received new order event, refreshing list...');
-        fetchAvailableOrders();
-        new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e)); // Đảm bảo tệp âm thanh tồn tại
+    const handleOrderListUpdate = (event) => {
+      console.log('Order list updated, refreshing...', event.detail);
+      fetchAvailableOrders();
+      fetchOngoingOrders();
     };
-    
-    // Lắng nghe sự kiện từ socket.io (server.js)
-    // Giả sử `socket` được truyền xuống component hoặc có context
-    // Ví dụ nếu bạn có socket.io client instance (ví dụ: `socket = io(BASE_URL)`)
-    // socket.on('new_order_available', handleNewOrder);
-    // Để đơn giản, nếu bạn đang sử dụng window event, hãy kiểm tra lại cách event này được emit
-    // Dòng dưới đây có vẻ là một custom event bạn đang dùng, hãy giữ lại nếu có:
-    window.addEventListener('new_order_for_driver', handleNewOrder);
+
+    window.addEventListener('order_list_updated', handleOrderListUpdate);
 
 
     return () => {
-        // socket.off('new_order_available', handleNewOrder); // Hủy đăng ký socket event
-        window.removeEventListener('new_order_for_driver', handleNewOrder);
+      window.removeEventListener('order_list_updated', handleOrderListUpdate);
     };
   }, []);
 
-  const acceptOrder = async (orderId) => {
+  const acceptOrder = async (orderId, orderType) => {
+    // Kiểm tra giới hạn số lượng đơn hàng
+    const maxDelivery = 3;
+    const maxRide = 1;
+    
+    // Kiểm tra nếu đã có đơn giao hàng thì không thể nhận đơn đưa đón
+    if (orderType === 'order' && ongoingOrders.delivery > 0) {
+      setLimitMessage('Bạn đã có đơn giao hàng đang thực hiện. Vui lòng hoàn thành tất cả đơn giao hàng trước khi nhận đơn đưa đón.');
+      setShowLimitModal(true);
+      return;
+    }
+    
+    // Kiểm tra nếu đã có đơn đưa đón thì không thể nhận đơn giao hàng
+    if (orderType === 'delivery' && ongoingOrders.ride > 0) {
+      setLimitMessage('Bạn đã có đơn đưa đón đang thực hiện. Vui lòng hoàn thành đơn đưa đón trước khi nhận đơn giao hàng.');
+      setShowLimitModal(true);
+      return;
+    }
+    
+    // Kiểm tra nếu đã đạt giới hạn đơn giao hàng hoặc đơn đưa đón
+    if (ongoingOrders.delivery >= maxDelivery || ongoingOrders.ride >= maxRide) {
+      let message = '';
+      if (ongoingOrders.delivery >= maxDelivery && ongoingOrders.ride >= maxRide) {
+        message = `Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng và ${maxRide} đơn đưa đón. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`;
+      } else if (ongoingOrders.delivery >= maxDelivery) {
+        message = `Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`;
+      } else {
+        message = `Bạn đã nhận tối đa ${maxRide} đơn đưa đón. Vui lòng hoàn thành đơn hiện tại trước khi nhận thêm.`;
+      }
+      setLimitMessage(message);
+      setShowLimitModal(true);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
@@ -82,6 +136,7 @@ const AvailableOrders = () => {
       toast.success('Nhận đơn thành công!'); // Sử dụng toast
       setMessages({ type: 'success', content: 'Nhận đơn thành công!' });
       fetchAvailableOrders();
+      fetchOngoingOrders();
     } catch (error) {
       console.error('Error accepting order:', error);
       const errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi nhận đơn';
@@ -134,7 +189,28 @@ const AvailableOrders = () => {
             Đi đến trang thanh toán hoa hồng
           </Button>
         </Modal.Footer>
-      </Modal> */}
+      </Modal>
+
+      {/* Modal cảnh báo giới hạn đơn hàng */}
+      <Modal show={showLimitModal} onHide={() => setShowLimitModal(false)} centered>
+        <Modal.Header closeButton className="bg-danger text-white">
+          <Modal.Title>Giới hạn đơn hàng</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex align-items-center">
+            <span className="me-3" style={{fontSize:'2rem'}}>&#9888;</span>
+            <span>{limitMessage}</span>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowLimitModal(false)}>
+            Đóng
+          </Button>
+          <Button variant="primary" onClick={() => { setShowLimitModal(false); navigate('/shipper/my-orders'); }}>
+            Xem đơn hàng của tôi
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <div className="container my-5">
         <button 
           className="btn btn-outline-primary mb-4"
@@ -143,6 +219,26 @@ const AvailableOrders = () => {
           <FaArrowLeft className="me-2" />
           Quay lại
         </button>
+
+        {/* Hiển thị thông tin đơn hàng đang thực hiện */}
+        <div className="row mb-4">
+          <div className="col-md-6">
+            <div className="card bg-info text-white">
+              <div className="card-body text-center">
+                <h6 className="card-title">Đơn giao hàng đang thực hiện</h6>
+                <h3 className="mb-0">{ongoingOrders.delivery}/3</h3>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card bg-warning text-dark">
+              <div className="card-body text-center">
+                <h6 className="card-title">Đơn đưa đón đang thực hiện</h6>
+                <h3 className="mb-0">{ongoingOrders.ride}/1</h3>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="card" style={cardStyle}>
           <div className="card-header bg-success text-white">
@@ -201,14 +297,29 @@ const AvailableOrders = () => {
                       </div>
                       <div className="col-md-4 text-end">
                         <h5 className="text-success fw-bold">{order.price.toLocaleString()} VNĐ</h5>
-                        <button 
-                          className="btn btn-success"
-                          onClick={() => acceptOrder(order._id)}
-                          style={buttonStyle}
-                        >
-                          <FaCheck className="me-2" />
-                          Nhận đơn
-                        </button>
+                                                 <button 
+                           className="btn btn-success"
+                           onClick={() => acceptOrder(order._id, order.type)}
+                           style={buttonStyle}
+                           disabled={
+                             (order.type === 'delivery' && ongoingOrders.ride > 0) ||
+                             (order.type === 'order' && ongoingOrders.delivery > 0) ||
+                             ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1
+                           }
+                         >
+                           <FaCheck className="me-2" />
+                           {(() => {
+                             if (order.type === 'delivery' && ongoingOrders.ride > 0) {
+                               return 'Có đơn đưa đón';
+                             } else if (order.type === 'order' && ongoingOrders.delivery > 0) {
+                               return 'Có đơn giao hàng';
+                             } else if (ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1) {
+                               return 'Đã đạt giới hạn';
+                             } else {
+                               return 'Nhận đơn';
+                             }
+                           })()}
+                         </button>
                       </div>
                     </div>
                   </div>
