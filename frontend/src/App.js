@@ -65,36 +65,40 @@ function App() {
         socket.current.on("notification", (data) => {
           console.log("Notification for user:", data);
 
-          toast.success(data.message || "Bạn có thông báo mới!", {
-            icon: "🔔",
-          });
+          // Bỏ qua toast notification cho ORDER_ACCEPTED nhưng vẫn cập nhật chuông thông báo
+          if (data.type !== "ORDER_ACCEPTED") {
+            toast.success(data.message || "Bạn có thông báo mới!", {
+              icon: "🔔",
+            });
+          }
 
           // Gửi sự kiện để các component khác (như chuông thông báo) có thể cập nhật
           window.dispatchEvent(new Event("new-notification"));
         });
       } else if (user.role === "driver") {
-        // Lắng nghe sự kiện 'new_order_available' từ server (chỉ dành cho driver)
-        socket.current.on("new_order_available", (data) => {
-          console.log("New order available for driver:", data);
-          toast.success(data.message || "Có đơn hàng mới!", {
-            icon: "🛵",
-          });
-          // Gửi sự kiện để trang AvailableOrders có thể cập nhật
+        // Lắng nghe sự kiện cập nhật danh sách đơn hàng (không hiển thị thông báo, chỉ refresh)
+        socket.current.on("order_list_updated", (data) => {
+          console.log("Order list updated for driver:", data);
+          // Gửi sự kiện để trang AvailableOrders có thể refresh
           window.dispatchEvent(
-            new CustomEvent("new_order_for_driver", { detail: data.order })
+            new CustomEvent("order_list_updated", { detail: data })
           );
         });
 
-        // Tài xế cũng có thể nhận được các thông báo chung khác (ví dụ: tài khoản được duyệt)
+        // Tài xế có thể nhận được các thông báo chung khác (ví dụ: tài khoản được duyệt)
         // nhưng chúng ta sẽ bỏ qua thông báo `ORDER_ACCEPTED` để tránh nhầm lẫn.
         socket.current.on("notification", (data) => {
           if (data.type === "ORDER_ACCEPTED") {
             return; // Bỏ qua thông báo này vì nó dành cho người dùng
           }
           console.log("Generic notification for driver:", data);
+          
+          // Hiển thị toast cho tất cả thông báo khác ngoại trừ ORDER_ACCEPTED
           toast.success(data.message || "Bạn có thông báo mới!", {
             icon: "🔔",
           });
+          
+          // Luôn cập nhật chuông thông báo
           window.dispatchEvent(new Event("new-notification"));
         });
       }

@@ -176,7 +176,7 @@ exports.updateReportStatus = async (req, res) => {
                 runValidators: true 
             }
         ).populate('reporterID', 'fullName email')
-         .populate('reported_user_id', 'fullName email')
+         .populate('reported_user_id')
          .populate('order_id');
 
         if (!updatedReport) {
@@ -184,12 +184,22 @@ exports.updateReportStatus = async (req, res) => {
         }
 
         // Nếu báo cáo được giải quyết (resolved), trừ tiền hoa hồng của driver
+        console.log('=== PROCESSING REPORT RESOLUTION ===');
+        console.log('Status:', status);
+        console.log('Updated report:', updatedReport);
+        console.log('Reported user ID exists:', !!updatedReport.reported_user_id);
+        
         if (status === 'resolved' && updatedReport.reported_user_id) {
+            console.log('Report resolved, reported_user_id:', updatedReport.reported_user_id);
+            console.log('Reported user ID:', updatedReport.reported_user_id._id);
+            
             try {
                 const Driver = require('../model/driverModel');
                 const driver = await Driver.findById(updatedReport.reported_user_id._id);
                 
                 if (driver) {
+                    console.log('Driver found:', driver.fullName);
+                    
                     // Tính toán số tiền bị trừ: 90% giá trị đơn hàng
                     const orderPrice = updatedReport.order_id?.price || 0;
                     const penaltyAmount = Math.round(orderPrice * 0.9); // Trừ 90% giá trị đơn
@@ -206,34 +216,40 @@ exports.updateReportStatus = async (req, res) => {
                     console.log(`Driver ${driver.fullName} bị trừ ${actualPenalty.toLocaleString()} VNĐ từ balance. Balance mới: ${newBalance.toLocaleString()} VNĐ`);
 
                     // Tạo thông báo cho driver
+                    console.log('About to create notification with data:', {
+                        recipient: updatedReport.reported_user_id._id,
+                        recipientModel: 'Driver',
+                        type: 'REPORT_RESOLVED_PENALTY',
+                        title: 'Báo cáo đã được giải quyết - Bị trừ tiền hoa hồng',
+                        message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.toString()?.slice(-6) || 'N/A'} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`
+                    });
+                    
                     const driverNotification = new Notification({
-                        recipient: driver._id,
+                        recipient: updatedReport.reported_user_id._id,
                         recipientModel: 'Driver',
                         title: 'Báo cáo đã được giải quyết - Bị trừ tiền hoa hồng',
-                        message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.slice(-6)} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`,
+                        message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.toString()?.slice(-6) || 'N/A'} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`,
                         type: 'REPORT_RESOLVED_PENALTY',
-                        link: `/driver/earnings`
+                        link: `/shipper/earnings`
                     });
-                    await driverNotification.save();
-
-                    // Gửi thông báo real-time cho driver nếu online
-                    const driverId = driver._id.toString();
-                    const driverSocketId = (connectedUsers && connectedUsers.driver) ? connectedUsers.driver[driverId] : null;
-
-                    if (driverSocketId) {
-                        io.to(driverSocketId).emit('notification', {
-                            title: 'Báo cáo đã được giải quyết - Bị trừ tiền hoa hồng',
-                            message: `Báo cáo về đơn hàng #${updatedReport.order_id?._id?.slice(-6)} đã được giải quyết. Bạn bị trừ ${actualPenalty.toLocaleString()} VNĐ (90% giá trị đơn) từ tiền hoa hồng.`,
-                            reportId: updatedReport._id,
-                            type: 'REPORT_RESOLVED_PENALTY',
-                            penaltyAmount: actualPenalty
-                        });
+                    
+                    console.log('Notification object created:', driverNotification);
+                    
+                    try {
+                        const savedNotification = await driverNotification.save();
+                        console.log('Notification saved successfully:', savedNotification._id);
+                    } catch (saveError) {
+                        console.error('Error saving notification:', saveError);
+                        console.error('Save error details:', saveError.message);
+                        throw saveError;
                     }
                 }
             } catch (driverError) {
                 console.error('Error updating driver balance:', driverError);
                 // Không dừng quá trình nếu có lỗi với driver
             }
+        } else {
+            console.log('Report not resolved or no reported user ID');
         }
 
         // Tạo và lưu thông báo cho người báo cáo

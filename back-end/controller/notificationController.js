@@ -3,8 +3,8 @@ const Notification = require('../model/notificationModel');
 // Lấy tất cả thông báo cho người dùng/tài xế hiện tại
 exports.getNotifications = async (req, res) => {
     try {
-        const recipientId = req.user.id;
-        const recipientModel = req.user.role === 'driver' ? 'Driver' : 'User';
+        const recipientId = req.user._id;
+        const recipientModel = req.isDriver ? 'Driver' : 'User';
 
         const notifications = await Notification.find({ 
             recipient: recipientId, 
@@ -32,8 +32,8 @@ exports.getNotifications = async (req, res) => {
 // Đánh dấu một thông báo là đã đọc
 exports.markAsRead = async (req, res) => {
     try {
-        const recipientId = req.user.id;
-        const recipientModel = req.user.role === 'driver' ? 'Driver' : 'User';
+        const recipientId = req.user._id;
+        const recipientModel = req.isDriver ? 'Driver' : 'User';
 
         const notification = await Notification.findOneAndUpdate(
             { _id: req.params.id, recipient: recipientId, recipientModel: recipientModel },
@@ -55,8 +55,8 @@ exports.markAsRead = async (req, res) => {
 // Đánh dấu tất cả thông báo là đã đọc
 exports.markAllAsRead = async (req, res) => {
     try {
-        const recipientId = req.user.id;
-        const recipientModel = req.user.role === 'driver' ? 'Driver' : 'User';
+        const recipientId = req.user._id;
+        const recipientModel = req.isDriver ? 'Driver' : 'User';
 
         await Notification.updateMany(
             { recipient: recipientId, recipientModel: recipientModel, isRead: false },

@@ -73,18 +73,16 @@ const AvailableOrders = () => {
     fetchAvailableOrders();
     fetchOngoingOrders();
 
-    const handleNewOrder = (event) => {
-        console.log('Received new order event, refreshing list...');
-        fetchAvailableOrders();
-        fetchOngoingOrders();
-        // Optional: Add a more prominent sound or visual cue
-        new Audio('/notification-sound.mp3').play().catch(e => console.log("Audio play failed:", e));
+    const handleOrderListUpdate = (event) => {
+      console.log('Order list updated, refreshing...', event.detail);
+      fetchAvailableOrders();
+      fetchOngoingOrders();
     };
 
-    window.addEventListener('new_order_for_driver', handleNewOrder);
+    window.addEventListener('order_list_updated', handleOrderListUpdate);
 
     return () => {
-        window.removeEventListener('new_order_for_driver', handleNewOrder);
+      window.removeEventListener('order_list_updated', handleOrderListUpdate);
     };
   }, []); // The dependency array is empty, so fetchAvailableOrders is not recreated
 

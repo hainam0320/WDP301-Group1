@@ -63,15 +63,17 @@ const OrderManagement = () => {
                       <td>{order.shipper}</td>
                       <td>{order.from} → {order.to}</td>
                       <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
-                      <td>
-                        <span className={`badge ${
-                          order.status === 'completed' ? 'bg-success' : 
-                          order.status === 'in-progress' ? 'bg-warning' : 'bg-secondary'
-                        }`}>
-                          {order.status === 'completed' ? 'Hoàn thành' : 
-                           order.status === 'in-progress' ? 'Đang giao' : 'Chờ xử lý'}
-                        </span>
-                      </td>
+                                             <td>
+                         <span className={`badge ${
+                           order.status === 'completed' ? 'bg-success' : 
+                           order.status === 'in-progress' ? 'bg-warning' : 
+                           order.status === 'failed' ? 'bg-danger' : 'bg-secondary'
+                         }`}>
+                           {order.status === 'completed' ? 'Hoàn thành' : 
+                            order.status === 'in-progress' ? 'Đang giao' : 
+                            order.status === 'failed' ? 'Thất bại' : 'Chờ xử lý'}
+                         </span>
+                       </td>
                       <td>{new Date(order.date).toLocaleDateString('vi-VN')}</td>
                      
                     </tr>
@@ -81,22 +83,46 @@ const OrderManagement = () => {
             {/* Pagination */}
             {orders.length > ordersPerPage && (
               <nav>
-                <ul className="pagination justify-content-center">
+                <ul className="pagination pagination-sm justify-content-center">
                   <li className={`page-item${currentPage === 1 ? ' disabled' : ''}`}>
                     <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
-                      Trước
+                      ‹
                     </button>
                   </li>
-                  {[...Array(Math.ceil(orders.length / ordersPerPage))].map((_, idx) => (
-                    <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
-                      <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
-                        {idx + 1}
-                      </button>
-                    </li>
-                  ))}
+                  {[...Array(Math.ceil(orders.length / ordersPerPage))].map((_, idx) => {
+                    // Chỉ hiển thị 5 trang gần nhất
+                    const totalPages = Math.ceil(orders.length / ordersPerPage);
+                    if (totalPages <= 5) {
+                      return (
+                        <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                          <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                            {idx + 1}
+                          </button>
+                        </li>
+                      );
+                    } else {
+                      // Logic hiển thị thông minh
+                      if (idx === 0 || idx === totalPages - 1 || (idx >= currentPage - 2 && idx <= currentPage + 2)) {
+                        return (
+                          <li key={idx} className={`page-item${currentPage === idx + 1 ? ' active' : ''}`}>
+                            <button className="page-link" onClick={() => setCurrentPage(idx + 1)}>
+                              {idx + 1}
+                            </button>
+                          </li>
+                        );
+                      } else if (idx === currentPage - 3 || idx === currentPage + 3) {
+                        return (
+                          <li key={idx} className="page-item disabled">
+                            <span className="page-link">...</span>
+                          </li>
+                        );
+                      }
+                      return null;
+                    }
+                  })}
                   <li className={`page-item${currentPage === Math.ceil(orders.length / ordersPerPage) ? ' disabled' : ''}`}>
                     <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === Math.ceil(orders.length / ordersPerPage)}>
-                      Sau
+                      ›
                     </button>
                   </li>
                 </ul>

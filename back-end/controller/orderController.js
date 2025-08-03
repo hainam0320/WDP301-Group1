@@ -61,14 +61,14 @@ exports.createOrder = async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // Thông báo cho tất cả các tài xế đang online
+    // Thông báo cho tất cả các tài xế đang online để refresh danh sách
     const { io, connectedUsers } = req;
     if (connectedUsers && connectedUsers.driver) {
       const driverSockets = Object.values(connectedUsers.driver);
       driverSockets.forEach(socketId => {
-        io.to(socketId).emit('new_order_available', {
-          title: 'Có đơn hàng mới!',
-          message: `Một đơn hàng mới vừa được tạo gần bạn.`,
+        io.to(socketId).emit('order_list_updated', {
+          type: 'new_order',
+          message: 'Có đơn hàng mới được tạo',
           order: savedOrder,
         });
       });
@@ -175,6 +175,18 @@ exports.acceptOrder = async (req, res) => {
       // Check if the order was already taken
       const existingOrder = await Order.findById(orderId);
       if (existingOrder && existingOrder.driverId) {
+        // Thông báo cho tất cả driver khác để refresh danh sách khi đơn bị đặt mất
+        if (connectedUsers && connectedUsers.driver) {
+          const driverSockets = Object.values(connectedUsers.driver);
+          driverSockets.forEach(socketId => {
+            io.to(socketId).emit('order_list_updated', {
+              type: 'order_taken',
+              message: 'Một đơn hàng đã được shipper khác nhận',
+              orderId: orderId,
+            });
+          });
+        }
+        
         return res.status(400).json({
           message: 'Đơn hàng này đã được shipper khác nhận',
           order: existingOrder
@@ -204,6 +216,18 @@ exports.acceptOrder = async (req, res) => {
         message: `Tài xế ${req.user.fullName} đang trên đường đến chỗ bạn.`,
         orderId: order._id,
         type: 'ORDER_ACCEPTED'
+      });
+    }
+
+    // Thông báo cho tất cả driver khác để refresh danh sách đơn hàng
+    if (connectedUsers && connectedUsers.driver) {
+      const driverSockets = Object.values(connectedUsers.driver);
+      driverSockets.forEach(socketId => {
+        io.to(socketId).emit('order_list_updated', {
+          type: 'order_accepted',
+          message: 'Một đơn hàng đã được shipper khác nhận',
+          orderId: order._id,
+        });
       });
     }
 

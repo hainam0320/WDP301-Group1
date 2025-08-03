@@ -14,7 +14,7 @@ const createIcon = (iconUrl) =>
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
   });
-
+  const defaultCenter = [21.0124, 105.5253];
 const pickupIcon = createIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png');
 const deliveryIcon = createIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png');
 
@@ -245,10 +245,10 @@ const DeliveryMap = ({ onLocationUpdate, pickupLocation, deliveryLocation }) => 
           </div>
         </div>
       </div>
-
+      
       <div style={{ height: '400px', width: '100%' }}>
         <MapContainer
-          center={[21.0285, 105.8542]}
+          center={defaultCenter}
           zoom={13}
           style={{ height: '100%', width: '100%' }}
           whenCreated={setMap}
