@@ -93,14 +93,17 @@ const AvailableOrders = () => {
     const maxDelivery = 3;
     const maxRide = 1;
     
-    if (orderType === 'delivery' && ongoingOrders.delivery >= maxDelivery) {
-      setLimitMessage(`Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`);
-      setShowLimitModal(true);
-      return;
-    }
-    
-    if (orderType === 'order' && ongoingOrders.ride >= maxRide) {
-      setLimitMessage(`Bạn đã nhận tối đa ${maxRide} đơn đưa đón. Vui lòng hoàn thành đơn hiện tại trước khi nhận thêm.`);
+    // Kiểm tra nếu đã đạt giới hạn đơn giao hàng hoặc đơn đưa đón
+    if (ongoingOrders.delivery >= maxDelivery || ongoingOrders.ride >= maxRide) {
+      let message = '';
+      if (ongoingOrders.delivery >= maxDelivery && ongoingOrders.ride >= maxRide) {
+        message = `Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng và ${maxRide} đơn đưa đón. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`;
+      } else if (ongoingOrders.delivery >= maxDelivery) {
+        message = `Bạn đã nhận tối đa ${maxDelivery} đơn giao hàng. Vui lòng hoàn thành một số đơn trước khi nhận thêm.`;
+      } else {
+        message = `Bạn đã nhận tối đa ${maxRide} đơn đưa đón. Vui lòng hoàn thành đơn hiện tại trước khi nhận thêm.`;
+      }
+      setLimitMessage(message);
       setShowLimitModal(true);
       return;
     }
@@ -286,13 +289,11 @@ const AvailableOrders = () => {
                            onClick={() => acceptOrder(order._id, order.type)}
                            style={buttonStyle}
                            disabled={
-                             (order.type === 'delivery' && ongoingOrders.delivery >= 3) ||
-                             (order.type === 'order' && ongoingOrders.ride >= 1)
+                             ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1
                            }
                          >
                            <FaCheck className="me-2" />
-                           {((order.type === 'delivery' && ongoingOrders.delivery >= 3) ||
-                             (order.type === 'order' && ongoingOrders.ride >= 1)) 
+                           {(ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1) 
                              ? 'Đã đạt giới hạn' : 'Nhận đơn'}
                          </button>
                       </div>
