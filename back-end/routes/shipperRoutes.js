@@ -551,5 +551,13 @@ router.get('/orders/ongoing/count', protect, async (req, res) => {
     res.status(500).json({ message: 'Error fetching ongoing orders count' });
   }
 });
+// Xác thực email cho driver
+const driverController = require('../controller/driverController');
+router.post('/verify-email/send', protect, driverController.sendEmailVerification);
+router.post('/verify-email/confirm', protect, driverController.verifyEmailCode);
+router.post('/forgot-password/send', driverController.sendForgotPasswordCode);
+router.post('/forgot-password/reset', driverController.resetPassword);
+// Change password
+router.post('/change-password', protect, driverController.changePassword);
 
 module.exports = router; 

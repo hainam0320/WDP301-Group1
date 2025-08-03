@@ -39,6 +39,7 @@ const handleError = (error) => {
 
 export const authAPI = {
   login: (credentials) => api.post('auth/login', credentials),
+  loginWithGoogle: (idToken) => api.post('auth/login/google', { idToken }),
   registerUser: (formData) =>
     api.post('/auth/register-user', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -60,6 +61,13 @@ export const shipperAPI = {
     }),
   completeOrder: (orderId) => api.post(`/orders/${orderId}/complete`),
   updateOrderStatus: (orderId, status) => api.put(`/shipper/orders/${orderId}/status`, { status }),
+  // Thêm các chức năng quên mật khẩu cho driver
+  sendForgotPasswordCode: (email) => api.post('/shipper/forgot-password/send', { email }),
+  resetPassword: (data) => api.post('/shipper/forgot-password/reset', data),
+  changePassword: (data) => api.post('/shipper/change-password', data),
+  // Thêm các chức năng xác thực email cho driver
+  sendEmailVerification: () => api.post('/shipper/verify-email/send'),
+  verifyEmailCode: (code) => api.post('/shipper/verify-email/confirm', { code }),
 };
 
 export const userAPI = {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster, toast } from "react-hot-toast";
 import io from "socket.io-client";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
@@ -33,6 +34,7 @@ import ReportManagement from "./components/admin/ReportManagement";
 
 import AdminDashboardHome from "./components/admin/AdminDashboardHome";
 import ForgotPassword from "./pages/ForgotPassword";
+import ForgotPasswordDriver from "./pages/ForgotPasswordDriver";
 
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFail from "./pages/PaymentFail";
@@ -112,156 +114,159 @@ function App() {
   }, []); // Chỉ chạy 1 lần khi App mount
 
   return (
-    <Router>
-      <div>
-        <Toaster position="top-right" />
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "539003291803-vre7diqbp5frh57ec971hn0h1nmvi07t.apps.googleusercontent.com"}>
+      <Router>
+        <div>
+          <Toaster position="top-right" />
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/forgot-password-driver" element={<ForgotPasswordDriver />} />
 
-          {/* User Routes */}
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <Home />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/new-order"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <NewOrder />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/order-tracking"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <OrderTracking />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/order-history"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <OrderHistory />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <UserProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-reports"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <MyReports />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/confirmOrder"
-            element={
-              <ProtectedRoute allowedRoles={["user"]}>
-                <ConfirmOrder />
-              </ProtectedRoute>
-            }
-          />
-          {/* Shipper Routes */}
-          <Route
-            path="/shipper"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <ShipperDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/available-orders"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <AvailableOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/my-orders"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <MyOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/completed-orders"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <CompletedOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/earnings"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <Earnings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/profile"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <ShipperProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shipper/commissions"
-            element={
-              <ProtectedRoute allowedRoles={["driver"]}>
-                <CommissionManagement />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Admin Routes */}
-          <Route
-            path="/admin/*"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminDashboardHome />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="shippers" element={<ShipperManagement />} />
-            <Route path="orders" element={<OrderManagement />} />
-            <Route path="revenue" element={<RevenueReport />} />
-            <Route path="reports" element={<ReportManagement />} />
-
+            {/* User Routes */}
             <Route
-              path="commission-management"
-              element={<AdminCommissionManagement />}
+              path="/home"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <Home />
+                </ProtectedRoute>
+              }
             />
-          </Route>
-          <Route path="/payment-success" element={<PaymentSuccess />} />
-          <Route path="/payment-fail" element={<PaymentFail />} />
-        </Routes>
-      </div>
-    </Router>
+            <Route
+              path="/new-order"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <NewOrder />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/order-tracking"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <OrderTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/order-history"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <OrderHistory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <UserProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-reports"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <MyReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confirmOrder"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <ConfirmOrder />
+                </ProtectedRoute>
+              }
+            />
+            {/* Shipper Routes */}
+            <Route
+              path="/shipper"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <ShipperDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/available-orders"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <AvailableOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/my-orders"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <MyOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/completed-orders"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <CompletedOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/earnings"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <Earnings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/profile"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <ShipperProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shipper/commissions"
+              element={
+                <ProtectedRoute allowedRoles={["driver"]}>
+                  <CommissionManagement />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin Routes */}
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminDashboardHome />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="shippers" element={<ShipperManagement />} />
+              <Route path="orders" element={<OrderManagement />} />
+              <Route path="revenue" element={<RevenueReport />} />
+              <Route path="reports" element={<ReportManagement />} />
+
+              <Route
+                path="commission-management"
+                element={<AdminCommissionManagement />}
+              />
+            </Route>
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-fail" element={<PaymentFail />} />
+          </Routes>
+        </div>
+      </Router>
+    </GoogleOAuthProvider>
   );
 }
 
