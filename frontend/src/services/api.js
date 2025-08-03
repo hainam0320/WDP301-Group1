@@ -81,13 +81,14 @@ export const userAPI = {
   getUserOrders: () => api.get('/orders/user'), // Đã đổi route ở orderRoutes.js
   getOrderRate: (orderId) => api.get(`/rate/${orderId}`),
   createOrderRate: (data) => api.post('/rate', data),
-  uploadReportImages: async (formData) => {
-    console.log('API: Uploading report images...');
-    console.log('API: Token from localStorage:', localStorage.getItem('token'));
+  uploadReportImages: async (files) => {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
     const response = await api.post('/reports/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    console.log('API: Upload response:', response);
     return response;
   },
   createReport: async (data) => {

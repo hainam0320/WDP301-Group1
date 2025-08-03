@@ -15,6 +15,4 @@ router.patch('/:id/read', notificationController.markAsRead);
 // Đánh dấu tất cả thông báo là đã đọc
 router.patch('/read-all', notificationController.markAllAsRead);
 
-
-
 module.exports = router; 

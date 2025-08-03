@@ -34,11 +34,7 @@ const CompletedOrders = () => {
         order.status === 'user_confirmed_completion' ||
         order.status === 'driver_paid'
       );
-      // Sắp xếp theo thời gian cập nhật mới nhất lên trước
-      const sortedOrders = finishedOrders.sort((a, b) => 
-        new Date(b.updatedAt) - new Date(a.updatedAt)
-      );
-      setCompletedOrders(sortedOrders);
+      setCompletedOrders(finishedOrders);
     } catch (err) {
       console.error('Error fetching completed orders:', err);
       setError('Không thể tải danh sách đơn hàng đã hoàn thành');

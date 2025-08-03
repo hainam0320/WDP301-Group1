@@ -29,7 +29,7 @@ const notificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['ORDER_ACCEPTED', 'REPORT_UPDATED', 'REPORT_RESOLVED_PENALTY', 'GENERAL'],
+        enum: ['ORDER_ACCEPTED', 'REPORT_UPDATED', 'GENERAL'],
         required: true
     }
 }, {

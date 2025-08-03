@@ -258,18 +258,11 @@ const OrderHistory = () => {
 
     try {
       setReportLoading(true);
-      console.log('Files to upload:', files.map(f => ({
-        name: f.name,
-        size: f.size,
-        type: f.type
-      })));
-      
       const formData = new FormData();
       files.forEach(file => {
         formData.append('files', file);
       });
 
-      console.log('FormData created, sending to API...');
       const response = await userAPI.uploadReportImages(formData);
 
       if (response.data?.filePaths) {
@@ -280,11 +273,6 @@ const OrderHistory = () => {
       }
     } catch (error) {
       console.error('Error handling report image upload:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       setMessage({ 
         type: 'error', 
         content: error.response?.data?.message || error.message || 'Lỗi khi tải ảnh lên' 
@@ -345,12 +333,17 @@ const OrderHistory = () => {
     );
   };
 
-  const handlePay = async (orderId) => {
-    try {
-      const paymentUrl = await createPayOSLink(orderId);
-      window.location.href = paymentUrl;
-    } catch (err) {
-      alert('Không thể tạo link thanh toán. Vui lòng thử lại!');
+  const getOrderStatusBadge = (status) => {
+    switch (status) {
+        case 'shipper_completed': return <Badge bg="info">Shipper Hoàn thành</Badge>;
+        case 'user_confirmed_completion': return <Badge bg="success">Đã Hoàn tất</Badge>;
+        case 'driver_paid': return <Badge bg="success">Hoàn tiền cho shipper</Badge>;
+        case 'disputed': return <Badge bg="danger">Tranh chấp</Badge>;
+        case 'failed': return <Badge bg="danger">Thất bại</Badge>;
+        case 'pending_payment': return <Badge bg="secondary">Chờ TT</Badge>;
+        case 'payment_successful': return <Badge bg="info">Đã TT</Badge>;
+        case 'refunded': return <Badge bg="secondary">Đã hoàn tiền</Badge>;
+        default: return <Badge bg="secondary">{status}</Badge>;
     }
   };
 
@@ -481,43 +474,53 @@ const OrderHistory = () => {
                         <td>{order.pickupaddress}</td>
                         <td>{order.dropupaddress}</td>
                         <td>{order.type === 'delivery' ? 'Giao hàng' : 'Đưa đón'}</td>
-                        <td>{new Date(order.updatedAt).toLocaleString('vi-VN')}</td>
                         <td className="fw-bold">{order.price.toLocaleString()} VNĐ</td>
                         <td>
-                          <span className={`badge ${order.status === 'failed' ? 'bg-danger' : 'bg-success'}`}>
-                            {order.status === 'failed' ? 'Thất bại' : 'Hoàn thành'}
-                          </span>
-                          {order.status === 'failed' && order.statusDescription && (
-                            <div className="small text-danger mt-1">
-                              Lý do: {order.statusDescription}
-                            </div>
+                          {getOrderStatusBadge(order.status)}
+                          {(order.status === 'failed' || order.status === 'disputed' || order.paymentStatus === 'disputed_payment') && order.statusDescription && (
+                            <OverlayTrigger
+                                placement="top"
+                                overlay={<Tooltip id={`tooltip-desc-${order._id}`}>{order.statusDescription}</Tooltip>}
+                            >
+                                <FaInfoCircle className="ms-1 text-muted" style={{cursor: 'help'}} />
+                            </OverlayTrigger>
                           )}
                         </td>
                         <td>
-                          {order.status === 'failed' ? (
-                            <span className="text-danger small">Không thể đánh giá</span>
-                          ) : orderRates[order._id] ? (
-                            <div>
-                              <span className="text-warning">
-                                {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
-                              </span>
-                              <div className="small text-muted">{orderRates[order._id].comment}</div>
-                            </div>
+                            {order.status === 'shipper_completed' && (
+                                <Button 
+                                    size="sm" 
+                                    variant="success" 
+                                    onClick={() => handleConfirmCompletion(order._id)}
+                                    className="me-2"
+                                >
+                                    <FaCheckCircle className="me-1" />
+                                    Xác nhận hoàn tất
+                                </Button>
+                            )}
+                            {(order.status === 'pending_payment') && (
+                                <Button size="sm" variant="info" onClick={() => navigate(`/new-order?orderId=${order._id}`)}> {/* Có thể chuyển hướng lại trang đặt đơn để thanh toán lại */}
+                                    <FaMoneyBillWave className="me-1" /> Thanh toán lại
+                                </Button>
+                            )}
+                        </td>
+                        <td>
+                          {(order.status === 'user_confirmed_completion' || order.status === 'completed') ? ( // Chỉ cho đánh giá khi user đã xác nhận
+                            orderRates[order._id] ? (
+                              <div>
+                                <span className="text-warning">
+                                  {[...Array(orderRates[order._id].rate)].map((_, i) => <FaStar key={i} />)}
+                                </span>
+                                <div className="small text-muted">{orderRates[order._id].comment}</div>
+                              </div>
+                            ) : (
+                              <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
+                                Đánh giá
+                              </Button>
+                            )
                           ) : (
-                            <Button size="sm" variant="outline-primary" onClick={() => handleOpenRateModal(order)}>
-                              Đánh giá
-                            </Button>
+                            <span className="text-muted small">Chưa hoàn tất</span>
                           )}
-                        </td>
-                        <td>
-                          <Button 
-                            size="sm" 
-                            variant="outline-danger"
-                            onClick={() => handleOpenReportModal(order)}
-                          >
-                            <FaExclamationTriangle className="me-1" />
-                            Báo cáo
-                          </Button>
                         </td>
                         <td>
                             {(order.status !== 'pending_payment' && order.status !== 'refunded') && ( // Không cho báo cáo khi chưa thanh toán/đã hoàn tiền

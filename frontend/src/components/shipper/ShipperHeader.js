@@ -105,9 +105,7 @@ const ShipperHeader = () => {
               {driverAvgRate.avg.toFixed(1)}<FaStar className="ms-1" /> ({driverAvgRate.count} đánh giá)
             </li>
 
-            <li className="nav-item me-3">
-              <NotificationBell />
-            </li>
+            
 
             <li className="nav-item dropdown pe-3">
               <button className="nav-link nav-profile d-flex align-items-center pe-0 btn btn-link" data-bs-toggle="dropdown">

@@ -28,7 +28,7 @@ const dropoffIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const defaultCenter = [21.0124, 105.5253]; // Hanoi
+const defaultCenter = [21.0285, 105.8542]; // Hanoi
 
 // Map click handler
 const MapClickHandler = ({ onMapClick, isSelectingPoint }) => {
