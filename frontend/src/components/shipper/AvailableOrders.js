@@ -91,6 +91,20 @@ const AvailableOrders = () => {
     const maxDelivery = 3;
     const maxRide = 1;
     
+    // Kiểm tra nếu đã có đơn giao hàng thì không thể nhận đơn đưa đón
+    if (orderType === 'order' && ongoingOrders.delivery > 0) {
+      setLimitMessage('Bạn đã có đơn giao hàng đang thực hiện. Vui lòng hoàn thành tất cả đơn giao hàng trước khi nhận đơn đưa đón.');
+      setShowLimitModal(true);
+      return;
+    }
+    
+    // Kiểm tra nếu đã có đơn đưa đón thì không thể nhận đơn giao hàng
+    if (orderType === 'delivery' && ongoingOrders.ride > 0) {
+      setLimitMessage('Bạn đã có đơn đưa đón đang thực hiện. Vui lòng hoàn thành đơn đưa đón trước khi nhận đơn giao hàng.');
+      setShowLimitModal(true);
+      return;
+    }
+    
     // Kiểm tra nếu đã đạt giới hạn đơn giao hàng hoặc đơn đưa đón
     if (ongoingOrders.delivery >= maxDelivery || ongoingOrders.ride >= maxRide) {
       let message = '';
@@ -287,12 +301,23 @@ const AvailableOrders = () => {
                            onClick={() => acceptOrder(order._id, order.type)}
                            style={buttonStyle}
                            disabled={
+                             (order.type === 'delivery' && ongoingOrders.ride > 0) ||
+                             (order.type === 'order' && ongoingOrders.delivery > 0) ||
                              ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1
                            }
                          >
                            <FaCheck className="me-2" />
-                           {(ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1) 
-                             ? 'Đã đạt giới hạn' : 'Nhận đơn'}
+                           {(() => {
+                             if (order.type === 'delivery' && ongoingOrders.ride > 0) {
+                               return 'Có đơn đưa đón';
+                             } else if (order.type === 'order' && ongoingOrders.delivery > 0) {
+                               return 'Có đơn giao hàng';
+                             } else if (ongoingOrders.delivery >= 3 || ongoingOrders.ride >= 1) {
+                               return 'Đã đạt giới hạn';
+                             } else {
+                               return 'Nhận đơn';
+                             }
+                           })()}
                          </button>
                       </div>
                     </div>
