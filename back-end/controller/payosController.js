@@ -49,7 +49,6 @@ exports.createPayOSPaymentLink = async (req, res) => {
       description,
       returnUrl,
       cancelUrl,
-      notifyUrl,
       buyerName: req.user.fullName || "Khách hàng",
       buyerEmail: req.user.email || "test@example.com",
       buyerPhone: order.phone || "0900000000",
@@ -64,11 +63,6 @@ exports.createPayOSPaymentLink = async (req, res) => {
     console.log("PayOS payment payload:", paymentPayload);
     const paymentLinkRes = await payos.createPaymentLink(paymentPayload);
 
-    console.log("--- createPayOSPaymentLink: PayOS Response after creating link ---");
-    console.log("paymentLinkRes.orderCode (sent to PayOS):", paymentLinkRes.orderCode); // Sẽ dùng cái này
-    console.log("paymentLinkRes.paymentId (from PayOS):", paymentLinkRes.paymentId); // Đã là undefined
-    console.log("paymentLinkRes.checkoutUrl:", paymentLinkRes.checkoutUrl);
-    console.log("-----------------------------------------------------------------");
 
     // Cập nhật lại bản ghi CompanyTransaction với orderCode từ PayOS response
     transaction.orderCode = paymentLinkRes.orderCode.toString(); // LƯU orderCode này vào DB
